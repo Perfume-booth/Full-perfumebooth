@@ -1,0 +1,77 @@
+import HeroBanner from "@/components/home/HeroBanner";
+import TopCategories from "@/components/home/CategoryList";
+import { getCollection } from "@/lib/shopify";
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
+import { CollectionSkeleton } from "@/components/ui/CollectionSkeleton";
+import TrendingSection from "@/components/home/TrendingSection";
+import NewLaunchesSection from "@/components/home/NewLaunchesSection";
+import BestSellerSection from "@/components/home/BestSellerSection";
+import BlogSectionWrapper from "@/components/home/BlogSectionWrapper";
+
+const VideoSection = dynamic(() => import("@/components/home/VideoSection"), {
+  loading: () => <div className="h-[300px] md:h-[500px] w-full bg-white/[0.02] animate-pulse rounded-2xl" />
+});
+const ScentGrid = dynamic(() => import("@/components/home/ScentGrid"), {
+  loading: () => <div className="h-[400px] md:h-[600px] w-full bg-white/[0.02] animate-pulse rounded-2xl" />
+});
+const BrandSlider = dynamic(() => import("@/components/home/BrandSlider"), {
+  loading: () => <div className="h-[80px] md:h-[120px] w-full bg-white/[0.02] animate-pulse rounded-xl" />
+});
+const InstagramFeed = dynamic(() => import("@/components/home/InstagramFeed"), {
+  loading: () => <div className="h-[200px] md:h-[300px] w-full bg-white/[0.02] animate-pulse rounded-xl" />
+});
+const RecentlyViewed = dynamic(() => import("@/components/product/RecentlyViewed"), {
+  loading: () => <div className="h-[250px] md:h-[350px] w-full bg-white/[0.02] animate-pulse rounded-xl" />
+});
+const GenderSection = dynamic(() => import("@/components/home/GenderSection"), {
+  loading: () => <div className="h-[350px] md:h-[500px] w-full bg-white/[0.02] animate-pulse rounded-2xl" />
+});
+
+export default async function HomePage() {
+  // Only fetch Hero Banner data to unblock initial render
+  const heroData = await getCollection("home-hero");
+
+  return (
+    <>
+      <HeroBanner
+        slides={[
+          { id: 1, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-1.jpg?v=1778129692", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ap.jpg?v=1778130171", href: "/arabiyat-prestige", alt_text: "Arabiyat Prestige Premium Fragrances" },
+          { id: 2, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-2.jpg?v=1778129694", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-banner.jpg?v=1778130178", href: "/al-haramain", alt_text: "Al Haramain Exclusive Perfumes" },
+          { id: 3, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-3.jpg?v=1778129693", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.jpg?v=1778130173", href: "/otoori", alt_text: "Otoori Luxury Attars and Perfumes" },
+          { id: 4, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-4.jpg?v=1778129691", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf.jpg?v=1778130170", href: "/mpf", alt_text: "MPF Signature Scents Collection" },
+        ]}
+      />
+
+      <TopCategories />
+
+      <GenderSection />
+
+      <VideoSection />
+
+      <ScentGrid />
+
+      <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
+        <TrendingSection />
+      </Suspense>
+
+      <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
+        <NewLaunchesSection />
+      </Suspense>
+
+      <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
+        <BestSellerSection />
+      </Suspense>
+
+      <RecentlyViewed />
+
+      <BrandSlider />
+
+      <Suspense fallback={<div className="h-64 flex items-center justify-center text-[var(--color-gold)] font-display tracking-widest uppercase">Loading Journal...</div>}>
+        <BlogSectionWrapper />
+      </Suspense>
+
+      <InstagramFeed />
+    </>
+  );
+}

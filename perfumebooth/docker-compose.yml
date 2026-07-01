@@ -1,0 +1,198 @@
+services:
+  # ─────────────────────────────────────────────────────────────
+  # DATABASE — PostgreSQL 16 with pgvector extension
+  # ─────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: perfumebooth_postgres
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - perfumebooth_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  # CACHE & BROKER — Redis 7
+  # DB 0: App cache  |  DB 1: Celery broker  |  DB 2: Celery results
+  # ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: perfumebooth_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - perfumebooth_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  # BACKEND — Django via Gunicorn
+  # ─────────────────────────────────────────────────────────────
+  django:
+    build:
+      context: ../perfumebooth-backend
+      dockerfile: Dockerfile
+    container_name: perfumebooth_django
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - static_files:/app/static
+      - media_files:/app/media
+    networks:
+      - perfumebooth_net
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn core.wsgi:application
+             --bind 0.0.0.0:8000
+             --workers 4
+             --worker-class sync
+             --timeout 120
+             --access-logfile -
+             --error-logfile -"
+
+  # ─────────────────────────────────────────────────────────────
+  # CELERY WORKERS — One container per queue for isolation
+  # ─────────────────────────────────────────────────────────────
+  celery_default:
+    build:
+      context: ../perfumebooth-backend
+      dockerfile: Dockerfile
+    container_name: perfumebooth_celery_default
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - perfumebooth_net
+    command: celery -A core worker -Q default --loglevel=info --concurrency=4
+
+  celery_imports:
+    build:
+      context: ../perfumebooth-backend
+      dockerfile: Dockerfile
+    container_name: perfumebooth_celery_imports
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - perfumebooth_net
+    command: celery -A core worker -Q imports --loglevel=info --concurrency=2
+
+  celery_emails:
+    build:
+      context: ../perfumebooth-backend
+      dockerfile: Dockerfile
+    container_name: perfumebooth_celery_emails
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - perfumebooth_net
+    command: celery -A core worker -Q emails --loglevel=info --concurrency=4
+
+  celery_ai:
+    build:
+      context: ../perfumebooth-backend
+      dockerfile: Dockerfile
+    container_name: perfumebooth_celery_ai
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - perfumebooth_net
+    command: celery -A core worker -Q ai_tasks --loglevel=info --concurrency=2
+
+  # ─────────────────────────────────────────────────────────────
+  # FRONTEND — Next.js 16 (standalone production build)
+  # ─────────────────────────────────────────────────────────────
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: perfumebooth_nextjs
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      - django
+    networks:
+      - perfumebooth_net
+
+  # ─────────────────────────────────────────────────────────────
+  # REVERSE PROXY — Nginx
+  # Routes: /api/* → Django:8000  |  /* → Next.js:3000
+  # ─────────────────────────────────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: perfumebooth_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - nextjs
+      - django
+    volumes:
+      - static_files:/var/www/perfumebooth/static:ro
+      - media_files:/var/www/perfumebooth/media:ro
+    networks:
+      - perfumebooth_net
+
+# ─────────────────────────────────────────────────────────────
+# VOLUMES — Persistent named volumes
+# ─────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  static_files:
+    driver: local
+  media_files:
+    driver: local
+
+# ─────────────────────────────────────────────────────────────
+# NETWORKS — Isolated bridge network
+# ─────────────────────────────────────────────────────────────
+networks:
+  perfumebooth_net:
+    driver: bridge

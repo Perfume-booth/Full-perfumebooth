@@ -1,0 +1,85 @@
+# Development overrides — run with:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# This overlay:
+#   • Mounts source code into containers for hot-reload
+#   • Replaces production commands with dev server commands
+#   • Exposes backend port directly for debugging
+#   • Disables Nginx (dev accesses services on their native ports)
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # BACKEND — Django dev server with auto-reload
+  # ─────────────────────────────────────────────────────────────
+  django:
+    volumes:
+      - ../perfumebooth-backend:/app                   # Live code mount for hot-reload
+      - static_files:/app/static
+      - media_files:/app/media
+    ports:
+      - "8000:8000"                      # Direct access for API clients / Postman
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_DEBUG: "True"
+
+  # ─────────────────────────────────────────────────────────────
+  # CELERY WORKERS — Verbose logging in dev
+  # ─────────────────────────────────────────────────────────────
+  celery_default:
+    volumes:
+      - ../perfumebooth-backend:/app
+    command: celery -A core worker -Q default --loglevel=debug --concurrency=2
+
+  celery_imports:
+    volumes:
+      - ../perfumebooth-backend:/app
+    command: celery -A core worker -Q imports --loglevel=debug --concurrency=1
+
+  celery_emails:
+    volumes:
+      - ../perfumebooth-backend:/app
+    command: celery -A core worker -Q emails --loglevel=debug --concurrency=2
+
+  celery_ai:
+    volumes:
+      - ../perfumebooth-backend:/app
+    command: celery -A core worker -Q ai_tasks --loglevel=debug --concurrency=1
+
+  # ─────────────────────────────────────────────────────────────
+  # FRONTEND — Next.js dev server with hot-reload
+  # ─────────────────────────────────────────────────────────────
+  nextjs:
+    build:
+      target: deps                        # Only install deps, skip production build
+    volumes:
+      - .:/app                            # Full source mount for HMR
+      - /app/node_modules                 # Preserve container's node_modules
+      - /app/.next                        # Preserve Next.js build cache
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+
+  # ─────────────────────────────────────────────────────────────
+  # POSTGRES — Expose for external DB tools (TablePlus, DBeaver)
+  # ─────────────────────────────────────────────────────────────
+  postgres:
+    ports:
+      - "5432:5432"
+
+  # ─────────────────────────────────────────────────────────────
+  # REDIS — Expose for redis-cli / RedisInsight
+  # ─────────────────────────────────────────────────────────────
+  redis:
+    ports:
+      - "6379:6379"
+
+  # ─────────────────────────────────────────────────────────────
+  # NGINX — Disabled in dev (services accessed directly)
+  # ─────────────────────────────────────────────────────────────
+  nginx:
+    profiles:
+      - production                       # Excluded from default dev profile

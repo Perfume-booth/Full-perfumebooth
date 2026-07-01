@@ -1,0 +1,31 @@
+[
+  {
+    "orderId": "PB-469652-457",
+    "email": "sr8171067@gmail.com",
+    "customer": {
+      "firstName": "sumit",
+      "lastName": "kumar",
+      "phone": "+919097382997"
+    },
+    "address": {
+      "address1": "mahavir  enclave, new delhi",
+      "address2": "Rama Road address: 33/33a, Tower No. 6, 3rd Floor, Rama Road, Industrial Area, New Delhi - 110015.",
+      "city": "new delhi",
+      "state": "delhi",
+      "zip": "110059",
+      "country": "India"
+    },
+    "items": [
+      {
+        "id": 10177887338788,
+        "title": "Arabiyat Prestige - Bahiya Garnet | EDP 100ML | Unisex",
+        "quantity": 1,
+        "price": "4999"
+      }
+    ],
+    "paymentMethod": "cod",
+    "total": 4999,
+    "status": "Processing",
+    "createdAt": "2026-04-21T08:34:29.652Z"
+  }
+]

@@ -1,0 +1,77 @@
+[
+  {
+    "id": "dr-1777637182040",
+    "productHandle": "mpf-lamour-edp-perfume-for-unisex-long-lasting-100ml-copy",
+    "name": "rahul",
+    "email": "rs8171067@gmail.com",
+    "text": "nice perfume",
+    "rating": 4,
+    "images": [],
+    "image": null,
+    "isVerified": false,
+    "date": "2026-05-01",
+    "role": "Verified Buyer"
+  },
+  {
+    "id": "m1",
+    "productHandle": "arabiyat-prestige-marwa-perfume-100ml-long-lasting-unisex-fragrance",
+    "text": "Honestly, I wasn’t expecting it to be this good. Arabiyat Prestige Marwa smells really smooth and classy right from the first spray. It’s not too strong, but people around you will definitely notice it. What I liked the most is how long it lasts — I could still smell it hours later. It has that slightly sweet, warm vibe that feels perfect for evenings or going out.",
+    "name": "Sahil Sriwastva",
+    "role": "Verified Buyer",
+    "rating": 5,
+    "isVerified": true,
+    "date": "2026-04-14"
+  },
+  {
+    "id": "m2",
+    "productHandle": "arabiyat-prestige-marwa-perfume-100ml-long-lasting-unisex-fragrance",
+    "text": "Loved it. Packaging and fragrance of Marwa perfume both are amazing",
+    "name": "Priya Mehta",
+    "role": "Verified Buyer",
+    "rating": 5,
+    "isVerified": true,
+    "date": "2026-03-13"
+  },
+  {
+    "id": "m3",
+    "productHandle": "arabiyat-prestige-marwa-perfume-100ml-long-lasting-unisex-fragrance",
+    "text": "Worth every rupee. Marwa perfume is totally worth the price and lasts long",
+    "name": "Rohit Singh",
+    "role": "Verified Buyer",
+    "rating": 5,
+    "isVerified": true,
+    "date": "2026-03-04"
+  },
+  {
+    "id": "m4",
+    "productHandle": "arabiyat-prestige-marwa-perfume-100ml-long-lasting-unisex-fragrance",
+    "text": "fragrance is amazing",
+    "name": "Anonymous",
+    "role": "Verified Buyer",
+    "rating": 5,
+    "isVerified": true,
+    "date": "2026-03-25"
+  },
+  {
+    "id": "r1",
+    "productHandle": "l-immensite",
+    "text": "Absolutely mesmerizing fragrance. It lasts all day and evolves beautifully on the skin. The packaging alone feels like a work of art.",
+    "image": "https://randomuser.me/api/portraits/women/1.jpg",
+    "name": "Elena M.",
+    "role": "Verified Buyer",
+    "rating": 5,
+    "isVerified": true,
+    "date": "2024-03-15"
+  },
+  {
+    "id": "r2",
+    "productHandle": "afternoon-swim",
+    "text": "The opening notes are incredibly fresh, but it dries down into a warm, woody vanilla that is so comforting. Compliments everywhere I go.",
+    "image": "https://randomuser.me/api/portraits/women/44.jpg",
+    "name": "Sophie T.",
+    "role": "Verified Buyer",
+    "rating": 5,
+    "isVerified": true,
+    "date": "2024-03-10"
+  }
+]

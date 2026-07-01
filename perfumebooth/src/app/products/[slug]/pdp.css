@@ -1,0 +1,282 @@
+/* ═══════════════════════════════════════════════════════════
+   PRODUCT DETAIL PAGE — Stitch "Scent Shot Manhattan" Design
+   Fonts : Noto Serif (display) · Manrope (body)
+   Palette: #f9f9f9 bg · #f2f4f4 surface-low · #e4e9ea surface-high
+            #5f5e5e primary · #757c7d outline · #2d3435 on-surface
+═══════════════════════════════════════════════════════════ */
+
+/* ── Google Fonts ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,300;0,400;0,700;1,300&family=Manrope:wght@300;400;500;600&display=swap');
+
+/* ── Reset scoped to PDP ──────────────────────────────────── */
+.pdp-root *, .pdp-root *::before, .pdp-root *::after { box-sizing: border-box; }
+.pdp-root { font-family: 'Manrope', sans-serif; background: #f9f9f9; color: #2d3435; }
+.pdp-root h1, .pdp-root h2, .pdp-root h3 { font-family: 'Noto Serif', serif; font-weight: 300; }
+
+/* ── Breadcrumb ───────────────────────────────────────────── */
+.pdp-bc {
+  display: flex; align-items: center; gap: 0.375rem;
+  font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.18em;
+  color: #5a6061; margin-bottom: 1.5rem;
+}
+.pdp-bc a { color: #5a6061; text-decoration: none; }
+.pdp-bc a:hover { color: #2d3435; }
+.pdp-bc-sep { font-size: 0.75rem; color: #adb3b4; }
+
+/* ── Hero Section ─────────────────────────────────────────── */
+.pdp-hero {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 4rem;
+  padding: 3rem 3rem 6rem;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+@media (max-width: 1023px) {
+  .pdp-hero { grid-template-columns: 1fr; padding: 2rem 1.5rem 4rem; gap: 2.5rem; }
+}
+
+/* Gallery */
+.pdp-gallery {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.pdp-gallery__main {
+  grid-column: 1 / -1;
+  aspect-ratio: 4 / 5;
+  background: #f2f4f4;
+  overflow: hidden;
+  position: relative;
+}
+.pdp-gallery__main img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 2.5rem;
+  transition: filter 300ms ease;
+}
+.pdp-gallery__thumb {
+  aspect-ratio: 1 / 1;
+  background: #f2f4f4;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  border: 1.5px solid transparent;
+  transition: border-color 200ms;
+}
+.pdp-gallery__thumb--active { border-color: #5f5e5e; }
+.pdp-gallery__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pdp-gallery__thumb-num {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  font-family: 'Noto Serif', serif; font-size: 2rem; font-weight: 300; color: #adb3b4;
+}
+.pdp-soldout-badge {
+  position: absolute; top: 1rem; left: 1rem;
+  background: #2d3435; color: #f9f9f9;
+  font-family: 'Manrope', sans-serif; font-size: 0.5625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; padding: 0.3rem 0.75rem;
+}
+
+/* Purchase Sidebar */
+.pdp-purchase { display: flex; flex-direction: column; justify-content: flex-start; }
+
+.pdp-purchase h1 {
+  font-size: clamp(2rem, 3.5vw, 3.2rem);
+  line-height: 1.15; margin: 0 0 1.5rem; font-weight: 300;
+  color: #2d3435;
+}
+.pdp-price-row { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 2rem; }
+.pdp-price {
+  font-family: 'Manrope', sans-serif; font-size: 1.5rem;
+  font-weight: 500; color: #2d3435;
+}
+.pdp-price-incl {
+  font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.12em; color: #5a6061;
+}
+.pdp-price-original {
+  font-size: 1.1rem; color: #9f403d;
+  text-decoration: line-through; font-weight: 400;
+}
+
+.pdp-desc {
+  font-size: 0.9375rem; color: #5a6061; line-height: 1.75;
+  font-weight: 300; margin-bottom: 3rem;
+}
+
+.pdp-soldout-msg {
+  font-size: 0.8125rem; color: #9f403d;
+  background: #fee8e8; padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.pdp-cta-stack { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+
+.pdp-btn-primary {
+  width: 100%; padding: 1.25rem;
+  background: #5f5e5e; color: #faf7f6;
+  font-family: 'Manrope', sans-serif; font-size: 0.75rem;
+  font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  border: none; cursor: pointer; transition: background 200ms;
+}
+.pdp-btn-primary:hover:not(:disabled) { background: #535252; }
+.pdp-btn-primary:disabled { background: #adb3b4; cursor: not-allowed; }
+
+.pdp-btn-secondary {
+  width: 100%; padding: 1.25rem;
+  background: transparent; color: #2d3435;
+  font-family: 'Manrope', sans-serif; font-size: 0.75rem;
+  font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  border: 1px solid rgba(173,179,180,0.3); cursor: pointer;
+  transition: background 200ms;
+}
+.pdp-btn-secondary:hover:not(:disabled) { background: #f2f4f4; }
+.pdp-btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.pdp-attrs {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 2rem; border-top: 1px solid rgba(173,179,180,0.15);
+  padding-top: 2rem;
+}
+.pdp-attr-label {
+  display: block; font-size: 0.5625rem; text-transform: uppercase;
+  letter-spacing: 0.2em; color: #5a6061; margin-bottom: 0.4rem;
+}
+.pdp-attr-value { font-size: 0.875rem; font-weight: 500; }
+
+/* ── Olfactory Journey ────────────────────────────────────── */
+.oj-section { background: #f2f4f4; padding: 6rem 3rem; }
+.oj-inner { max-width: 1280px; margin: 0 auto; }
+.oj-header { text-align: center; margin-bottom: 4rem; }
+.oj-title { font-size: 2rem; font-weight: 300; color: #2d3435; margin: 0 0 0.5rem; }
+.oj-subtitle {
+  font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.28em; color: #5a6061; margin: 0;
+  font-family: 'Manrope', sans-serif;
+}
+.oj-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3rem; }
+@media (max-width: 767px) { .oj-grid { grid-template-columns: 1fr; gap: 2rem; } }
+
+.oj-col { text-align: center; }
+.oj-icon-box {
+  width: 120px; height: 120px; margin: 0 auto 1.5rem;
+  background: #e4e9ea;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 200ms;
+}
+.oj-col:hover .oj-icon-box { background: rgba(152,240,255,0.2); }
+.oj-icon-box svg { width: 36px; height: 36px; color: #535252; }
+.oj-note-label {
+  font-family: 'Noto Serif', serif; font-size: 1.1rem;
+  font-weight: 400; color: #2d3435; margin: 0 0 1rem;
+}
+.oj-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+.oj-tag {
+  padding: 0.25rem 0.75rem; background: #e4e9ea;
+  font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.1em; color: #2d3435;
+}
+
+/* ── Bento Grid ───────────────────────────────────────────── */
+.bento-section { padding: 6rem 3rem; max-width: 1280px; margin: 0 auto; }
+.bento-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+@media (max-width: 767px) { .bento-grid { grid-template-columns: 1fr; } }
+
+.bento-card {
+  background: #ffffff; padding: 3rem;
+  box-shadow: 0 12px 40px rgba(45,52,53,0.06);
+}
+.bento-card--details-wrap { display: flex; flex-direction: column; gap: 2rem; }
+.bento-card--surface { background: #ebeeef; padding: 3rem; }
+.bento-card--surface-high { background: #e4e9ea; padding: 3rem; }
+.bento-card--dark { background: #dde4e5; padding: 3rem; }
+
+.bento-h { font-size: 1.5rem; font-weight: 300; color: #2d3435; margin: 0 0 2rem; }
+.bento-h--sm { font-size: 1.25rem; margin-bottom: 1.5rem; }
+
+.bento-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+.bento-list-item {
+  display: flex; align-items: flex-start; gap: 1rem;
+  border-bottom: 1px solid rgba(173,179,180,0.1); padding-bottom: 1rem;
+}
+.bento-list-item:last-child { border-bottom: none; padding-bottom: 0; }
+.bento-list-num {
+  font-size: 0.6875rem; font-weight: 700; color: #5f5e5e;
+  min-width: 2rem; padding-top: 0.1rem;
+}
+.bento-list-name { display: block; font-weight: 500; font-size: 0.9375rem; margin-bottom: 0.2rem; }
+.bento-list-sub { font-size: 0.8125rem; color: #5a6061; }
+
+.bento-desc-text { font-size: 0.9375rem; color: #5a6061; line-height: 1.7; }
+
+.bento-dl { display: flex; flex-direction: column; gap: 0.875rem; }
+.bento-dl p { margin: 0; font-size: 0.875rem; color: #5a6061; line-height: 1.6; }
+
+.bento-ingredients {
+  font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.1em; line-height: 1.9; color: #5a6061;
+  margin: 0;
+}
+
+/* ── Related Products ─────────────────────────────────────── */
+.rp-section { padding: 0 3rem 6rem; max-width: 1920px; margin: 0 auto; }
+.rp-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: 3rem;
+}
+.rp-title { font-size: 2rem; font-weight: 300; color: #2d3435; margin: 0 0 0.5rem; }
+.rp-sub { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.18em; color: #5a6061; margin: 0; font-family: 'Manrope', sans-serif; }
+.rp-view-all {
+  font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.14em;
+  border-bottom: 1px solid #2d3435; padding-bottom: 2px;
+  color: #2d3435; text-decoration: none;
+}
+
+.rp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+@media (max-width: 1023px) { .rp-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 599px) { .rp-grid { grid-template-columns: 1fr 1fr; } }
+
+.rp-card { text-decoration: none; color: inherit; display: block; cursor: pointer; }
+.rp-card__img-wrap {
+  aspect-ratio: 3 / 4; background: #f2f4f4;
+  margin-bottom: 1.5rem; overflow: hidden;
+  position: relative;
+}
+.rp-card__img-wrap img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 700ms ease;
+}
+.rp-card:hover .rp-card__img-wrap img { transform: scale(1.05); }
+.rp-card__no-img {
+  display: flex; height: 100%; align-items: center; justify-content: center;
+  font-family: 'Noto Serif', serif; font-size: 0.875rem; color: #adb3b4;
+}
+.rp-card__soldout {
+  position: absolute; bottom: 0.75rem; left: 0.75rem;
+  background: #2d3435; color: #f9f9f9;
+  font-size: 0.5625rem; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.25rem 0.625rem;
+}
+.rp-card__name {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.14em;
+  font-weight: 500; color: #2d3435; margin-bottom: 0.25rem;
+}
+.rp-card__sub { font-size: 0.875rem; color: #5a6061; margin-bottom: 1rem; }
+.rp-card__price-row { display: flex; align-items: baseline; gap: 0.5rem; }
+.rp-card__price { font-size: 0.875rem; font-weight: 600; color: #2d3435; }
+.rp-card__price--sale { color: #2d3435; }
+.rp-card__price--original { font-size: 0.75rem; color: #9f403d; text-decoration: line-through; font-weight: 400; }
+
+/* ── Utils ────────────────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@media (max-width: 767px) {
+  .pdp-hero { padding: 1.5rem 1rem 3rem; }
+  .oj-section { padding: 4rem 1.25rem; }
+  .bento-section { padding: 3rem 1.25rem; }
+  .bento-card, .bento-card--surface, .bento-card--surface-high { padding: 1.75rem 1.25rem; }
+  .rp-section { padding: 0 1.25rem 4rem; }
+  .rp-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+}
