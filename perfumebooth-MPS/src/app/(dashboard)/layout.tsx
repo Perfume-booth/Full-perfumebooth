@@ -1,0 +1,88 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuthStore } from '@/store/useAuthStore';
+import Sidebar from '@/components/Sidebar';
+import Navbar from '@/components/Navbar';
+import { ShieldAlert } from 'lucide-react';
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, accessToken } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!accessToken || !user) {
+      router.push('/login');
+    }
+  }, [accessToken, user, router]);
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-background"></div>;
+  }
+
+  if (!accessToken || !user) {
+    return null;
+  }
+
+  // Active Role Guard Check
+  let hasAccess = false;
+  if (pathname === '/' || pathname.startsWith('/products') || pathname.startsWith('/orders')) {
+    hasAccess = user.roles.some(r => ['Super Admin', 'Admin', 'E-commerce Executive'].includes(r));
+  } else if (pathname.startsWith('/cms')) {
+    hasAccess = user.roles.some(r => ['Super Admin', 'Admin', 'Content Manager'].includes(r));
+  } else if (pathname.startsWith('/settings/staff')) {
+    hasAccess = user.roles.includes('Super Admin');
+  } else {
+    hasAccess = true;
+  }
+
+  if (!hasAccess) {
+    const defaultHome = user.roles.includes('Content Manager') ? '/cms' : '/';
+    return (
+      <div className="flex bg-background text-foreground min-h-screen">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+          <Navbar />
+          <main className="flex-1 flex items-center justify-center p-8">
+            <div className="max-w-md w-full glass-panel p-8 rounded-2xl shadow-2xl flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-400">
+                <ShieldAlert className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Access Denied</h2>
+              <p className="text-sm text-muted-foreground">
+                Your merchant account role does not have permissions to access this page.
+              </p>
+              <button 
+                onClick={() => router.push(defaultHome)}
+                className="mt-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+              >
+                Go Back Home
+              </button>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex bg-background text-foreground min-h-screen">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+        <Navbar />
+        <main className="flex-1 px-8 pb-12 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
