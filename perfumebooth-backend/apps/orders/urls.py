@@ -1,0 +1,8 @@
+from django.urls import path
+from .views import OrderListView, OrderDetailView, RazorpayWebhookView
+
+urlpatterns = [
+    path('', OrderListView.as_view(), name='order-list'),
+    path('<uuid:pk>/', OrderDetailView.as_view(), name='order-detail'),
+    path('webhooks/razorpay/', RazorpayWebhookView.as_view(), name='razorpay-webhook'),
+]
