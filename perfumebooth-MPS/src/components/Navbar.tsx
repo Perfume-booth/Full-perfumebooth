@@ -1,11 +1,13 @@
 'use client';
 
 import { useAuthStore } from '@/store/useAuthStore';
-import { User, Bell } from 'lucide-react';
+import { useThemeStore } from '@/store/useThemeStore';
+import { User, Bell, Sun, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Navbar() {
   const user = useAuthStore((state) => state.user);
+  const { theme, toggleTheme } = useThemeStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -22,6 +24,14 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-6">
+        <button
+          onClick={toggleTheme}
+          className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition duration-200 cursor-pointer"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
+        </button>
+
         <button className="text-muted-foreground hover:text-foreground relative p-2 rounded-full hover:bg-muted transition duration-200 cursor-pointer">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full"></span>

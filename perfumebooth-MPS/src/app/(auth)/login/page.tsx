@@ -4,21 +4,28 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { apiFetch } from '@/lib/api';
-import { Sparkles, Lock, Mail, Loader2 } from 'lucide-react';
+import { Lock, Mail, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setAuth, accessToken } = useAuthStore();
+  const { setAuth, user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (accessToken) {
+    // Prime the CSRF cookie on load
+    apiFetch('/auth/csrf/').catch((err) => 
+      console.warn('CSRF priming skipped (offline or not needed yet):', err) 
+    );
+  }, []);
+
+  useEffect(() => {
+    if (user) {
       router.push('/');
     }
-  }, [accessToken, router]);
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,14 +33,10 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const tokenData = await apiFetch('/auth/token/', {
+      const userData = await apiFetch('/auth/login/', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-
-      useAuthStore.setState({ accessToken: tokenData.access });
-
-      const userData = await apiFetch('/auth/me/');
 
       const isAdmin = userData.roles.some((role: string) => 
         ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive'].includes(role)
@@ -46,15 +49,12 @@ export default function LoginPage() {
         return;
       }
 
-      setAuth(
-        {
-          id: userData.id,
-          email: userData.email,
-          fullName: userData.full_name,
-          roles: userData.roles,
-        },
-        tokenData.access
-      );
+      setAuth({
+        id: userData.id,
+        email: userData.email,
+        fullName: userData.full_name,
+        roles: userData.roles,
+      });
 
       router.push('/');
     } catch (err: any) {
@@ -64,6 +64,7 @@ export default function LoginPage() {
     }
   };
 
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full filter blur-[100px] animate-pulse"></div>
@@ -72,7 +73,6 @@ export default function LoginPage() {
       <div className="w-full max-w-md glass-panel p-8 rounded-2xl shadow-2xl relative z-10">
         <div className="flex flex-col items-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            <Sparkles className="w-6 h-6 animate-pulse" />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-transparent">
             PerfumeBooth Admin
@@ -96,7 +96,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="merchant@perfumebooth.com"
+                placeholder="jone@.com"
                 className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm"
               />
             </div>

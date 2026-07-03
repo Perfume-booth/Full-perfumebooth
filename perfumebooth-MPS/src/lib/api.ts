@@ -2,30 +2,46 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift() || null;
+  }
+  return null;
+}
+
 export async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = useAuthStore.getState().accessToken;
   const headers = new Headers(options.headers);
 
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  // Extract and append CSRF token for state-changing requests
+  const method = options.method?.toUpperCase() || 'GET';
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    const csrfToken = getCookie('csrftoken');
+    if (csrfToken) {
+      headers.set('X-CSRFToken', csrfToken);
+    }
   }
 
+  // Ensure cookies (sessionid, csrftoken) are sent with cross-origin requests
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
+    credentials: 'include',
     headers,
   });
 
-  if (response.status === 401) {
-    // Session expired
+  if (response.status === 401 || response.status === 403) {
+    // Session expired or CSRF failed
     useAuthStore.getState().clearAuth();
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
       window.location.href = '/login';
     }
     throw new Error('Unauthorized');
@@ -48,3 +64,4 @@ export async function apiFetch<T = any>(
 
   return response.json();
 }
+

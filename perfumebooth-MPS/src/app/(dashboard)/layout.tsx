@@ -14,21 +14,21 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, accessToken } = useAuthStore();
+  const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    if (!accessToken || !user) {
+    if (!user) {
       router.push('/login');
     }
-  }, [accessToken, user, router]);
+  }, [user, router]);
 
   if (!mounted) {
     return <div className="min-h-screen bg-background"></div>;
   }
 
-  if (!accessToken || !user) {
+  if (!user) {
     return null;
   }
 
@@ -47,7 +47,7 @@ export default function DashboardLayout({
   if (!hasAccess) {
     const defaultHome = user.roles.includes('Content Manager') ? '/cms' : '/';
     return (
-      <div className="flex bg-background text-foreground min-h-screen">
+      <div className="flex text-foreground min-h-screen">
         <Sidebar />
         <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
           <Navbar />

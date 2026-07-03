@@ -146,7 +146,7 @@ CELERY_TASK_ROUTES = {
 # ─────────────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -166,20 +166,24 @@ REST_FRAMEWORK = {
     },
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# JWT — djangorestframework-simplejwt
-# ─────────────────────────────────────────────────────────────────────────────
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-}
+# Session & CSRF Cookie Settings for Local Cross-Origin Dev
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Allows frontend to read csrf cookie
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Survived browser window close
+SESSION_COOKIE_AGE = 1209600  # Persistent session lasts for 14 days
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+]
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS — django-cors-headers

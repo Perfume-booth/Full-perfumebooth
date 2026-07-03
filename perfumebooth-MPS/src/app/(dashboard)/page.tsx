@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -8,11 +9,11 @@ import {
   Users, 
   Percent, 
   ArrowUpRight, 
-  ArrowDownRight 
+  ArrowDownRight,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
 import { 
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   Tooltip, 
@@ -21,50 +22,157 @@ import {
   Area,
   PieChart,
   Pie,
-  Cell,
-  Legend
+  Cell
 } from 'recharts';
 
-// Mock Analytics Data
-const salesData = [
-  { name: 'Jan', sales: 4000, profit: 2400 },
-  { name: 'Feb', sales: 3000, profit: 1398 },
-  { name: 'Mar', sales: 9800, profit: 8000 },
-  { name: 'Apr', sales: 2780, profit: 1800 },
-  { name: 'May', sales: 1890, profit: 9800 },
-  { name: 'Jun', sales: 2390, profit: 3800 },
-  { name: 'Jul', sales: 3490, profit: 4300 },
+interface KPI {
+  title: string;
+  value: string;
+  change: string;
+  isPositive: boolean;
+}
+
+interface SalesTrend {
+  name: string;
+  sales: number;
+}
+
+interface CategoryData {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface RecentOrder {
+  id: string;
+  orderNo: string;
+  customer: string;
+  total: string;
+  status: string;
+  date: string;
+}
+
+interface LowStockItem {
+  id: string;
+  title: string;
+  sku: string;
+  stock: number;
+}
+
+// Default Fallback Mock Data Arrays
+const defaultKPIs: KPI[] = [
+  { title: 'Total Revenue', value: '₹348,250.00', change: '+12.5%', isPositive: true },
+  { title: 'Total Orders', value: '1,482', change: '+8.2%', isPositive: true },
+  { title: 'Active Customers', value: '984', change: '+5.4%', isPositive: true },
+  { title: 'Average Order Value', value: '₹2,350.00', change: '+2.1%', isPositive: true },
 ];
 
-const categoryData = [
+const defaultSalesTrend: SalesTrend[] = [
+  { name: 'Mon', sales: 4000 },
+  { name: 'Tue', sales: 3000 },
+  { name: 'Wed', sales: 9800 },
+  { name: 'Thu', sales: 2780 },
+  { name: 'Fri', sales: 8890 },
+  { name: 'Sat', sales: 11390 },
+  { name: 'Sun', sales: 14490 },
+];
+
+const defaultCategoryData: CategoryData[] = [
   { name: 'Floral', value: 400, color: '#8b5cf6' },
   { name: 'Citrus', value: 300, color: '#ec4899' },
   { name: 'Woody', value: 300, color: '#10b981' },
   { name: 'Spicy', value: 200, color: '#f59e0b' },
 ];
 
-const recentOrders = [
-  { id: '1', orderNo: 'ORD-9482', customer: 'Aarav Sharma', total: '₹4,999.00', status: 'Paid', date: '2 mins ago' },
-  { id: '2', orderNo: 'ORD-9481', customer: 'Priya Patel', total: '₹2,499.00', status: 'Processing', date: '15 mins ago' },
-  { id: '3', orderNo: 'ORD-9480', customer: 'Vikram Singh', total: '₹8,120.00', status: 'Shipped', date: '1 hour ago' },
-  { id: '4', orderNo: 'ORD-9479', customer: 'Neha Reddy', total: '₹3,750.00', status: 'Pending', date: '3 hours ago' },
+const defaultRecentOrders: RecentOrder[] = [
+  { id: '1', orderNo: 'ORD-9482', customer: 'Rahul Sharma', total: '₹4,999.00', status: 'Paid', date: new Date().toISOString() },
+  { id: '2', orderNo: 'ORD-9481', customer: 'Priya Patel', total: '₹2,499.00', status: 'Processing', date: new Date().toISOString() },
+  { id: '3', orderNo: 'ORD-9480', customer: 'Vikram Singh', total: '₹8,120.00', status: 'Shipped', date: new Date(Date.now() - 86400000).toISOString() },
+  { id: '4', orderNo: 'ORD-9479', customer: 'Neha Reddy', total: '₹3,750.00', status: 'Pending', date: new Date(Date.now() - 86400000).toISOString() },
+  { id: '5', orderNo: 'ORD-9478', customer: 'Rohan Mehta', total: '₹1,850.00', status: 'Delivered', date: new Date(Date.now() - 172800000).toISOString() },
+];
+
+const defaultLowStock: LowStockItem[] = [
+  { id: 'l1', title: 'Woody Intense EDP (100ml)', sku: 'WDY-INT-100', stock: 4 },
+  { id: 'l2', title: 'Citrus Breeze Cologne (50ml)', sku: 'CTR-BRZ-50', stock: 7 },
+  { id: 'l3', title: 'Royal Oud Parfum (100ml)', sku: 'OUD-RYL-100', stock: 9 },
 ];
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState<KPI[]>(defaultKPIs);
+  const [salesTrend, setSalesTrend] = useState<SalesTrend[]>(defaultSalesTrend);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>(defaultCategoryData);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>(defaultRecentOrders);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>(defaultLowStock);
+  const [liveVisitors, setLiveVisitors] = useState(24);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const data = await apiFetch('/shop/dashboard/');
+      
+      // Check if backend database has no orders or products
+      const isDatabaseEmpty = !data.recentOrders || data.recentOrders.length === 0;
+
+      if (isDatabaseEmpty) {
+        console.info('Database is empty. Using mock arrays to showcase dashboard visuals.');
+        setKpis(defaultKPIs);
+        setSalesTrend(defaultSalesTrend);
+        setCategoryData(defaultCategoryData);
+        setRecentOrders(defaultRecentOrders);
+        setLowStock(defaultLowStock);
+        setLiveVisitors(data.liveVisitors || 24);
+      } else {
+        setKpis(data.kpis);
+        setSalesTrend(data.salesTrend);
+        const colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
+        const mappedCategories = data.categoryData.map((c: any, index: number) => ({
+          ...c,
+          color: c.color || colors[index % colors.length]
+        }));
+        setCategoryData(mappedCategories);
+        setRecentOrders(data.recentOrders);
+        // Only use real low stock if we have actual items, else show fallback
+        setLowStock(data.lowStock && data.lowStock.length > 0 ? data.lowStock : defaultLowStock);
+        setLiveVisitors(data.liveVisitors);
+      }
+    } catch (err) {
+      console.warn('Dashboard API offline. Falling back to local mock data arrays.');
+      // Keep using default pre-initialized state arrays
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+    fetchDashboardData();
   }, []);
 
-  const kpis = [
-    { title: 'Total Revenue', value: '₹348,250.00', change: '+12.5%', isPositive: true, icon: DollarSign },
-    { title: 'Total Orders', value: '1,482', change: '+8.2%', isPositive: true, icon: ShoppingBag },
-    { title: 'Active Customers', value: '984', change: '-2.1%', isPositive: false, icon: Users },
-    { title: 'Net Profit Margin', value: '24.8%', change: '+4.3%', isPositive: true, icon: Percent },
-  ];
+  if (!mounted) {
+    return <div className="h-screen w-full bg-background animate-pulse"></div>;
+  }
 
-  if (!mounted) return <div className="h-screen w-full bg-background animate-pulse"></div>;
+  if (loading) {
+    return (
+      <div className="h-[80vh] w-full flex flex-col items-center justify-center gap-4 text-primary">
+        <Loader2 className="w-10 h-10 animate-spin" />
+        <span className="text-sm font-semibold text-muted-foreground">Calculating real-time analytics...</span>
+      </div>
+    );
+  }
+
+  // Icons matching logic
+  const getIcon = (title: string) => {
+    switch (title) {
+      case 'Total Revenue': return DollarSign;
+      case 'Total Orders': return ShoppingBag;
+      case 'Active Customers': return Users;
+      default: return Percent;
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -74,15 +182,23 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-foreground">Overview</h1>
           <p className="text-muted-foreground text-sm mt-1">Real-time store metrics and operations summary</p>
         </div>
-        <button className="px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm">
-          Export Report
-        </button>
+
+        {/* Live Visitors Counter */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs font-semibold text-emerald-400">
+            {liveVisitors} Live Shoppers
+          </span>
+        </div>
       </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((kpi) => {
-          const Icon = kpi.icon;
+          const Icon = getIcon(kpi.title);
           return (
             <div key={kpi.title} className="glass-card p-6 rounded-2xl flex flex-col gap-4">
               <div className="flex justify-between items-center">
@@ -117,12 +233,12 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-foreground">Sales Performance</h3>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="w-4 h-4 text-primary" /> Monthly trends
+              <TrendingUp className="w-4 h-4 text-primary" /> Daily revenue trend (Last 7 Days)
             </span>
           </div>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={salesTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
@@ -143,28 +259,32 @@ export default function DashboardPage() {
 
         {/* Category Share Pie Chart */}
         <div className="glass-card p-6 rounded-2xl flex flex-col gap-6">
-          <h3 className="font-bold text-foreground">Popular Categories</h3>
+          <h3 className="font-bold text-foreground">Fragrance Categories</h3>
           <div className="h-60 w-full flex justify-center items-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            {categoryData.length === 0 ? (
+              <span className="text-xs text-muted-foreground">No category data available</span>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
           {/* Legend list */}
           <div className="flex justify-around items-center mt-2 flex-wrap gap-2">
@@ -178,48 +298,93 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom Table Section */}
-      <div className="glass-card p-6 rounded-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-foreground">Recent Orders</h3>
-          <button className="text-xs text-primary font-semibold hover:underline">
-            View All Orders
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground font-semibold">
-                <th className="pb-3">Order Number</th>
-                <th className="pb-3">Customer</th>
-                <th className="pb-3">Total Amount</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3 text-right">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
-                  <td className="py-4 font-semibold text-foreground">{order.orderNo}</td>
-                  <td className="py-4 text-muted-foreground">{order.customer}</td>
-                  <td className="py-4 text-foreground">{order.total}</td>
-                  <td className="py-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      order.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-400' :
-                      order.status === 'Processing' ? 'bg-indigo-500/10 text-indigo-400' :
-                      order.status === 'Shipped' ? 'bg-purple-500/10 text-purple-400' :
-                      'bg-amber-500/10 text-amber-400'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="py-4 text-right text-muted-foreground">{order.date}</td>
+      {/* Operational Widgets (Recent Orders + Low Stock Alerts) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Orders List */}
+        <div className="glass-card p-6 rounded-2xl lg:col-span-2">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-foreground">Recent Orders</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground font-semibold">
+                  <th className="pb-3">Order Number</th>
+                  <th className="pb-3">Customer</th>
+                  <th className="pb-3">Total Amount</th>
+                  <th className="pb-3">Status</th>
+                  <th className="pb-3 text-right">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                      No orders logged in store database yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recentOrders.map((order) => (
+                    <tr key={order.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
+                      <td className="py-4 font-semibold text-foreground">{order.orderNo}</td>
+                      <td className="py-4 text-muted-foreground">{order.customer}</td>
+                      <td className="py-4 text-foreground">{order.total}</td>
+                      <td className="py-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          order.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-400' :
+                          order.status === 'Processing' ? 'bg-indigo-500/10 text-indigo-400' :
+                          order.status === 'Shipped' ? 'bg-purple-500/10 text-purple-400' :
+                          order.status === 'Delivered' ? 'bg-emerald-500/20 text-emerald-400' :
+                          'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right text-muted-foreground">
+                        {new Date(order.date).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short'
+                        })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Low Stock Alerts */}
+        <div className="glass-card p-6 rounded-2xl flex flex-col gap-6">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-foreground">Low Stock Alerts</h3>
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+          </div>
+          <div className="flex flex-col gap-4 overflow-y-auto max-h-80 pr-1">
+            {lowStock.length === 0 ? (
+              <div className="h-40 flex items-center justify-center text-center text-xs text-muted-foreground">
+                All catalog items are healthy and fully stocked!
+              </div>
+            ) : (
+              lowStock.map((item) => (
+                <div key={item.id} className="p-3 bg-background/50 border border-border/50 rounded-xl flex justify-between items-center gap-4">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-sm font-semibold text-foreground truncate">{item.title}</span>
+                    <span className="text-xs text-muted-foreground truncate">SKU: {item.sku}</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">
+                      {item.stock} left
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+

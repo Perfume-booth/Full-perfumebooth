@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useAuthStore } from '@/store/useAuthStore';
 import { 
   UserPlus, 
   Trash2, 
@@ -12,7 +13,8 @@ import {
   Key,
   ShieldCheck,
   History,
-  Users
+  Users,
+  Lock
 } from 'lucide-react';
 
 interface StaffUser {
@@ -34,7 +36,7 @@ interface AuditLog {
 }
 
 export default function StaffSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'accounts' | 'logs'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'logs' | 'security'>('accounts');
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,20 @@ export default function StaffSettingsPage() {
   const [role, setRole] = useState('Admin');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Self Password Change State
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changeSelfLoading, setChangeSelfLoading] = useState(false);
+  const [changeSelfSuccess, setChangeSelfSuccess] = useState('');
+  const [changeSelfError, setChangeSelfError] = useState('');
+
+  // Reset Staff Password State
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetStaffLoading, setResetStaffLoading] = useState(false);
+  const [resetStaffError, setResetStaffError] = useState('');
 
   const fetchStaff = async () => {
     try {
@@ -76,10 +92,64 @@ export default function StaffSettingsPage() {
   useEffect(() => {
     if (activeTab === 'accounts') {
       fetchStaff();
-    } else {
+    } else if (activeTab === 'logs') {
       fetchLogs();
     }
   }, [activeTab]);
+
+  const handleChangeSelfPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangeSelfLoading(true);
+    setChangeSelfError('');
+    setChangeSelfSuccess('');
+
+    try {
+      await apiFetch('/auth/change-password-self/', {
+        method: 'POST',
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword,
+        })
+      });
+      setChangeSelfSuccess('Your password has been changed successfully.');
+      setOldPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      setChangeSelfError(err.message || 'Failed to change password.');
+    } finally {
+      setChangeSelfLoading(false);
+    }
+  };
+
+  const handleOpenResetPassword = (user: StaffUser) => {
+    setSelectedStaff(user);
+    setResetPassword('');
+    setResetStaffError('');
+    setResetModalOpen(true);
+  };
+
+  const handleResetStaffPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff) return;
+    setResetStaffLoading(true);
+    setResetStaffError('');
+
+    try {
+      await apiFetch('/auth/reset-staff-password/', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: selectedStaff.id,
+          new_password: resetPassword,
+        })
+      });
+      setResetModalOpen(false);
+      alert(`Password for ${selectedStaff.email} has been reset successfully.`);
+    } catch (err: any) {
+      setResetStaffError(err.message || 'Failed to reset password.');
+    } finally {
+      setResetStaffLoading(false);
+    }
+  };
 
   const handleOpenCreate = () => {
     setFirstName('');
@@ -171,6 +241,17 @@ export default function StaffSettingsPage() {
           <History className="w-4 h-4" />
           <span>Activity Log</span>
         </button>
+        <button
+          onClick={() => setActiveTab('security')}
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm border-b-2 transition duration-200 cursor-pointer ${
+            activeTab === 'security' 
+              ? 'border-primary text-foreground' 
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Lock className="w-4 h-4" />
+          <span>Security Settings</span>
+        </button>
       </div>
 
       {/* Loading state */}
@@ -222,7 +303,14 @@ export default function StaffSettingsPage() {
                           year: 'numeric'
                         })}
                       </td>
-                      <td className="p-5 text-right">
+                      <td className="p-5 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenResetPassword(user)}
+                          className="p-2 text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition duration-200 cursor-pointer"
+                          title="Reset Password"
+                        >
+                          <Key className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleDelete(user.id, user.email)}
                           className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition duration-200 cursor-pointer"
@@ -238,7 +326,7 @@ export default function StaffSettingsPage() {
             </table>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'logs' ? (
         /* Activity logs tab */
         <div className="glass-card rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -282,6 +370,73 @@ export default function StaffSettingsPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      ) : (
+        /* Security Settings tab */
+        <div className="glass-panel p-8 rounded-2xl max-w-md w-full flex flex-col gap-6">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Change Password</h2>
+            <p className="text-muted-foreground text-sm mt-1">Update your Super Admin merchant credentials</p>
+          </div>
+
+          {changeSelfSuccess && (
+            <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
+              {changeSelfSuccess}
+            </div>
+          )}
+
+          {changeSelfError && (
+            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+              {changeSelfError}
+            </div>
+          )}
+
+          <form onSubmit={handleChangeSelfPassword} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">Current Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  required
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">New Password</label>
+              <div className="relative">
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={changeSelfLoading}
+              className="mt-2 flex items-center justify-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
+            >
+              {changeSelfLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>Update Password</span>
+              )}
+            </button>
+          </form>
         </div>
       )}
 
@@ -407,6 +562,76 @@ export default function StaffSettingsPage() {
                     </>
                   ) : (
                     <span>Create User</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Staff Password Modal */}
+      {resetModalOpen && selectedStaff && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col gap-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">
+                Reset Password
+              </h2>
+              <button 
+                onClick={() => setResetModalOpen(false)}
+                className="p-2 hover:bg-muted rounded-full transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              You are resetting the password for <strong className="text-foreground">{selectedStaff.email}</strong> ({selectedStaff.first_name} {selectedStaff.last_name || ''}).
+            </p>
+
+            {resetStaffError && (
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+                {resetStaffError}
+              </div>
+            )}
+
+            <form onSubmit={handleResetStaffPassword} className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">New Password</label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="password"
+                    required
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setResetModalOpen(false)}
+                  className="px-4 py-2.5 border border-border text-foreground font-semibold rounded-xl hover:bg-muted transition duration-200 cursor-pointer text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetStaffLoading}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
+                >
+                  {resetStaffLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Resetting...</span>
+                    </>
+                  ) : (
+                    <span>Reset Password</span>
                   )}
                 </button>
               </div>

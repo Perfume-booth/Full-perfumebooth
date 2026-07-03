@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { 
   Loader2, 
-  Plus, 
   Trash2, 
   ArrowUp, 
   ArrowDown, 
@@ -12,8 +11,6 @@ import {
   EyeOff, 
   Settings, 
   Save, 
-  Sparkles, 
-  ChevronRight,
   PlusCircle,
   Layout
 } from 'lucide-react';
@@ -393,7 +390,6 @@ export default function CMSBuilderPage() {
 
             {selectedSectionIdx === null ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-10 text-muted-foreground">
-                <Sparkles className="w-8 h-8 text-primary/40 mb-3 animate-pulse" />
                 <p className="text-sm">Select a page section from the left panel to edit its settings and text copies</p>
               </div>
             ) : (

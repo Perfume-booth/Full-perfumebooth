@@ -1,14 +1,19 @@
-"""
+ # pyrefly: ignore [parse-error]
+ """
 Authentication Views — JWT token endpoints & RBAC permission class
 """
-# pyrefly: ignore [missing-import]
+# pyrefly: ignore [missing-import, parse-error]
 from rest_framework import permissions, status
 # pyrefly: ignore [missing-import]
 from rest_framework.response import Response
 # pyrefly: ignore [missing-import]
 from rest_framework.views import APIView
 # pyrefly: ignore [missing-import]
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.contrib.auth import authenticate, login, logout
+# pyrefly: ignore [missing-import]
+from django.utils.decorators import method_decorator
+# pyrefly: ignore [missing-import]
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from .models import CustomUser, Role, UserRole, AuditLog
 
@@ -28,6 +33,60 @@ class HasRolePermission(permissions.BasePermission):
 
         user_roles = request.user.roles.values_list('role__name', flat=True)
         return any(role in allowed_roles for role in user_roles)
+
+
+class GetCSRFTokenView(APIView):
+    """
+    GET /api/auth/csrf/ — Sets the CSRF cookie for frontend cross-origin requests.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request):
+        return Response({'detail': 'CSRF cookie set.'})
+
+
+class LoginView(APIView):
+    """
+    POST /api/auth/login/ — Authenticate credentials and initiate Django session.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'detail': 'Email and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(request, username=email, password=password)
+        if not user:
+            return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user_roles = list(user.roles.values_list('role__name', flat=True))
+        if not user_roles:
+            return Response({'detail': 'Access denied. Account has no merchant role.'}, status=status.HTTP_403_FORBIDDEN)
+
+        login(request, user)
+
+        return Response({
+            'id': str(user.id),
+            'email': user.email,
+            'full_name': user.full_name,
+            'roles': user_roles,
+            'date_joined': user.date_joined,
+        })
+
+
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/ — Invalidate session and clear session cookies.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({'detail': 'Successfully logged out.'})
 
 
 class MeView(APIView):
@@ -142,5 +201,71 @@ class StaffAuditLogView(APIView):
                 'created_at': log.created_at,
             })
         return Response(data)
+
+
+class ChangePasswordSelfView(APIView):
+    """
+    POST /api/auth/change-password-self/ — Change own password (Super Admin only).
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin']
+
+    def post(self, request):
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not old_password or not new_password:
+            return Response({'detail': 'Both old and new passwords are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(old_password):
+            return Response({'detail': 'Invalid old password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        # Log action
+        AuditLog.objects.create(
+            user=user,
+            action="Changed their own password.",
+            ip_address=request.META.get('REMOTE_ADDR', '')
+        )
+
+        return Response({'detail': 'Password updated successfully.'})
+
+
+class ResetStaffPasswordView(APIView):
+    """
+    POST /api/auth/reset-staff-password/ — Reset password of a staff member (Super Admin only).
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin']
+
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        new_password = request.data.get('new_password')
+
+        if not user_id or not new_password:
+            return Response({'detail': 'User ID and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            staff_user = CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if staff_user.email == 'superadmin@perfumebooth.com':
+            return Response({'detail': 'Cannot reset primary Super Admin password via this endpoint.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        staff_user.set_password(new_password)
+        staff_user.save()
+
+        # Log action
+        AuditLog.objects.create(
+            user=request.user,
+            action=f"Reset password for staff member: {staff_user.email}.",
+            ip_address=request.META.get('REMOTE_ADDR', '')
+        )
+
+        return Response({'detail': f'Password for {staff_user.email} reset successfully.'})
 
 

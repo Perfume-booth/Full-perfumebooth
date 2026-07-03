@@ -7,13 +7,19 @@ import {
   ShoppingBag, 
   FileText, 
   Sliders, 
-  Sparkles,
   LogOut,
-  Shield
+  Shield,
+  Ticket,
+  Package,
+  BarChart2,
+  FileSpreadsheet,
+  Users,
+  Megaphone,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import PerfumeLogo from '@/components/Logo';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -28,7 +34,13 @@ export default function Sidebar() {
   const menuItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Products', href: '/products', icon: ShoppingBag, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Inventory', href: '/inventory', icon: Package, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Orders', href: '/orders', icon: FileText, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Customers', href: '/customers', icon: Users, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Analytics', href: '/analytics', icon: BarChart2, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Reports', href: '/reports', icon: FileSpreadsheet, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Marketing', href: '/marketing', icon: Megaphone, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Coupons', href: '/coupons', icon: Ticket, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'CMS Builder', href: '/cms', icon: Sliders, allowedRoles: ['Super Admin', 'Admin', 'Content Manager'] },
     { name: 'Staff Settings', href: '/settings/staff', icon: Shield, allowedRoles: ['Super Admin'] },
   ];
@@ -50,11 +62,8 @@ export default function Sidebar() {
   return (
     <aside className="w-64 glass-panel border-r border-border min-h-screen flex flex-col justify-between p-6">
       <div className="flex flex-col gap-8">
-        <div className="flex items-center gap-3">
-          <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-          <h1 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-purple-500 bg-clip-text text-transparent">
-            PerfumeBooth
-          </h1>
+        <div className="flex items-center justify-start h-10 w-full text-foreground">
+          <PerfumeLogo />
         </div>
 
         <nav className="flex flex-col gap-2">
