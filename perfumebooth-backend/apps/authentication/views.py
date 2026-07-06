@@ -1,5 +1,5 @@
- # pyrefly: ignore [parse-error]
- """
+# pyrefly: ignore [parse-error]
+"""
 Authentication Views — JWT token endpoints & RBAC permission class
 """
 # pyrefly: ignore [missing-import, parse-error]

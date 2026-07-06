@@ -41,9 +41,36 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'cdn1.judge.me',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8000',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '8000',
+      },
+      {
+        protocol: 'http',
+        hostname: 'django',
+        port: '8000',
+      },
     ],
     qualities: [75, 85],
     unoptimized: process.env.NODE_ENV === 'development',
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/media/:path*',
+        destination: 'http://django:8000/media/:path*'
+      },
+      {
+        source: '/api/shop/:path*',
+        destination: 'http://django:8000/api/shop/:path*'
+      }
+    ];
   },
   async redirects() {
     return [

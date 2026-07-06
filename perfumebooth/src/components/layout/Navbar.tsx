@@ -40,7 +40,7 @@ const CREAM = "#faf7f2";
 const BORDER = "#ede8e0";
 const ROW2_BG = "#faf8f5";
 
-export default function Navbar() {
+export default function Navbar({ initialBrands = [] }: { initialBrands?: string[] }) {
   const [isMounted, setIsMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -49,6 +49,18 @@ export default function Navbar() {
   const isScrolled = scrollY > 10;
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
+  const [brands, setBrands] = useState<string[]>(initialBrands);
+
+  useEffect(() => {
+    fetch("/api/shop/brands/")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setBrands(data);
+        }
+      })
+      .catch(err => console.error("Error fetching brands in Navbar:", err));
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -77,8 +89,15 @@ export default function Navbar() {
     closeTimeoutRef.current = setTimeout(() => setActiveDropdown(null), 280);
   }
 
-  const brandGroups = BRAND_SUB_MENU.reduce((acc: any, brand) => {
-    const c = brand.label[0].toUpperCase();
+  const brandSubMenu = brands.length > 0
+    ? brands.map(brand => ({
+        label: brand,
+        href: `/${brand.toLowerCase().replace(/\s+/g, '-')}`
+      }))
+    : BRAND_SUB_MENU;
+
+  const brandGroups = brandSubMenu.reduce((acc: any, brand) => {
+    const c = brand.label[0]?.toUpperCase() || '#';
     if (!acc[c]) acc[c] = [];
     acc[c].push(brand);
     return acc;
@@ -397,7 +416,7 @@ export default function Navbar() {
                         {isBrands && activeDropdown === "mobile-brands" && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} className="overflow-hidden rounded-lg ml-4 mt-1 mb-1" style={{ background: CREAM }}>
                             <div className="py-2 px-3 columns-2 gap-2">
-                              {BRAND_SUB_MENU.map((brand) => (
+                              {brandSubMenu.map((brand) => (
                                 <Link key={brand.href} href={brand.href} onClick={() => setMobileOpen(false)} className="block text-[11px] font-medium py-1 break-inside-avoid transition-colors" style={{ color: MUTED }}
                                   onMouseEnter={(e) => (e.currentTarget.style.color = GOLD)}
                                   onMouseLeave={(e) => (e.currentTarget.style.color = MUTED)}>

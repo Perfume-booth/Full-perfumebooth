@@ -59,6 +59,7 @@ export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cartId: cartId,
+          subtotal: subtotal,
           shippingAddress: {
             firstName: form.firstName,
             lastName: form.lastName,

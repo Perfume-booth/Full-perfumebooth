@@ -1,5 +1,7 @@
 import CollectionTemplate from "@/components/product/CollectionTemplate";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AllCollectionsPage({ searchParams }: { searchParams: Promise<any> }) {
   const sParams = await searchParams;
   return (

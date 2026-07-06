@@ -2,20 +2,28 @@
 Orders Views — Checkout & Webhook Endpoints
 """
 import json
+import datetime
+import random
+from django.db import transaction
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .services import verify_razorpay_signature, process_payment_webhook
 from .tasks import send_order_email_receipt
-from .models import Order
+from .models import Order, OrderItem
+from apps.shop.models import Product, Inventory
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
 
 
 class OrderListView(APIView):
-    """GET /api/orders/ — List orders for customers or all orders for merchants."""
-    permission_classes = [permissions.IsAuthenticated]
+    """GET /api/orders/ — List orders. POST /api/orders/ — Create order."""
+    
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
 
     def get(self, request):
         is_merchant = any(
@@ -40,6 +48,97 @@ class OrderListView(APIView):
             })
             
         return Response(data)
+
+    def post(self, request):
+        items_data = request.data.get('items', [])
+        shipping_address = request.data.get('shipping_address', {})
+        payment_method = request.data.get('payment_method', 'COD')
+        coupon_code = request.data.get('coupon_code', '')
+        discount_amount_val = float(request.data.get('discount_amount', 0.0))
+
+        if not items_data:
+            return Response({'detail': 'Cart is empty.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                subtotal = 0.0
+                order_items_to_create = []
+                inventory_updates = []
+
+                for item in items_data:
+                    product_id = item.get('id')
+                    quantity = int(item.get('quantity', 1))
+
+                    try:
+                        product = Product.objects.get(id=product_id)
+                    except Product.DoesNotExist:
+                        return Response({'detail': f'Product {product_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+                    try:
+                        inventory = Inventory.objects.select_for_update().get(product=product)
+                    except Inventory.DoesNotExist:
+                        return Response({'detail': f'Inventory for product {product.title} not initialized.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                    if inventory.stock_level < quantity:
+                        return Response({'detail': f'Insufficient stock for product {product.title}. Only {inventory.stock_level} available.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                    # Deduct stock level directly
+                    inventory.stock_level -= quantity
+                    inventory_updates.append(inventory)
+
+                    line_price = float(product.price)
+                    subtotal += line_price * quantity
+
+                    order_items_to_create.append({
+                        'product': product,
+                        'quantity': quantity,
+                        'unit_price': line_price
+                    })
+
+                discount_amount = min(discount_amount_val, subtotal)
+                total = max(subtotal - discount_amount, 0.0)
+                tax = 0.0
+
+                timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+                rand = random.randint(1000, 9999)
+                order_number = f'PB-{timestamp}-{rand}'
+
+                order_user = request.user if request.user and request.user.is_authenticated else None
+
+                order = Order.objects.create(
+                    user=order_user,
+                    order_number=order_number,
+                    status=Order.Status.PENDING,
+                    subtotal=subtotal,
+                    tax=tax,
+                    total=total,
+                    shipping_address=shipping_address
+                )
+
+                for item_data in order_items_to_create:
+                    OrderItem.objects.create(
+                        order=order,
+                        product=item_data['product'],
+                        quantity=item_data['quantity'],
+                        unit_price=item_data['unit_price']
+                    )
+
+                for inv in inventory_updates:
+                    inv.save()
+
+                if payment_method == 'COD':
+                    order.status = Order.Status.PROCESSING
+                    order.save(update_fields=['status'])
+
+                return Response({
+                    'success': True,
+                    'order_id': str(order.id),
+                    'order_number': order.order_number,
+                    'total': str(order.total)
+                }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class OrderDetailView(APIView):

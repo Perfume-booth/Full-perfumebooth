@@ -4,7 +4,7 @@ import Razorpay from 'razorpay';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { items, form, finalTotal, shopifyCartId, couponCode, discountAmount, shippingRate } = body;
+    const { items, form, finalTotal, couponCode, discountAmount, shippingRate } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json({ success: false, message: "Cart is empty" }, { status: 400 });
@@ -26,21 +26,68 @@ export async function POST(request: Request) {
       key_secret: keySecret,
     });
 
-    // Convert amount to paise (multiply INR by 100 and round to prevent floating point inaccuracies)
+    // 1. Create a pending order in custom Django database first
+    const djangoItems = items.map((item: any) => ({
+      id: item.id,
+      quantity: item.cartQuantity || item.quantity,
+    }));
+
+    const selectedRate = shippingRate || { title: "Complimentary Standard Shipping", amount: 0 };
+
+    const djangoPayload = {
+      items: djangoItems,
+      shipping_address: {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        address1: form.address1,
+        address2: form.address2,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        countryCode: "IN",
+        phone: form.phone,
+        email: form.email,
+        shipping_carrier: selectedRate.title,
+        shipping_cost: parseFloat(selectedRate.amount || "0")
+      },
+      payment_method: 'RAZORPAY',
+      coupon_code: couponCode || '',
+      discount_amount: parseFloat(discountAmount || '0')
+    };
+
+    const djangoRes = await fetch('http://localhost:8000/api/orders/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(djangoPayload)
+    });
+
+    if (!djangoRes.ok) {
+      const err = await djangoRes.json();
+      console.error("Django Order Creation failed in Razorpay Init:", err);
+      return NextResponse.json({ 
+        success: false, 
+        message: err.detail || "Failed to initialize order in database" 
+      }, { status: 400 });
+    }
+
+    const djangoOrder = await djangoRes.json();
+
+    // 2. Convert amount to paise
     const amountInPaise = Math.round(parseFloat(finalTotal) * 100);
 
     if (isNaN(amountInPaise) || amountInPaise <= 0) {
       return NextResponse.json({ success: false, message: "Invalid payment amount" }, { status: 400 });
     }
 
-    // Attach all necessary metadata to the Razorpay order notes (limited to 15 key-value pairs, values up to 256 chars)
-    // This allows the server-to-server Webhook fallback to reconstruct the order if the browser drops off!
+    // 3. Attach internal Django Order UUID to the Razorpay order notes
     const orderOptions = {
       amount: amountInPaise,
       currency: "INR",
-      receipt: `rcpt_pb_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      receipt: djangoOrder.order_number,
       notes: {
-        cart_id: shopifyCartId || "",
+        order_id: djangoOrder.order_id, // Links directly to internal Order UUID
         email: form?.email || "",
         phone: form?.phone || "",
         firstName: form?.firstName || "",
@@ -52,8 +99,8 @@ export async function POST(request: Request) {
         zip: form?.zip || "",
         couponCode: couponCode || "",
         discountAmount: String(discountAmount || "0"),
-        shippingRateTitle: shippingRate?.title || "Complimentary Standard Shipping",
-        shippingRatePrice: String(shippingRate?.amount || "0")
+        shippingRateTitle: selectedRate.title,
+        shippingRatePrice: String(selectedRate.amount || "0")
       }
     };
 
@@ -76,3 +123,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: error.message || "Internal server error" }, { status: 500 });
   }
 }
+

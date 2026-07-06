@@ -62,6 +62,8 @@ export async function apiFetch<T = any>(
     return {} as T;
   }
 
-  return response.json();
+  const text = await response.text();
+  const cleanedText = text.replace(/http:\/\/django:8000/g, '').replace(/http:\/\/localhost:8000/g, '');
+  return JSON.parse(cleanedText);
 }
 

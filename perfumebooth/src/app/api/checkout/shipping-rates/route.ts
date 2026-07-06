@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getCart } from '@/lib/shopify/cart';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { cartId, shippingAddress } = body;
+    const { cartId, shippingAddress, subtotal: bodySubtotal } = body;
 
     // Strict validation of input parameters
     if (!cartId || !shippingAddress) {
@@ -22,15 +21,8 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Fetch the active cart to determine the subtotal for free shipping eligibility
-    const cart = await getCart(cartId);
-    
-    // Default values if cart fetch fails
-    let subtotal = 0;
-    if (cart) {
-      subtotal = parseFloat(cart.cost?.subtotalAmount?.amount || "0");
-    }
-
+    // Determine subtotal for free shipping eligibility from request payload
+    const subtotal = bodySubtotal !== undefined ? parseFloat(String(bodySubtotal)) : 0;
     const isFree = subtotal >= 999;
 
     const shippingRates = isFree 

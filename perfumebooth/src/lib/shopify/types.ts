@@ -61,6 +61,8 @@ export interface Article {
   handle: string;
   excerpt: string;
   publishedAt: string;
+  content: string;
+  contentHtml: string;
   image?: {
     url: string;
     altText?: string;

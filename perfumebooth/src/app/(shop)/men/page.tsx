@@ -6,6 +6,8 @@ export const metadata = {
     "Explore our curated collection of architectural fragrances engineered for impact. Discover premium men's perfumes from Swiss Arabian, Lattafa, Arabiyat Prestige, and more.",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function MenFragrancePage({ searchParams }: { searchParams: Promise<any> }) {
   const sParams = await searchParams;
   return (

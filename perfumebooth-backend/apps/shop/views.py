@@ -4,14 +4,374 @@ from rest_framework.views import APIView
 from django.core.cache import cache
 import json
 
-from .models import Product, Inventory, ProductImage
+from .models import Product, Inventory, ProductImage, Collection, AutoCollection
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
 from django.db.models import Sum, Count
+from .services import CollectionSyncService
 from django.utils import timezone
 from datetime import timedelta
 import random
 from apps.orders.models import Order
+
+def flatten_product(product, request):
+    """
+    Extracts nested data from the attributes JSONB field and flattens it
+    so the API response matches the storefront's expected TypeScript interface.
+    """
+    images_data = []
+    for img in product.images.all():
+        images_data.append({
+            'url': request.build_absolute_uri(img.image.url) if img.image else None,
+            'altText': img.alt_text,
+            'width': img.width,
+            'height': img.height
+        })
+
+    stock_val = product.inventory.stock_level if hasattr(product, 'inventory') else 0
+
+    result = {
+        'id': str(product.id),
+        'title': product.title,
+        'slug': product.slug,
+        'sku': product.sku,
+        'price': str(product.price),
+        'compare_at_price': str(product.compare_at_price) if product.compare_at_price else None,
+        'image': request.build_absolute_uri(product.image.url) if product.image else None,
+        'images': images_data,
+        'stock': stock_val,
+        'stock_count': stock_val,
+        'is_online': product.is_online,
+        'created_at': product.created_at.isoformat(),
+        'updated_at': product.updated_at.isoformat(),
+        'description': product.description,
+    }
+
+    attrs = product.attributes or {}
+    
+    # Storefront metafields defaults
+    result['brand'] = attrs.get('brand', '')
+    result['tagline'] = attrs.get('tagline', '')
+    result['category'] = attrs.get('category')
+    result['productType'] = attrs.get('productType')
+    result['tags'] = attrs.get('tags', [])
+    result['vendor'] = attrs.get('vendor', '')
+    result['top_notes'] = attrs.get('top_notes', '')
+    result['middle_notes'] = attrs.get('middle_notes', '')
+    result['base_notes'] = attrs.get('base_notes', '')
+    result['longevity'] = attrs.get('longevity', '')
+    result['sillage'] = attrs.get('sillage', '')
+    result['size_ml'] = attrs.get('size_ml', 100)
+    result['is_scent_shot'] = attrs.get('is_scent_shot', False)
+    result['whats_inside'] = attrs.get('whats_inside', [])
+    result['ingredients'] = attrs.get('ingredients', '')
+    
+    # Optional fields
+    result['ideal_for'] = attrs.get('ideal_for', '')
+    result['fragrance_type'] = attrs.get('fragrance_type', '')
+    result['origin_country'] = attrs.get('origin_country', '')
+    result['concentration'] = attrs.get('concentration', '')
+    result['gender'] = attrs.get('gender', '')
+    result['season'] = attrs.get('season', '')
+    result['occasion'] = attrs.get('occasion', '')
+    result['rating'] = attrs.get('rating', 4.5)
+    result['rating_count'] = attrs.get('rating_count', 0)
+    result['discount_price'] = attrs.get('discount_price', None)
+    result['has_discount'] = attrs.get('has_discount', False)
+    
+    # Preserve raw attributes for backward compatibility
+    result['attributes'] = attrs
+
+    return result
+
+
+def auto_generate_tags(attributes):
+    """
+    Build tags array from product attribute fields for collection matching and search.
+    Called automatically on product create/update.
+    """
+    tags = list(attributes.get('tags', []))
+    
+    # Gender tags (for /men, /women collection matching)
+    gender = attributes.get('gender', '')
+    if gender:
+        gl = gender.lower()
+        if 'men' in gl and 'women' not in gl:
+            for t in ['Perfume for Men', 'men']:
+                if t.lower() not in [x.lower() for x in tags]:
+                    tags.append(t)
+        if 'women' in gl or 'female' in gl:
+            for t in ['Perfume for Women', 'women']:
+                if t.lower() not in [x.lower() for x in tags]:
+                    tags.append(t)
+        if 'unisex' in gl:
+            for t in ['Unisex Perfume', 'unisex']:
+                if t.lower() not in [x.lower() for x in tags]:
+                    tags.append(t)
+    
+    # Category as tag (for /woody, /floral collection matching)
+    category = attributes.get('category', '')
+    if category and category.lower() not in [t.lower() for t in tags]:
+        tags.append(category.lower())
+    
+    # Brand as tag (for /brands/[slug] collection matching)
+    brand = attributes.get('brand', '')
+    if brand and brand.lower() not in [t.lower() for t in tags]:
+        tags.append(brand.lower())
+    
+    # Product type as tag
+    product_type = attributes.get('productType', '')
+    if product_type and product_type.lower() not in [t.lower() for t in tags]:
+        tags.append(product_type.lower())
+    
+    # Occasion as tag
+    occasion = attributes.get('occasion', '')
+    if occasion and occasion.lower() not in [t.lower() for t in tags]:
+        tags.append(occasion.lower())
+    
+    # Season as tag
+    season = attributes.get('season', '')
+    if season and season.lower() not in [t.lower() for t in tags]:
+        tags.append(season.lower())
+    
+    # Scent notes as tags (top, middle, base)
+    for note_field in ['top_notes', 'middle_notes', 'base_notes']:
+        notes = attributes.get(note_field, '')
+        if notes:
+            for note in notes.split(','):
+                note = note.strip().lower()
+                if note and note not in [t.lower() for t in tags]:
+                    tags.append(note)
+    
+    # Deduplicate (case-insensitive, preserve first occurrence)
+    seen = set()
+    unique = []
+    for t in tags:
+        key = t.lower().strip()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(t)
+    
+    return unique
+
+
+import os
+# pyrefly: ignore [missing-import]
+from django.conf import settings
+
+BRANDS_FILE_PATH = os.path.join(settings.BASE_DIR, 'brands.json')
+CONSTANTS_PATH = '/app/constants.ts'
+
+import re
+
+def load_brands():
+    # 1. Try to read from constants.ts first
+    if os.path.exists(CONSTANTS_PATH):
+        try:
+            with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
+                content = f.read()
+            match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)\]', content, re.DOTALL)
+            if match:
+                brands_block = match.group(1)
+                brands = re.findall(r'["\'](.*?)["\']', brands_block)
+                return [b.strip() for b in brands if b.strip()]
+        except Exception as e:
+            print("Error loading brands from constants.ts:", e)
+
+    # 2. Fallback to brands.json
+    if not os.path.exists(BRANDS_FILE_PATH):
+        default_brands = [
+            "Al Haramain", "Arabiyat Prestige", "Lomani", "Louis Cardin",
+            "MPF", "New NB", "Otoori", "Lattafa", "Swiss Arabian",
+            "PerfumeBooth", "Armaf", "Creed", "Chanel"
+        ]
+        with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(default_brands, f, indent=2)
+        return default_brands
+    try:
+        with open(BRANDS_FILE_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_brand(brand_name):
+    if not brand_name:
+        return
+    brand_name = brand_name.strip()
+    if not brand_name:
+        return
+    
+    # 1. If constants.ts exists, update constants.ts
+    if os.path.exists(CONSTANTS_PATH):
+        try:
+            with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)(,\s*)?\]', content, re.DOTALL)
+            if match:
+                brands_block = match.group(1)
+                existing_brands = re.findall(r'["\'](.*?)["\']', brands_block)
+                # Case insensitive check
+                if not any(b.lower() == brand_name.lower() for b in existing_brands):
+                    # Strip any trailing comma/space
+                    clean_block = brands_block.rstrip()
+                    if clean_block and not clean_block.endswith(','):
+                        new_block = clean_block + f',\n  "{brand_name}"'
+                    else:
+                        new_block = clean_block + f'\n  "{brand_name}"'
+                    
+                    new_content = content.replace(brands_block, new_block)
+                    with open(CONSTANTS_PATH, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                    return
+        except Exception as e:
+            print("Error saving brand to constants.ts:", e)
+
+    # 2. Fallback to brands.json
+    brands = load_brands()
+    if not any(b.lower() == brand_name.lower() for b in brands):
+        brands.append(brand_name)
+        with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(brands, f, indent=2)
+
+class BrandListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        brands = load_brands()
+        return Response(brands)
+
+    def post(self, request):
+        brand_name = request.data.get('brand')
+        if brand_name:
+            save_brand(brand_name)
+            return Response({'status': 'success', 'brands': load_brands()})
+        return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request):
+        brand_name = request.data.get('brand') or request.query_params.get('brand')
+        if not brand_name:
+            return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        brand_name = brand_name.strip()
+        
+        # 1. Update constants.ts if it exists
+        if os.path.exists(CONSTANTS_PATH):
+            try:
+                with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)(,\s*)?\]', content, re.DOTALL)
+                if match:
+                    brands_block = match.group(1)
+                    existing_brands = re.findall(r'["\'](.*?)["\']', brands_block)
+                    
+                    # Filter out the deleted brand (case-insensitive)
+                    new_brands = [b for b in existing_brands if b.lower() != brand_name.lower()]
+                    
+                    # Rebuild the TOP_BRANDS block
+                    new_block = "\n  " + ",\n  ".join([f'"{b}"' for b in new_brands]) + ",\n"
+                    new_content = content.replace(brands_block, new_block)
+                    with open(CONSTANTS_PATH, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+            except Exception as e:
+                print("Error deleting brand from constants.ts:", e)
+        
+        # 2. Fallback / Sync brands.json
+        if os.path.exists(BRANDS_FILE_PATH):
+            try:
+                with open(BRANDS_FILE_PATH, 'r', encoding='utf-8') as f:
+                    brands = json.load(f)
+                brands = [b for b in brands if b.lower() != brand_name.lower()]
+                with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
+                    json.dump(brands, f, indent=2)
+            except Exception:
+                pass
+                
+        return Response({'status': 'success', 'brands': load_brands()})
+
+
+class ProductFacetsView(APIView):
+    """
+    GET /api/shop/facets/ — Returns aggregated filter facets from all online products.
+    Used by the storefront sidebar to dynamically populate filter options.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        cache_key = 'catalog:facets'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        products = Product.objects.filter(is_online=True)
+
+        # Counters for each facet
+        genders = {}
+        brands = {}
+        categories = {}
+        product_types = {}
+        occasions = {}
+        seasons = {}
+        all_tags = set()
+
+        for product in products:
+            attrs = product.attributes or {}
+
+            # Gender
+            gender = attrs.get('gender', '').strip()
+            if gender:
+                genders[gender] = genders.get(gender, 0) + 1
+
+            # Brand
+            brand = attrs.get('brand', '').strip()
+            if brand:
+                brands[brand] = brands.get(brand, 0) + 1
+
+            # Category
+            category = attrs.get('category', '').strip()
+            if category:
+                categories[category] = categories.get(category, 0) + 1
+
+            # Product Type
+            pt = attrs.get('productType', '').strip()
+            if pt:
+                product_types[pt] = product_types.get(pt, 0) + 1
+
+            # Occasion
+            occasion = attrs.get('occasion', '').strip()
+            if occasion:
+                occasions[occasion] = occasions.get(occasion, 0) + 1
+
+            # Season
+            season = attrs.get('season', '').strip()
+            if season:
+                seasons[season] = seasons.get(season, 0) + 1
+
+            # Tags
+            tags = attrs.get('tags', [])
+            if isinstance(tags, list):
+                all_tags.update(tags)
+
+        def to_facet_list(counter):
+            return sorted(
+                [{'value': k, 'count': v} for k, v in counter.items()],
+                key=lambda x: x['count'],
+                reverse=True
+            )
+
+        data = {
+            'genders': to_facet_list(genders),
+            'brands': to_facet_list(brands),
+            'categories': to_facet_list(categories),
+            'productTypes': to_facet_list(product_types),
+            'occasions': to_facet_list(occasions),
+            'seasons': to_facet_list(seasons),
+            'tags': sorted(list(all_tags)),
+        }
+
+        cache.set(cache_key, data, timeout=300)  # Cache 5 minutes
+        return Response(data)
 
 
 class ProductListView(APIView):
@@ -44,28 +404,7 @@ class ProductListView(APIView):
             
         data = []
         for product in products:
-            images_data = []
-            for img in product.images.all():
-                images_data.append({
-                    'url': request.build_absolute_uri(img.image.url) if img.image else None,
-                    'altText': img.alt_text,
-                    'width': img.width,
-                    'height': img.height
-                })
-
-            data.append({
-                'id': str(product.id),
-                'title': product.title,
-                'slug': product.slug,
-                'sku': product.sku,
-                'price': str(product.price),
-                'compare_at_price': str(product.compare_at_price) if product.compare_at_price else None,
-                'image': request.build_absolute_uri(product.image.url) if product.image else None,
-                'images': images_data,
-                'attributes': product.attributes,
-                'stock': product.inventory.stock_level if hasattr(product, 'inventory') else 0,
-                'is_online': product.is_online,
-            })
+            data.append(flatten_product(product, request))
 
         cache.set(cache_key, data, timeout=7200)  # TTL: 2 hours
         return Response(data)
@@ -86,6 +425,9 @@ class ProductListView(APIView):
             except json.JSONDecodeError:
                 attributes = {}
 
+        # Auto-generate tags from product fields for collection matching
+        attributes['tags'] = auto_generate_tags(attributes)
+
         product = Product.objects.create(
             title=title,
             slug=slug,
@@ -98,19 +440,28 @@ class ProductListView(APIView):
             image=request.FILES.get('image')
         )
         
+        # Auto-save brand to brands.json
+        brand_name = attributes.get('brand') or attributes.get('vendor')
+        if brand_name:
+            save_brand(brand_name)
+        
         stock_level = int(request.data.get('stock_level', 0))
         Inventory.objects.create(product=product, stock_level=stock_level)
         
         gallery_images = request.FILES.getlist('gallery')
         for img in gallery_images:
             ProductImage.objects.create(product=product, image=img)
-            
+        # Auto sync collections
+        synced = CollectionSyncService.syncProductCollections(product)
+        
         cache.clear()
         log_action(request.user, f"Created product '{product.title}' (SKU: {product.sku})", request)
         return Response({
-            'id': str(product.id), 
-            'slug': product.slug,
-            'detail': 'Product created successfully.'
+            "success": True,
+            "message": "Product saved successfully.",
+            "collections_synced": synced,
+            "id": str(product.id),
+            "slug": product.slug
         }, status=status.HTTP_201_CREATED)
 
 
@@ -135,29 +486,7 @@ class ProductDetailView(APIView):
         except Product.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
 
-        images_data = []
-        for img in product.images.all():
-            images_data.append({
-                'url': request.build_absolute_uri(img.image.url) if img.image else None,
-                'altText': img.alt_text,
-                'width': img.width,
-                'height': img.height
-            })
-
-        data = {
-            'id': str(product.id),
-            'title': product.title,
-            'slug': product.slug,
-            'sku': product.sku,
-            'description': product.description,
-            'price': str(product.price),
-            'compare_at_price': str(product.compare_at_price) if product.compare_at_price else None,
-            'image': request.build_absolute_uri(product.image.url) if product.image else None,
-            'images': images_data,
-            'attributes': product.attributes,
-            'stock': product.inventory.stock_level if hasattr(product, 'inventory') else 0,
-            'is_online': product.is_online,
-        }
+        data = flatten_product(product, request)
         cache.set(cache_key, data, timeout=7200)
         return Response(data)
 
@@ -181,25 +510,39 @@ class ProductDetailView(APIView):
         if attributes:
             if isinstance(attributes, str):
                 try:
-                    product.attributes = json.loads(attributes)
+                    attributes = json.loads(attributes)
                 except json.JSONDecodeError:
-                    pass
-            elif isinstance(attributes, dict):
+                    attributes = None
+            if isinstance(attributes, dict):
+                # Auto-generate tags from product fields for collection matching
+                attributes['tags'] = auto_generate_tags(attributes)
                 product.attributes = attributes
                 
         product.save()
         
+        # Auto-save brand to brands.json
+        if product.attributes:
+            brand_name = product.attributes.get('brand') or product.attributes.get('vendor')
+            if brand_name:
+                save_brand(brand_name)
+        
         if 'stock_level' in request.data:
             stock = int(request.data['stock_level'])
             Inventory.objects.update_or_create(product=product, defaults={'stock_level': stock})
-            
         gallery_images = request.FILES.getlist('gallery')
         for img in gallery_images:
             ProductImage.objects.create(product=product, image=img)
             
+        # Auto sync collections
+        synced = CollectionSyncService.syncProductCollections(product)
+
         cache.clear()
         log_action(request.user, f"Updated product '{product.title}' (SKU: {product.sku})", request)
-        return Response({'detail': 'Product updated successfully.'})
+        return Response({
+            "success": True,
+            "message": "Product saved successfully.",
+            "collections_synced": synced
+        })
 
     def delete(self, request, slug: str):
         try:
@@ -310,5 +653,348 @@ class DashboardAnalyticsView(APIView):
             'lowStock': low_stock_data,
             'liveVisitors': live_visitors
         })
+
+
+class CollectionListCreateView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get(self, request):
+        collections = AutoCollection.objects.all()
+        is_merchant = request.user and request.user.is_authenticated and any(
+            role in ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive'] 
+            for role in request.user.roles.values_list('role__name', flat=True)
+        )
+        if not is_merchant:
+            collections = collections.filter(status='active')
+
+        data = []
+        for col in collections:
+            image_url = request.build_absolute_uri(col.image.url) if col.image else None
+            data.append({
+                'id': str(col.id),
+                'title': col.name,
+                'slug': col.slug,
+                'description': col.description or '',
+                'image': image_url,
+                'match_type': col.collection_type,
+                'match_value': '',
+                'is_active': col.status == 'active',
+                'sort_order': 0,
+                'product_count': col.products.count(),
+                'products': [str(p.id) for p in col.products.all()]
+            })
+        return Response(data)
+
+    def post(self, request):
+        title = request.data.get('title')
+        match_type = request.data.get('match_type', 'manual')
+        slug = request.data.get('slug')
+        
+        if slug:
+            if '/' not in slug:
+                slug = f"{match_type}/{slug}"
+        else:
+            slug = f"{match_type}/{slugify(title)}"
+
+        description = request.data.get('description', '')
+        is_active = str(request.data.get('is_active', 'true')).lower() == 'true'
+        status_val = 'active' if is_active else 'inactive'
+        image = request.FILES.get('image')
+
+        collection = AutoCollection.objects.create(
+            name=title,
+            slug=slug,
+            description=description,
+            collection_type=match_type,
+            status=status_val,
+            image=image
+        )
+
+        if match_type == 'manual':
+            product_ids = request.data.getlist('products')
+            if not product_ids and 'products' in request.data:
+                try:
+                    product_ids = json.loads(request.data.get('products'))
+                except:
+                    pass
+            if product_ids:
+                products = Product.objects.filter(id__in=product_ids)
+                collection.products.set(products)
+
+        cache.clear()
+        log_action(request.user, f"Created collection '{collection.name}' (Slug: {collection.slug})", request)
+        return Response({
+            'id': str(collection.id),
+            'slug': collection.slug,
+            'detail': 'Collection created successfully.'
+        }, status=status.HTTP_201_CREATED)
+
+
+class CollectionDetailView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get_collection(self, slug):
+        if '/' in slug:
+            return AutoCollection.objects.filter(slug=slug).first()
+        return AutoCollection.objects.filter(slug=slug).first() or \
+               AutoCollection.objects.filter(slug__endswith=f"/{slug}").first()
+
+    def get(self, request, slug):
+        col = self.get_collection(slug)
+        if not col:
+            return Response({'detail': 'Collection not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        is_merchant = request.user and request.user.is_authenticated and any(
+            role in ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive'] 
+            for role in request.user.roles.values_list('role__name', flat=True)
+        )
+        if not is_merchant and col.status != 'active':
+            return Response({'detail': 'Collection not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        image_url = request.build_absolute_uri(col.image.url) if col.image else None
+        
+        if col.collection_type == 'manual':
+            products_qs = col.products.filter(is_online=True)
+        else:
+            base = Product.objects.filter(is_online=True)
+            val = col.name
+            if col.collection_type == 'gender':
+                products_qs = base.filter(attributes__gender__iexact=val)
+            elif col.collection_type == 'brand':
+                products_qs = base.filter(attributes__brand__iexact=val)
+            elif col.collection_type == 'category':
+                products_qs = base.filter(attributes__category__iexact=val)
+            elif col.collection_type == 'type':
+                products_qs = base.filter(attributes__productType__iexact=val)
+            elif col.collection_type == 'note':
+                products_qs = base.filter(attributes__tags__contains=[val])
+            else:
+                products_qs = base.none()
+
+        products_data = [flatten_product(p, request) for p in products_qs]
+
+        data = {
+            'id': str(col.id),
+            'title': col.name,
+            'slug': col.slug,
+            'description': col.description or '',
+            'image': image_url,
+            'match_type': col.collection_type,
+            'match_value': col.name,
+            'is_active': col.status == 'active',
+            'sort_order': 0,
+            'products': products_data,
+            'manual_product_ids': [str(p.id) for p in col.products.all()] if col.collection_type == 'manual' else []
+        }
+        return Response(data)
+
+    def put(self, request, slug):
+        col = self.get_collection(slug)
+        if not col:
+            return Response({'detail': 'Collection not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        col.name = request.data.get('title', col.name)
+        col.slug = request.data.get('slug', col.slug)
+        col.description = request.data.get('description', col.description)
+        col.collection_type = request.data.get('match_type', col.collection_type)
+        if 'is_active' in request.data:
+            is_active = str(request.data.get('is_active')).lower() == 'true'
+            col.status = 'active' if is_active else 'inactive'
+        if 'image' in request.FILES:
+            col.image = request.FILES.get('image')
+        elif request.data.get('image') == 'null' or request.data.get('image') == '':
+            col.image = None
+
+        col.save()
+
+        if col.collection_type == 'manual':
+            product_ids = request.data.getlist('products')
+            if not product_ids and 'products' in request.data:
+                try:
+                    product_ids = json.loads(request.data.get('products'))
+                except:
+                    pass
+            
+            if 'products' in request.data or product_ids:
+                products = Product.objects.filter(id__in=product_ids)
+                col.products.set(products)
+        else:
+            col.products.clear()
+
+        cache.clear()
+        log_action(request.user, f"Updated collection '{col.name}'", request)
+        return Response({'detail': 'Collection updated successfully.'})
+
+    def delete(self, request, slug):
+        col = self.get_collection(slug)
+        if not col:
+            return Response({'detail': 'Collection not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        name = col.name
+        col.delete()
+        cache.clear()
+        log_action(request.user, f"Deleted collection '{name}'", request)
+        return Response({'detail': 'Collection deleted successfully.'})
+
+
+# pyrefly: ignore [missing-import]
+from django.http import HttpResponse
+from io import BytesIO
+# pyrefly: ignore [missing-import]
+from django.utils.text import slugify
+
+class ProductExcelExportView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Products"
+
+        headers = [
+            "Title", "Slug", "SKU", "Price", "Compare At Price", 
+            "Description", "Stock Level", "Is Online", "Brand", 
+            "Category", "Gender", "Product Type", "Top Notes", 
+            "Middle Notes", "Base Notes", "Occasion", "Season"
+        ]
+        ws.append(headers)
+
+        products = Product.objects.all().prefetch_related('inventory')
+        for p in products:
+            attrs = p.attributes or {}
+            stock = p.inventory.stock_level if hasattr(p, 'inventory') else 0
+            row = [
+                p.title,
+                p.slug,
+                p.sku,
+                float(p.price) if p.price else 0.0,
+                float(p.compare_at_price) if p.compare_at_price else None,
+                p.description,
+                stock,
+                p.is_online,
+                attrs.get('brand') or attrs.get('vendor', ''),
+                attrs.get('category', ''),
+                attrs.get('gender', ''),
+                attrs.get('productType', ''),
+                attrs.get('top_notes', ''),
+                attrs.get('middle_notes', ''),
+                attrs.get('base_notes', ''),
+                attrs.get('occasion', ''),
+                attrs.get('season', '')
+            ]
+            ws.append(row)
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        response = HttpResponse(
+            output.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response['Content-Disposition'] = 'attachment; filename="perfumebooth_products.xlsx"'
+        return response
+
+
+class ProductExcelImportView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        import openpyxl
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'detail': 'No file uploaded.'}, status=400)
+
+        try:
+            wb = openpyxl.load_workbook(file_obj, read_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                return Response({'detail': 'Excel sheet is empty.'}, status=400)
+
+            headers = [str(h).strip().lower() for h in rows[0]]
+            header_map = {h: i for i, h in enumerate(headers)}
+
+            def get_val(row, key, default=''):
+                idx = header_map.get(key.lower())
+                if idx is not None and idx < len(row):
+                    return row[idx]
+                return default
+
+            products_imported = 0
+            for row in rows[1:]:
+                if not any(row):
+                    continue
+
+                sku = get_val(row, 'sku')
+                title = get_val(row, 'title')
+                if not sku or not title:
+                    continue
+
+                price = get_val(row, 'price', 0.0)
+                compare_price = get_val(row, 'compare at price')
+                description = get_val(row, 'description', '')
+                is_online = str(get_val(row, 'is online', 'true')).lower() == 'true'
+                stock_level = int(get_val(row, 'stock level', 0) or 0)
+                slug = get_val(row, 'slug')
+                if not slug:
+                    slug = slugify(title)
+
+                attributes = {
+                    'brand': get_val(row, 'brand'),
+                    'vendor': get_val(row, 'brand'),
+                    'category': get_val(row, 'category'),
+                    'gender': get_val(row, 'gender'),
+                    'productType': get_val(row, 'product type'),
+                    'top_notes': get_val(row, 'top notes'),
+                    'middle_notes': get_val(row, 'middle notes'),
+                    'base_notes': get_val(row, 'base notes'),
+                    'occasion': get_val(row, 'occasion'),
+                    'season': get_val(row, 'season')
+                }
+
+                attributes = {k: (v if v is not None else '') for k, v in attributes.items()}
+                attributes['tags'] = auto_generate_tags(attributes)
+
+                product, created = Product.objects.update_or_create(
+                    sku=sku,
+                    defaults={
+                        'title': title,
+                        'slug': slug,
+                        'price': price,
+                        'compare_at_price': compare_price if compare_price else None,
+                        'description': description,
+                        'is_online': is_online,
+                        'attributes': attributes
+                    }
+                )
+
+                Inventory.objects.update_or_create(
+                    product=product,
+                    defaults={'stock_level': stock_level}
+                )
+
+                CollectionSyncService.syncProductCollections(product)
+                products_imported += 1
+
+            cache.clear()
+            return Response({
+                'success': True,
+                'detail': f'Successfully imported {products_imported} products.'
+            })
+        except Exception as e:
+            return Response({'detail': f'Error reading Excel: {str(e)}'}, status=500)
+
 
 

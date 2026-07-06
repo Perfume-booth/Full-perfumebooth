@@ -92,6 +92,7 @@ export const TOP_BRANDS = [
   "Otoori",
   "Lattafa",
   "Swiss Arabian",
+  "majnu",
 ];
 
 export const INDIAN_STATES = [

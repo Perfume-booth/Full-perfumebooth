@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+export const dynamic = 'force-dynamic';
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 // TypeScript may complain about side-effect CSS imports when no declarations exist.
@@ -61,7 +62,11 @@ export const viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+import { getBrands } from "@/lib/shopify";
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const brands = await getBrands();
+
   return (
     <html lang="en" className={`${inter.variable} ${cormorant.variable}`} suppressHydrationWarning>
       <GoogleTagManager gtmId="GTM-PLC7P2NZ" />
@@ -84,7 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ScrollToTop />
         <Toaster position="bottom-right" />
         {/* Progress bar placeholder (mounted on client) */}
-        <Navbar />
+        <Navbar initialBrands={brands} />
         <main>
           {children}
         </main>

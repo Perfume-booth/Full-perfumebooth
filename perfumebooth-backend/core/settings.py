@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ─────────────────────────────────────────────────────────────────────────────
 SECRET_KEY = config('DJANGO_SECRET_KEY')
 DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost', cast=Csv())
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,django,127.0.0.1', cast=Csv())
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Installed Applications
@@ -193,6 +193,8 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:3000,http://nextjs:3000',
     cast=Csv(),
 )
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',

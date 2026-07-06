@@ -1,12 +1,11 @@
 import { MetadataRoute } from 'next';
-import { shopifyFetch } from '@/lib/shopify/fetcher';
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.perfumebooth.com';
 
 /**
- * Dynamic Sitemap Generator for Next.js 14+
- * Safely fetches active products/collections from Shopify Storefront API
- * and falls back gracefully to a rich list of static, category, brand, and policy routes.
+ * Dynamic Sitemap Generator
+ * Safely fetches active products from Django REST API
+ * and falls back gracefully to static category, brand, and policy routes.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date();
@@ -69,58 +68,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let dynamicRoutes: MetadataRoute.Sitemap = [];
 
   try {
-    // 2. Safely fetch dynamic products and collections if Shopify credentials exist
-    const domain = process.env.SHOPIFY_STORE_DOMAIN || process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN;
-    const storefrontAccessToken = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN;
+    const res = await fetch('http://localhost:8000/api/shop/products/');
+    if (res.ok) {
+      const products = await res.json();
+      const productRoutes = products.map((p: any) => ({
+        url: `${baseUrl}/products/${p.slug}`,
+        lastModified: new Date(p.updated_at || lastModified),
+        changeFrequency: 'weekly' as const,
+        priority: 0.8,
+      }));
 
-    if (domain && storefrontAccessToken) {
-      const response = await shopifyFetch<any>({
-        query: `
-          {
-            products(first: 250) {
-              edges {
-                node {
-                  handle
-                  updatedAt
-                }
-              }
-            }
-            collections(first: 250) {
-              edges {
-                node {
-                  handle
-                  updatedAt
-                }
-              }
-            }
-          }
-        `,
-        next: { revalidate: 3600 }
-      });
-
-      if (response?.body?.data) {
-        const products = response.body.data.products?.edges.map((e: any) => ({
-          url: `${baseUrl}/products/${e.node.handle}`,
-          lastModified: new Date(e.node.updatedAt),
-          changeFrequency: 'weekly' as const,
-          priority: 0.8,
-        })) || [];
-
-        const collections = response.body.data.collections?.edges.map((e: any) => ({
-          url: `${baseUrl}/${e.node.handle}`,
-          lastModified: new Date(e.node.updatedAt),
-          changeFrequency: 'daily' as const,
-          priority: 0.9,
-        })) || [];
-
-        dynamicRoutes = [...collections, ...products];
-      }
+      dynamicRoutes = [...productRoutes];
     }
   } catch (error) {
-    console.error('Failed to fetch dynamic Shopify routes for sitemap:', error);
+    console.error('Failed to fetch dynamic Django routes for sitemap:', error);
   }
 
-  // Combine static fallback routes with dynamic ones (if successfully retrieved)
   return [...staticRoutes, ...dynamicRoutes];
 }
+
 

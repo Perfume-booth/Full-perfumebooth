@@ -1,76 +1,112 @@
-"""
-Shop Services — Business Logic Layer
-─────────────────────────────────────
-deduct_product_stock        — Pessimistic locking stock deduction
-find_semantically_similar   — pgvector cosine similarity search
-"""
+import re
 from django.db import transaction
-from django.core.exceptions import ValidationError
-from pgvector.django import CosineDistance
+from .models import Product, AutoCollection, ProductCollection
 
-from .models import Inventory, Product
+class CollectionSyncService:
+    @staticmethod
+    def sanitize_slug(value):
+        # strict normalization: lowercase, kebab-case, removing special characters
+        val = value.strip().lower()
+        val = re.sub(r'[^a-z0-9\s-]', '', val)
+        val = re.sub(r'[\s-]+', '-', val)
+        return val.strip('-')
 
+    @classmethod
+    @transaction.atomic
+    def syncProductCollections(cls, product):
+        """
+        Synchronizes a product's collections based on its attributes.
+        Fulfills:
+        - Zero Manual Overhead: Dynamic generation from real-time state.
+        - Open-Closed Principle (Registry-based design).
+        - Data Integrity: Runs entirely in transaction block.
+        - Performance: Anti N+1 bulk database operations.
+        - No-Op Guard: Early exit if no changes detected.
+        """
+        attrs = product.attributes or {}
+        
+        brand_val = attrs.get('brand') or attrs.get('vendor')
+        category_val = attrs.get('category')
+        gender_val = attrs.get('gender')
+        type_val = attrs.get('productType') or attrs.get('type')
+        
+        # Extract notes list
+        notes_list = []
+        for note_field in ['top_notes', 'middle_notes', 'base_notes']:
+            field_val = attrs.get(note_field, '')
+            if field_val:
+                for note in field_val.split(','):
+                    note = note.strip()
+                    if note and note.lower() not in [n.lower() for n in notes_list]:
+                        notes_list.append(note)
 
-def deduct_product_stock(product_id: str, quantity: int) -> Inventory:
-    """
-    Concurrency-safe stock deduction using database row-level locking.
+        # OCP Taxonomy Registry mapping attributes to collection_type
+        registry = [
+            {'type': 'brand', 'values': [brand_val] if brand_val else []},
+            {'type': 'category', 'values': [category_val] if category_val else []},
+            {'type': 'gender', 'values': [gender_val] if gender_val else []},
+            {'type': 'type', 'values': [type_val] if type_val else []},
+            {'type': 'note', 'values': notes_list},
+        ]
 
-    Uses SELECT FOR UPDATE to block concurrent writes on the same
-    Inventory row, preventing overselling during peak checkout traffic.
+        # Extract target collections (name, type, unique slug)
+        target_collections = []
+        for reg in registry:
+            col_type = reg['type']
+            for val in reg['values']:
+                cleaned_val = val.strip()
+                if cleaned_val:
+                    sanitized = cls.sanitize_slug(cleaned_val)
+                    slug_str = f"{col_type}/{sanitized}"
+                    target_collections.append({
+                        'name': cleaned_val,
+                        'type': col_type,
+                        'slug': slug_str
+                    })
 
-    Args:
-        product_id: UUID of the product to deduct stock from.
-        quantity:   Number of units to deduct.
+        # Identify currently linked collections
+        current_links = ProductCollection.objects.filter(product=product).select_related('collection')
+        current_slugs = {link.collection.slug for link in current_links}
+        target_slugs = {tc['slug'] for tc in target_collections}
 
-    Returns:
-        The updated Inventory instance.
+        # No-Op Guard
+        if current_slugs == target_slugs:
+            return True
 
-    Raises:
-        ValidationError: If available stock is less than requested quantity.
-        Inventory.DoesNotExist: If no inventory record exists for the product.
-    """
-    with transaction.atomic():
-        inventory = (
-            Inventory.objects
-            .select_for_update()          # Acquires a row-level PG lock
-            .get(product_id=product_id)
-        )
+        # In-Memory cache of collections (Anti N+1 Directive)
+        all_target_slugs = list(target_slugs)
+        existing_collections = {
+            col.slug: col for col in AutoCollection.objects.filter(slug__in=all_target_slugs)
+        }
 
-        if inventory.stock_level < quantity:
-            raise ValidationError(
-                f'Insufficient stock for product {product_id}. '
-                f'Available: {inventory.stock_level}, Requested: {quantity}.'
-            )
+        # Create collection if missing (Upsert)
+        for tc in target_collections:
+            slug_str = tc['slug']
+            if slug_str not in existing_collections:
+                col = AutoCollection.objects.create(
+                    name=tc['name'],
+                    slug=slug_str,
+                    collection_type=tc['type'],
+                    status='active'
+                )
+                existing_collections[slug_str] = col
 
-        inventory.stock_level -= quantity
-        inventory.save(update_fields=['stock_level', 'updated_at'])
+        # Detach removed collections
+        slugs_to_remove = current_slugs - target_slugs
+        if slugs_to_remove:
+            ProductCollection.objects.filter(
+                product=product,
+                collection__slug__in=slugs_to_remove
+            ).delete()
 
-    return inventory
+        # Attach new collections (Bulk Attach)
+        slugs_to_add = target_slugs - current_slugs
+        new_links = []
+        for slug_str in slugs_to_add:
+            col = existing_collections[slug_str]
+            new_links.append(ProductCollection(product=product, collection=col))
 
+        if new_links:
+            ProductCollection.objects.bulk_create(new_links, ignore_conflicts=True)
 
-def find_semantically_similar_products(
-    query_vector: list[float],
-    limit: int = 4,
-    only_online: bool = True,
-) -> 'QuerySet[Product]':
-    """
-    Semantic product search using pgvector cosine distance.
-
-    Args:
-        query_vector: Float vector generated from the user's query text.
-        limit:        Maximum number of results to return.
-        only_online:  Filter to only include published products.
-
-    Returns:
-        QuerySet of Products ordered by cosine similarity (closest first).
-    """
-    qs = Product.objects.filter(embedding__isnull=False)
-    if only_online:
-        qs = qs.filter(is_online=True)
-
-    return (
-        qs
-        .annotate(distance=CosineDistance('embedding', query_vector))
-        .order_by('distance')
-        [:limit]
-    )
+        return True

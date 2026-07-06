@@ -16,6 +16,7 @@ services:
       - ../perfumebooth-backend:/app                   # Live code mount for hot-reload
       - static_files:/app/static
       - media_files:/app/media
+      - ./src/lib/constants.ts:/app/constants.ts
     ports:
       - "8000:8000"                      # Direct access for API clients / Postman
     command: >

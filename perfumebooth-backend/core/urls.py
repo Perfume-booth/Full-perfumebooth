@@ -24,3 +24,10 @@ urlpatterns = [
     path('api/orders/', include('apps.orders.urls')),
     path('api/cms/', include('apps.cms.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

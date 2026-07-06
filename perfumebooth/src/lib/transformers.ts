@@ -132,6 +132,11 @@ export function getBrandFromTags(tags: any): string | null {
     return null;
 }
 
+function cleanImageUrl(url: string | null | undefined): string | undefined {
+    if (!url) return undefined;
+    return url.replace('http://django:8000', '').replace('http://localhost:8000', '');
+}
+
 /**
  * Normalizes product data from various sources (Shopify API, internal DB, etc.)
  * into a consistent format for the UI.
@@ -151,18 +156,18 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
     
     // Normalize Images
     const allImages: string[] = [];
-    const featImg = product.image || product.featuredImage?.url;
+    const featImg = cleanImageUrl(product.image || product.featuredImage?.url);
     if (featImg) allImages.push(featImg);
     
     const nodes = product.images?.nodes || product.images?.edges?.map((e: any) => e.node) || [];
     nodes.forEach((n: any) => {
-        const url = n?.url || n?.image;
+        const url = cleanImageUrl(n?.url || n?.image);
         if (url && !allImages.includes(url)) allImages.push(url);
     });
     
     if (product.images && Array.isArray(product.images) && !allImages.length) {
         product.images.forEach((img: any) => {
-            const url = typeof img === 'string' ? img : img.image;
+            const url = cleanImageUrl(typeof img === 'string' ? img : img.image);
             if (url && !allImages.includes(url)) allImages.push(url);
         });
     }

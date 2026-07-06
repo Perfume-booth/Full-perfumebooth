@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCustomer } from "@/lib/shopify/customer";
-import { shopifyAdminFetch } from "@/lib/shopify/admin-fetcher";
 import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
@@ -18,69 +16,18 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const customerAccessToken = cookieStore.get("customerAccessToken")?.value;
-
-    if (!customerAccessToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // 1. Get Customer ID from Token
-    const customer = await getCustomer(customerAccessToken);
-    if (!customer || !customer.id) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
-    }
-
-    // 2. Update Metafield via Admin API
-    const wishlistJson = JSON.stringify(items);
-    
-    const mutation = `
-      mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
-        metafieldsSet(metafields: $metafields) {
-          metafields {
-            value
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-
-    const variables = {
-      metafields: [
-        {
-          namespace: "custom",
-          key: "wishlist",
-          type: "json",
-          value: wishlistJson,
-          ownerId: customer.id
-        }
-      ]
-    };
-
-    const response = await shopifyAdminFetch<any>({
-      query: mutation,
-      variables
+    cookieStore.set("mock_wishlist", JSON.stringify(items), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/"
     });
-
-    if (response.status === 403 || response.body.errors?.[0]?.extensions?.code === 'ACCESS_DENIED') {
-      console.error("Wishlist sync error: Missing 'write_customers' scope.");
-      return NextResponse.json({ 
-        error: "Access Denied: Your Shopify Admin Token needs the 'write_customers' scope to save wishlists." 
-      }, { status: 403 });
-    }
-
-    if (response.body.errors || response.body.data?.metafieldsSet?.userErrors?.length > 0) {
-      console.error("Wishlist sync error:", response.body.errors || response.body.data?.metafieldsSet?.userErrors);
-      return NextResponse.json({ error: "Failed to sync wishlist" }, { status: 500 });
-    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Wishlist POST API Error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal Server Error", details: error.toString() }, 
+      { error: error.message || "Internal Server Error" }, 
       { status: 500 }
     );
   }
@@ -89,25 +36,16 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const customerAccessToken = cookieStore.get("customerAccessToken")?.value;
-
-    if (!customerAccessToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const customer = await getCustomer(customerAccessToken);
-    if (!customer) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
-    }
-
-    const wishlistData = customer.wishlist?.value ? JSON.parse(customer.wishlist.value) : [];
+    const wishlistStr = cookieStore.get("mock_wishlist")?.value;
+    const wishlistData = wishlistStr ? JSON.parse(wishlistStr) : [];
 
     return NextResponse.json({ items: wishlistData });
   } catch (error: any) {
     console.error("Wishlist GET API Error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal Server Error", details: error.toString() }, 
+      { error: error.message || "Internal Server Error" }, 
       { status: 500 }
     );
   }
 }
+
