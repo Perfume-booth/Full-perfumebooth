@@ -5,10 +5,12 @@ Product   — catalog item with pgvector embedding for AI search
 Inventory — stock levels per product (1-to-1)
 """
 import uuid
+# pyrefly: ignore [missing-import]
 from django.db import models
+# pyrefly: ignore [missing-import]
 from pgvector.django import VectorField
 
-
+ 
 class Product(models.Model):
     """
     Core catalog item.
@@ -30,11 +32,25 @@ class Product(models.Model):
     # pgvector — 384-dim embedding (sentence-transformers) or 1536-dim (OpenAI ada-002)
     embedding = VectorField(dimensions=384, null=True, blank=True)
     is_online = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_products'
+    )
+    updated_by = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_products'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'shop_product'
+        db_table = 'shop_product'                     
         ordering = ['-created_at']
         verbose_name = 'Product'
         verbose_name_plural = 'Products'

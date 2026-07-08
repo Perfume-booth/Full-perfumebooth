@@ -31,6 +31,8 @@ interface Product {
   attributes: Record<string, any>;
   stock: number;
   is_online: boolean;
+  created_by_name?: string;
+  updated_by_name?: string;
 }
 
 const NOTE_OPTIONS = [
@@ -86,6 +88,61 @@ export default function ProductsPage() {
   const [bottleMaterial, setBottleMaterial] = useState('Glass');
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
+  const [imageAltText, setImageAltText] = useState('');
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const [manualTags, setManualTags] = useState<string[]>([]);
+
+  // Helper to extract auto-generated tags from current taxonomy inputs
+  const generateTagsFromInputs = () => {
+    const auto: string[] = [];
+    if (gender) {
+      const gl = gender.toLowerCase();
+      if (gl.includes('men') && !gl.includes('women')) {
+        auto.push('Perfume for Men', 'men');
+      }
+      if (gl.includes('women') || gl.includes('female')) {
+        auto.push('Perfume for Women', 'women');
+      }
+      if (gl.includes('unisex')) {
+        auto.push('Unisex Perfume', 'unisex');
+      }
+    }
+    if (category) auto.push(category);
+    if (brand) auto.push(brand);
+    if (productType) auto.push(productType);
+    if (occasion) auto.push(occasion);
+    if (season) auto.push(season);
+
+    [topNotes, middleNotes, baseNotes].forEach(notesStr => {
+      if (notesStr) {
+        notesStr.split(',').forEach(n => {
+          const cleaned = n.trim();
+          if (cleaned) auto.push(cleaned);
+        });
+      }
+    });
+    return auto;
+  };
+
+  // Sync tags dynamically when inputs change
+  useEffect(() => {
+    const autoTags = generateTagsFromInputs();
+    const combined = [...manualTags];
+    autoTags.forEach(at => {
+      if (!combined.some(c => c.toLowerCase() === at.toLowerCase())) {
+        combined.push(at);
+      }
+    });
+    setTags(combined.join(', '));
+  }, [brand, gender, category, productType, topNotes, middleNotes, baseNotes, occasion, season]);
+
+  const handleTagsChange = (val: string) => {
+    setTags(val);
+    const parsed = val.split(',').map(t => t.trim()).filter(Boolean);
+    const autoTags = generateTagsFromInputs();
+    const manual = parsed.filter(t => !autoTags.some(a => a.toLowerCase() === t.toLowerCase()));
+    setManualTags(manual);
+  };
 
   // Image/Video Files
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -123,6 +180,23 @@ export default function ProductsPage() {
     fetchProducts();
     fetchBrands();
   }, []);
+
+  const handleBulkDelete = async () => {
+    if (confirm(`Are you sure you want to delete ${selectedSlugs.length} products?`)) {
+      try {
+        await apiFetch('/shop/products/', {
+          method: 'DELETE',
+          body: JSON.stringify({ slugs: selectedSlugs }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        setSelectedSlugs([]);
+        fetchProducts();
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || 'Failed to delete selected products.');
+      }
+    }
+  };
 
   // Sync slug with title on creation
   const handleTitleChange = (val: string) => {
@@ -164,6 +238,8 @@ export default function ProductsPage() {
     setBottleMaterial('Glass');
     setMetaTitle('');
     setMetaDescription('');
+    setImageAltText('');
+    setManualTags([]);
     setImageFile(null);
     setGalleryFiles(null);
     setError('');
@@ -199,6 +275,46 @@ export default function ProductsPage() {
     setBottleMaterial(product.attributes.bottle_material || 'Glass');
     setMetaTitle(product.attributes.meta_title || '');
     setMetaDescription(product.attributes.meta_description || '');
+    setImageAltText(product.attributes.image_alt_text || '');
+
+    // Parse initial manual tags
+    const loadedTags = Array.isArray(product.attributes.tags)
+      ? product.attributes.tags
+      : (product.attributes.tags ? String(product.attributes.tags).split(',').map((t: string) => t.trim()).filter(Boolean) : []);
+
+    const b = product.attributes.brand || 'PerfumeBooth';
+    const g = product.attributes.gender || 'Unisex';
+    const c = product.attributes.category || 'Eau de Parfum (EDP)';
+    const pt = product.attributes.productType || 'Eau de Parfum';
+    const tn = product.attributes.top_notes || '';
+    const mn = product.attributes.middle_notes || '';
+    const bn = product.attributes.base_notes || '';
+    const oc = product.attributes.occasion || 'Daily Wear';
+    const sn = product.attributes.season || 'All Seasons';
+
+    const autoTags: string[] = [];
+    if (g) {
+      const gl = g.toLowerCase();
+      if (gl.includes('men') && !gl.includes('women')) autoTags.push('Perfume for Men', 'men');
+      if (gl.includes('women') || gl.includes('female')) autoTags.push('Perfume for Women', 'women');
+      if (gl.includes('unisex')) autoTags.push('Unisex Perfume', 'unisex');
+    }
+    if (c) autoTags.push(c);
+    if (b) autoTags.push(b);
+    if (pt) autoTags.push(pt);
+    if (oc) autoTags.push(oc);
+    if (sn) autoTags.push(sn);
+    [tn, mn, bn].forEach(notesStr => {
+      if (notesStr) {
+        notesStr.split(',').forEach((n: string) => {
+          const cleaned = n.trim();
+          if (cleaned) autoTags.push(cleaned);
+        });
+      }
+    });
+
+    const manual = loadedTags.filter((t: string) => !autoTags.some(a => a.toLowerCase() === t.toLowerCase()));
+    setManualTags(manual);
 
     setImageFile(null);
     setGalleryFiles(null);
@@ -239,7 +355,8 @@ export default function ProductsPage() {
       productType,
       bottle_material: bottleMaterial,
       meta_title: metaTitle,
-      meta_description: metaDescription
+      meta_description: metaDescription,
+      image_alt_text: imageAltText
     };
     formData.append('attributes', JSON.stringify(attributes));
 
@@ -421,75 +538,74 @@ export default function ProductsPage() {
 
               {/* Brand Name */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Brand Name</label>
-                {!showNewBrandInput ? (
-                  <div className="flex gap-2">
-                    <select
-                      value={brand}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === 'NEW_BRAND') {
-                          setShowNewBrandInput(true);
-                          setBrand('');
-                        } else {
-                          setBrand(val);
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Brand Name</label>
+                  {brand && brand !== 'NEW_BRAND' && !showNewBrandInput && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to delete the brand "${brand}"?`)) {
+                          try {
+                            const res = await apiFetch(`/shop/brands/`, {
+                              method: 'DELETE',
+                              body: JSON.stringify({ brand }),
+                              headers: { 'Content-Type': 'application/json' }
+                            });
+                            alert(`Brand "${brand}" deleted successfully.`);
+                            setBrand('');
+                            fetchBrands();
+                          } catch (err) {
+                            console.error(err);
+                          }
                         }
                       }}
-                      className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                      className="text-[10px] font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer uppercase tracking-wider"
                     >
-                      <option value="">-- Choose Brand --</option>
-                      {brandsList.map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                      <option value="NEW_BRAND">+ Add New Brand...</option>
-                    </select>
-                    {brand && brand !== 'NEW_BRAND' && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (confirm(`Are you sure you want to delete the brand "${brand}"?`)) {
-                            try {
-                              const res = await apiFetch(`/shop/brands/`, {
-                                method: 'DELETE',
-                                body: JSON.stringify({ brand }),
-                                headers: { 'Content-Type': 'application/json' }
-                              });
-                              alert(`Brand "${brand}" deleted successfully.`);
-                              setBrand('');
-                              fetchBrands();
-                            } catch (err) {
-                              console.error(err);
-                              alert("Failed to delete brand.");
-                            }
-                          }
-                        }}
-                        className="px-3.5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-semibold transition duration-200 cursor-pointer flex items-center justify-center border border-red-500/20"
-                        title="Delete this brand"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
+                      Delete Brand
+                    </button>
+                  )}
+                </div>
+                {!showNewBrandInput ? (
+                  <select
+                    value={brand}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'NEW_BRAND') {
+                        setShowNewBrandInput(true);
+                        setBrand('');
+                      } else {
+                        setBrand(val);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  >
+                    <option value="">-- Choose Brand --</option>
+                    {brandsList.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                    <option value="NEW_BRAND">+ Add New Brand...</option>
+                  </select>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-1.5">
                     <input
                       type="text"
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
-                      placeholder="Enter new brand name"
-                      className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
-                      autoFocus
+                      placeholder="Enter new brand name..."
+                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowNewBrandInput(false);
-                        setBrand('');
-                      }}
-                      className="px-3 py-2 bg-secondary hover:bg-border rounded-xl text-xs font-semibold text-muted-foreground transition duration-200 cursor-pointer"
-                    >
-                      Cancel
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewBrandInput(false);
+                          setBrand('');
+                        }}
+                        className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition duration-150 cursor-pointer uppercase tracking-wider"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -773,7 +889,7 @@ export default function ProductsPage() {
                 <input
                   type="text"
                   value={tags}
-                  onChange={(e) => setTags(e.target.value)}
+                  onChange={(e) => handleTagsChange(e.target.value)}
                   placeholder="e.g. fresh, luxury, sweet, office"
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
                 />
@@ -811,6 +927,18 @@ export default function ProductsPage() {
                     {imageFile ? imageFile.name : 'No file chosen'}
                   </span>
                 </div>
+              </div>
+
+              {/* Image Alt Text */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">Image Alt Text</label>
+                <input
+                  type="text"
+                  value={imageAltText}
+                  onChange={(e) => setImageAltText(e.target.value)}
+                  placeholder="e.g. Lomani Code Perfume Bottle"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                />
               </div>
 
               {/* Additional Gallery (Images/Videos) */}
@@ -962,14 +1090,14 @@ export default function ProductsPage() {
   const handleImportExcel = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.xlsx, .xls';
+    input.accept = '.xlsx,.xls,.csv,.XLSX,.XLS,.CSV,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv';
     input.onchange = async (e: any) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      
+
       const formData = new FormData();
       formData.append('file', file);
-      
+
       try {
         const response = await apiFetch('/shop/products/excel-import/', {
           method: 'POST',
@@ -989,32 +1117,46 @@ export default function ProductsPage() {
     <div className="flex flex-col gap-8">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Catalog</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage store products, stock levels, and S3 images</p>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-foreground">Catalog</h1>
+            <span className="text-xs font-bold text-muted-foreground bg-secondary/80 border border-border px-2.5 py-1 rounded-xl uppercase tracking-wider">
+              {products.length} {products.length === 1 ? 'product' : 'products'}
+            </span>
+          </div>
+          <p className="text-muted-foreground text-sm">Manage store products, stock levels, and S3 images</p>
         </div>
         <div className='flex justify-center item-center gap-3'>
+          {selectedSlugs.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+            >
+              <Trash2 className="w-5 h-5" />
+              <span>Delete ({selectedSlugs.length})</span>
+            </button>
+          )}
           <button
-          onClick={handleImportExcel}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
-        >
-          <FileDown className="w-5 h-5" />
-          <span>Import Excel</span>
-        </button>
-        <button
-          onClick={handleExportExcel}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
-        >
-          <FileUp className="w-5 h-5" />
-          <span>Export Excel</span>
-        </button>
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Product</span>
-        </button>
+            onClick={handleImportExcel}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+          >
+            <FileDown className="w-5 h-5" />
+            <span>Import Excel</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+          >
+            <FileUp className="w-5 h-5" />
+            <span>Export Excel</span>
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Product</span>
+          </button>
         </div>
       </div>
 
@@ -1043,6 +1185,20 @@ export default function ProductsPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground font-semibold">
+                  <th className="p-5 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredProducts.length > 0 && selectedSlugs.length === filteredProducts.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSlugs(filteredProducts.map(p => p.slug));
+                        } else {
+                          setSelectedSlugs([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
+                    />
+                  </th>
                   <th className="p-5 w-16">Preview</th>
                   <th className="p-5">Title / SKU</th>
                   <th className="p-5">Brand Name</th>
@@ -1051,19 +1207,34 @@ export default function ProductsPage() {
                   <th className="p-5">Price</th>
                   <th className="p-5">Stock Level</th>
                   <th className="p-5">Status</th>
+                  <th className="p-5">Editor</th>
                   <th className="p-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-10 text-center text-muted-foreground">
+                    <td colSpan={11} className="p-10 text-center text-muted-foreground">
                       No products found. Add your first item!
                     </td>
                   </tr>
                 ) : (
                   filteredProducts.map((product) => (
                     <tr key={product.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
+                      <td className="p-5 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedSlugs.includes(product.slug)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedSlugs([...selectedSlugs, product.slug]);
+                            } else {
+                              setSelectedSlugs(selectedSlugs.filter(s => s !== product.slug));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
+                        />
+                      </td>
                       <td className="p-5">
                         {product.image ? (
                           ['mp4', 'webm', 'mov', 'ogg', 'm4v'].some(ext => product.image?.toLowerCase().endsWith('.' + ext)) ? (
@@ -1119,6 +1290,16 @@ export default function ProductsPage() {
                           }`}>
                           {product.is_online ? 'Online' : 'Offline'}
                         </span>
+                      </td>
+                      <td className="p-5">
+                        <div className="flex flex-col text-xs gap-0.5">
+                          <span className="text-foreground font-semibold">
+                            L: {product.created_by_name || 'System'}
+                          </span>
+                          <span className="text-muted-foreground text-[10px]">
+                            U: {product.updated_by_name || 'N/A'}
+                          </span>
+                        </div>
                       </td>
                       <td className="p-5 text-right">
                         <div className="flex justify-end gap-3">

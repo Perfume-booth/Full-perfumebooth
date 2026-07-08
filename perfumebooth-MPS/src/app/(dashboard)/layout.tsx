@@ -15,16 +15,27 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuthStore();
-  const [mounted, setMounted] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    if (!user) {
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setIsHydrated(true);
+    });
+
+    if (useAuthStore.persist.hasHydrated()) {
+      setIsHydrated(true);
+    }
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated && !user) {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [isHydrated, user, router]);
 
-  if (!mounted) {
+  if (!isHydrated) {
     return <div className="min-h-screen bg-background"></div>;
   }
 
