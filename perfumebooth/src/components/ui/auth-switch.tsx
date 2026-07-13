@@ -29,39 +29,10 @@ export default function AuthSwitch() {
   return (
     <div className="flex flex-col items-center w-full max-w-lg mx-auto py-2">
       
-      {/* Premium Segmented Switcher - Hidden in forgot mode */}
-      {mode !== "forgot" && (
-        <div className="relative flex p-1 bg-[var(--color-bg-subtle)] rounded-full mb-8 border border-[var(--color-border)] w-fit mx-auto shadow-inner">
-          <div 
-            className="absolute h-[calc(100%-8px)] rounded-full bg-[var(--color-maroon)] shadow-lg transition-all duration-300 ease-out"
-            style={{ 
-              left: mode === "signin" ? "4px" : "110px",
-              width: mode === "signin" ? "100px" : "130px"
-            }}
-          />
-          <button
-            onClick={() => setMode("signin")}
-            className={cn(
-              "relative z-10 px-6 py-2 text-[10px] uppercase tracking-[0.2em] font-bold transition-colors duration-300 w-[100px]",
-              mode === "signin" ? "text-white" : "text-[var(--color-text-muted)] hover:text-white"
-            )}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => setMode("signup")}
-            className={cn(
-              "relative z-10 px-6 py-2 text-[10px] uppercase tracking-[0.2em] font-bold transition-colors duration-300 w-[130px]",
-              mode === "signup" ? "text-white" : "text-[var(--color-text-muted)] hover:text-white"
-            )}
-          >
-            Create Account
-          </button>
-        </div>
-      )}
+      {/* Premium Segmented Switcher - Removed as requested */}
 
-      {/* Forms Container with Animation */}
-      <div className="w-full">
+      {/* Auth Container with Morphing height */}
+      <div className="relative w-full  p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={mode}

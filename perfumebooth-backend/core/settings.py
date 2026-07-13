@@ -146,6 +146,7 @@ CELERY_TASK_ROUTES = {
 # ─────────────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -165,6 +166,17 @@ REST_FRAMEWORK = {
         'user': '300/minute',
     },
 }
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+}
+
 
 # Session & CSRF Cookie Settings for Local Cross-Origin Dev
 SESSION_COOKIE_SAMESITE = 'Lax'
@@ -211,22 +223,33 @@ CORS_ALLOW_HEADERS = [
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 
-# S3 / Local Media Storage Dynamic Configuration
-USE_S3 = config('USE_S3', default=False, cast=bool)
+# Cloudflare R2 / Local Media Storage Dynamic Configuration
+USE_R2 = config('USE_R2', default=False, cast=bool)
 
-if USE_S3:
-    AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
-    AWS_S3_CUSTOM_DOMAIN = config('AWS_S3_CUSTOM_DOMAIN', default=None)
-    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
+if USE_R2:
+    R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID')
+    R2_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY')
+    R2_STORAGE_BUCKET_NAME = config('R2_BUCKET_NAME')
+    R2_S3_ENDPOINT_URL = config('R2_ENDPOINT_URL')  # e.g., https://<account_id>.r2.cloudflarestorage.com
+    R2_S3_CUSTOM_DOMAIN = config('R2_CUSTOM_DOMAIN', default=None)  # e.g., media.perfumebooth.com or R2 public domain
+    
+    # Auto-fallback to local filesystem if credentials are still placeholder values
+    if "your_cloudflare" in R2_ACCESS_KEY_ID or "your_bucket_name" in R2_STORAGE_BUCKET_NAME or "<your_cloudflare_account_id>" in R2_S3_ENDPOINT_URL:
+        USE_R2 = False
+
+if USE_R2:
     
     STORAGES = {
         "default": {
             "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
             "OPTIONS": {
-                "default_acl": "public-read",
+                "access_key": R2_ACCESS_KEY_ID,
+                "secret_key": R2_SECRET_ACCESS_KEY,
+                "bucket_name": R2_STORAGE_BUCKET_NAME,
+                "endpoint_url": R2_S3_ENDPOINT_URL,
+                "custom_domain": R2_S3_CUSTOM_DOMAIN,
+                "region_name": "auto",
+                "default_acl": None,  # Cloudflare R2 does not support S3 ACLs
                 "querystring_auth": False,
             }
         },
@@ -235,10 +258,11 @@ if USE_S3:
         },
     }
     
-    if AWS_S3_CUSTOM_DOMAIN:
-        MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
+    if R2_S3_CUSTOM_DOMAIN:
+        MEDIA_URL = f'https://{R2_S3_CUSTOM_DOMAIN}/'
     else:
-        MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/'
+        # Default R2 public bucket URL fallback if custom domain is not provided
+        MEDIA_URL = f'https://{R2_STORAGE_BUCKET_NAME}.r2.dev/'
 else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'

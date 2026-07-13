@@ -36,3 +36,16 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('attributes', 'embedding', 'is_online')
         }),
     )
+
+from .models import PageBanner, PageBannerImage
+
+class PageBannerImageInline(admin.TabularInline):
+    model = PageBannerImage
+    extra = 1
+
+@admin.register(PageBanner)
+class PageBannerAdmin(admin.ModelAdmin):
+    list_display = ('page_slug', 'title', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('page_slug', 'title')
+    inlines = [PageBannerImageInline]

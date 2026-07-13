@@ -3,7 +3,8 @@ from django.urls import path
 from .views import (
     ProductListView, ProductDetailView, DashboardAnalyticsView, BrandListView, 
     ProductFacetsView, CollectionListCreateView, CollectionDetailView,
-    ProductExcelExportView, ProductExcelImportView
+    ProductExcelExportView, ProductExcelImportView, PageBannerDetailView,
+    PageBannerListCreateView, PageBannerDeleteView, PageBannerImageDeleteView
 )
 
 urlpatterns = [
@@ -16,4 +17,9 @@ urlpatterns = [
     path('facets/', ProductFacetsView.as_view(), name='product-facets'),
     path('collections/', CollectionListCreateView.as_view(), name='collection-list'),
     path('collections/<path:slug>/', CollectionDetailView.as_view(), name='collection-detail'),
+    path('banners/', PageBannerListCreateView.as_view(), name='banner-list-create'),
+    path('banners/delete/<uuid:id>/', PageBannerDeleteView.as_view(), name='banner-delete'),
+    path('banners/image/delete/<uuid:id>/', PageBannerImageDeleteView.as_view(), name='banner-image-delete'),
+    path('banners/<path:slug>/', PageBannerDetailView.as_view(), name='banner-detail'),
 ]
+

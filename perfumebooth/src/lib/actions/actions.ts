@@ -275,9 +275,9 @@ export async function getProductOffers(productId: string, productTags: string[] 
   return offers;
 }
 
-export async function cancelShopifyOrder(orderId: string, customerId: string) {
+export async function cancelOrder(orderId: string, customerId: string) {
   // TODO: Replace with your own backend API call
-  console.log("cancelShopifyOrder: Shopify removed.", { orderId, customerId });
+  console.log("cancelOrder: Shopify removed.", { orderId, customerId });
   return { success: false, error: "Shopify connection removed. Not implemented." };
 }
 
@@ -292,3 +292,4 @@ export async function getProductAction(handle: string) {
   console.log("getProductAction: Shopify removed.", { handle });
   return null;
 }
+ 

@@ -181,6 +181,46 @@ class StaffDetailView(APIView):
         user.delete()
         return Response({'detail': 'Staff member deleted successfully.'})
 
+    def put(self, request, pk: str):
+        try:
+            user = CustomUser.objects.get(id=pk)
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.email == 'superadmin@perfumebooth.com':
+            return Response({'detail': 'Cannot modify the primary Super Admin account.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        role_name = request.data.get('role')
+
+        if first_name is not None:
+            user.first_name = first_name
+        if last_name is not None:
+            user.last_name = last_name
+        user.save()
+
+        if role_name:
+            try:
+                role = Role.objects.get(name=role_name)
+                # clear existing roles and set the new one
+                UserRole.objects.filter(user=user).delete()
+                UserRole.objects.create(user=user, role=role)
+            except Role.DoesNotExist:
+                return Response({'detail': f'Role "{role_name}" does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'id': str(user.id),
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'roles': list(user.roles.values_list('role__name', flat=True)),
+            'detail': 'Staff member updated successfully.'
+        })
+
+
+
+
 
 class StaffAuditLogView(APIView):
     """

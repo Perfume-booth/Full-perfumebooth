@@ -3,11 +3,11 @@
 import Image from "next/image";
 import { motion, cubicBezier } from "framer-motion";
 import Link from "next/link";
-import { ShopifyCollection } from "@/lib/shopify/types";
+import { Collection } from "@/lib/shopify";
 import { AnimatedChevronRight } from "@/components/ui/icons";
 
 interface CollectionsClientProps {
-  collections: ShopifyCollection[];
+  collections: Collection[];
 }
 
 // ─── Image metadata keyed by handle fragment ──────────────────────────────────
@@ -35,11 +35,11 @@ const FALLBACK_MAP: Record<string, { url: string; type: "banner" | "product" }> 
 
 const DEFAULT = { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/perfume.png?v=1778139272", type: "product" as const };
 
-function getMedia(collection: ShopifyCollection): { url: string; type: "banner" | "product" } {
+function getMedia(collection: Collection): { url: string; type: "banner" | "product" } {
   // Shopify native collection image — detect type by checking if it's a jpg (wide banner) or png (product)
   if (collection.image?.url) {
     const url = collection.image.url;
-    const isJpeg = url.includes(".jpg") || url.includes(".jpeg") || url.includes("_jpg");
+    const isJpeg = url.includes(".jpg") || url.includes(".jpeg") || url.includes("_jpg") || url.includes(".webp") || url.includes(".avif");
     return { url, type: isJpeg ? "banner" : "product" };
   }
   const handle = collection.handle.toLowerCase();
@@ -60,7 +60,7 @@ const cardVariants = {
 };
 
 // ─── Banner card (wide 4.66:1) — spans 2 columns, uses full-width panoramic view ─
-function BannerCard({ collection, url }: { collection: ShopifyCollection; url: string }) {
+function BannerCard({ collection, url }: { collection: Collection; url: string }) {
   return (
     <Link
       href={`/${collection.handle}`}
@@ -100,7 +100,7 @@ function BannerCard({ collection, url }: { collection: ShopifyCollection; url: s
 }
 
 // ─── Product card (~1.18:1) — standard grid cell, contains the product PNG cleanly ─
-function ProductCard({ collection, url }: { collection: ShopifyCollection; url: string }) {
+function ProductCard({ collection, url }: { collection: Collection; url: string }) {
   return (
     <Link
       href={`/${collection.handle}`}
@@ -150,8 +150,8 @@ export default function CollectionsGrid({ collections }: CollectionsClientProps)
     >
       {/* Group collections: banners span full width (or 2-col), products in a grid */}
       {(() => {
-        const banners: ShopifyCollection[] = [];
-        const products: ShopifyCollection[] = [];
+        const banners: Collection[] = [];
+        const products: Collection[] = [];
 
         collections.forEach((c) => {
           const { type } = getMedia(c);

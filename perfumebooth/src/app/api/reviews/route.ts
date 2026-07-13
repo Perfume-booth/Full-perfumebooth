@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
 
   if (handle) {
     try {
-      const res = await fetch(`http://localhost:8000/api/shop/products/${handle}/`);
+      const backendUrl = process.env.BACKEND_API_URL || "http://django:8000";
+      const res = await fetch(`${backendUrl}/api/shop/products/${handle}/`);
       if (res.ok) {
         const p = await res.json();
         rating = p.rating || 4.5;
@@ -28,43 +29,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Fetch real live reviews from Judge.me API
-  let liveJudgemeReviews: any[] = [];
-  try {
-    const jToken = process.env.JUDGEME_PRIVATE_TOKEN || "K-8hpK-mc8LzBUHwKCjZgVNUQZE";
-    const jDomain = process.env.SHOPIFY_STORE_DOMAIN || "perfumesbooth.myshopify.com";
-    const jUrl = `https://judge.me/api/v1/reviews?api_token=${jToken}&shop_domain=${jDomain}&per_page=100`;
-    const jRes = await fetch(jUrl, { next: { revalidate: 60 } });
-    if (jRes.ok) {
-      const jData = await jRes.json();
-      if (jData && Array.isArray(jData.reviews)) {
-        let matchingReviews = jData.reviews;
-        if (handle) {
-          matchingReviews = matchingReviews.filter((r: any) => r.product_handle === handle);
-        }
-        liveJudgemeReviews = matchingReviews.map((r: any) => {
-          const images = r.pictures ? r.pictures.map((p: any) => p.urls?.huge || p.urls?.original).filter(Boolean) : [];
-          return {
-            id: `jdgm-${r.id}`,
-            productHandle: r.product_handle || handle || "",
-            name: r.reviewer?.name || "Verified Buyer",
-            email: r.reviewer?.email || "",
-            role: "Verified Buyer",
-            text: r.body || "",
-            rating: r.rating || 5,
-            images: images,
-            image: images[0] || null,
-            isVerified: r.verified !== 'nothing',
-            date: r.created_at ? r.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
-          };
-        });
-      }
-    }
-  } catch (e) {
-    console.error("Error fetching live Judge.me API reviews:", e);
-  }
-
-  const combinedReviews = [...liveJudgemeReviews, ...localReviews];
+  const combinedReviews = localReviews;
   
   if (combinedReviews.length > 0) {
     const sum = combinedReviews.reduce((acc: any, r: any) => acc + (r.rating || 5), 0);

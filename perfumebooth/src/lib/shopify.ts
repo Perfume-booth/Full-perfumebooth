@@ -1,13 +1,12 @@
 /**
  * Backend Data Service Layer
- * Swapped off Shopify and connected to local Django REST API.
+ * Swapped products/collections/cart/customer to backend Django REST API.
+ * Preserves shopify/content for banners, blogs, and policy pages.
  */
 
-export * from './shopify/types';
-export * from './shopify/products';
-export * from './shopify/collections';
+export * from './backend/types';
+export * from './backend/products';
+export * from './backend/collections';
 export * from './shopify/content';
-export * from './shopify/cart';
-export * from './shopify/customer';
-
-
+export * from './backend/cart';
+export * from './backend/customer';

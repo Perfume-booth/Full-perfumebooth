@@ -1,4 +1,5 @@
 import re
+# pyrefly: ignore [missing-import]
 from django.db import transaction
 from .models import Product, AutoCollection, ProductCollection
 
@@ -69,15 +70,24 @@ class CollectionSyncService:
         current_slugs = {link.collection.slug for link in current_links}
         target_slugs = {tc['slug'] for tc in target_collections}
 
-        # No-Op Guard
-        if current_slugs == target_slugs:
-            return True
-
         # In-Memory cache of collections (Anti N+1 Directive)
         all_target_slugs = list(target_slugs)
         existing_collections = {
             col.slug: col for col in AutoCollection.objects.filter(slug__in=all_target_slugs)
         }
+
+        # Filter out target collections where this product is manually excluded
+        excluded_col_slugs = set()
+        for slug_str in list(target_slugs):
+            col = existing_collections.get(slug_str)
+            if col and col.excluded_products and str(product.id) in col.excluded_products:
+                excluded_col_slugs.add(slug_str)
+        
+        target_slugs = target_slugs - excluded_col_slugs
+
+        # No-Op Guard
+        if current_slugs == target_slugs:
+            return True
 
         # Create collection if missing (Upsert)
         for tc in target_collections:

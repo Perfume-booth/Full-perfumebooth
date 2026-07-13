@@ -1,4 +1,4 @@
-import { getCollectionProducts } from "@/lib/shopify";
+import { getCollectionProducts, getBanner } from "@/lib/shopify";
 import SideFilter from "@/components/product/SideFilter";
 import CollectionProductGrid from "@/components/product/CollectionProductGrid";
 import CollectionBanner from "@/components/ui/CollectionBanner";
@@ -74,14 +74,11 @@ export default async function BrandPage({ params, searchParams }: BrandPageProps
   }
 
   // Fetch brand collection data including products
-  const collection = await getCollectionProducts(
-    slug, 
-    80, 
-    null, 
-    filterOptions, 
-    sortKey, 
-    reverse
-  );
+  // Fetch banner data concurrently
+  const [collection, cmsBanner] = await Promise.all([
+    getCollectionProducts(slug, 80, null, filterOptions, sortKey, reverse),
+    getBanner(slug)
+  ]);
 
   if (!collection) {
     return notFound();
@@ -89,6 +86,9 @@ export default async function BrandPage({ params, searchParams }: BrandPageProps
 
   const { title, products, totalCount, pageInfo, filters } = collection;
   const media = BRAND_MEDIA[slug] || BRAND_MEDIA["default"];
+  
+  // Extract CMS images if available
+  const cmsImages = cmsBanner?.images?.map((img: any) => img.image_url) || [];
 
   return (
     <main className="pt-20 lg:pt-28">
@@ -105,6 +105,7 @@ export default async function BrandPage({ params, searchParams }: BrandPageProps
           bannerImage={media?.type === 'image' ? media.desktopSrc : undefined}
           bannerVideo={media?.type === 'video' ? media.desktopSrc : undefined}
           backendBannerImage={collection.bannerImage}
+          cmsBannerImages={cmsImages}
         />
         <CollectionProductGrid />
       </SideFilter>

@@ -164,10 +164,6 @@ function AuthPageContent() {
                transition={{ delay: 0.4 }}
                className="relative z-10"
              >
-                <div className="mb-10">
-                   <h2 className="text-[var(--color-text-secondary)] text-[11px] uppercase tracking-[0.4em] font-bold mb-2">Perfume Booth </h2>
-                   <p className="text-[var(--color-text-muted)] text-[12px] font-sans">Enter the architectural world of scent.</p>
-                </div>
                 <AuthSwitch />
              </motion.div>
              

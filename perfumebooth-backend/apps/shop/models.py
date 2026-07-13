@@ -145,6 +145,7 @@ class Collection(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
     sort_order = models.IntegerField(default=0)
     products = models.ManyToManyField(Product, blank=True, related_name='collections')
+    excluded_products = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -160,8 +161,13 @@ class Collection(models.Model):
     def get_products(self):
         """Resolve products based on match_type."""
         base = Product.objects.filter(is_online=True)
+        if self.excluded_products:
+            base = base.exclude(id__in=self.excluded_products)
         if self.match_type == 'manual':
-            return self.products.filter(is_online=True)
+            qs = self.products.filter(is_online=True)
+            if self.excluded_products:
+                qs = qs.exclude(id__in=self.excluded_products)
+            return qs
         elif self.match_type == 'gender':
             return base.filter(attributes__gender__iexact=self.match_value)
         elif self.match_type == 'brand':
@@ -194,6 +200,7 @@ class AutoCollection(models.Model):
     seo_description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=50, default='active')
     products = models.ManyToManyField(Product, through='ProductCollection', related_name='auto_collections')
+    excluded_products = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -210,3 +217,42 @@ class ProductCollection(models.Model):
         db_table = 'product_collections'
         unique_together = ('product', 'collection')
 
+class PageBanner(models.Model):
+    """
+    A specific CMS-managed banner for a specific page slug (e.g. 'men', 'al-haramain').
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    page_slug = models.CharField(max_length=255, unique=True, help_text="The URL slug of the page (e.g., 'men', 'al-haramain', 'all')")
+    title = models.CharField(max_length=255, blank=True, null=True, help_text="Optional title for internal reference")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'shop_page_banner'
+        verbose_name = 'Page Banner'
+        verbose_name_plural = 'Page Banners'
+
+    def __str__(self) -> str:
+        return f"Banner for /{self.page_slug} ({self.title or 'No Title'})"
+
+
+class PageBannerImage(models.Model):
+    """
+    Individual images in a PageBanner (allowing for slideshows).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    banner = models.ForeignKey(PageBanner, on_delete=models.CASCADE, related_name='images')
+    image = models.FileField(upload_to='banners/')
+    mobile_image = models.FileField(upload_to='banners/mobile/', null=True, blank=True)
+    sort_order = models.IntegerField(default=0)
+    link_url = models.CharField(max_length=500, blank=True, null=True, help_text="Optional link when clicking the banner image")
+
+    class Meta:
+        db_table = 'shop_page_banner_image'
+        ordering = ['sort_order']
+        verbose_name = 'Banner Image'
+        verbose_name_plural = 'Banner Images'
+
+    def __str__(self) -> str:
+        return f"Image for {self.banner.page_slug} (Order: {self.sort_order})"

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 interface Product {
+  slug: any;
   id: string;
   title: string;
   sku: string;
@@ -24,6 +25,7 @@ interface Product {
 }
 
 interface Collection {
+  excluded_products: never[];
   id: string;
   title: string;
   slug: string;
@@ -57,6 +59,11 @@ export default function CollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Search & Filter State
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState(''); // 'active', 'offline', or ''
+  const [filterMatchType, setFilterMatchType] = useState(''); // 'manual', 'brand', etc.
+
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
@@ -72,7 +79,9 @@ export default function CollectionsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [excludedProductIds, setExcludedProductIds] = useState<string[]>([]);
   const [productSearch, setProductSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Delete State
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -139,6 +148,7 @@ export default function CollectionsPage() {
     setImageFile(null);
     setImagePreview(null);
     setSelectedProductIds([]);
+    setExcludedProductIds([]);
     setProductSearch('');
     setError(null);
     setModalOpen(true);
@@ -156,6 +166,7 @@ export default function CollectionsPage() {
     setImageFile(null);
     setImagePreview(col.image);
     setSelectedProductIds(col.products || []);
+    setExcludedProductIds(col.excluded_products || []);
     setProductSearch('');
     setError(null);
     setModalOpen(true);
@@ -203,6 +214,11 @@ export default function CollectionsPage() {
     e.preventDefault();
     setError(null);
 
+    if (matchType === 'manual' && selectedProductIds.length === 0) {
+      setError('A manual collection must contain at least 1 product.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('title', title);
     formData.append('slug', slug);
@@ -219,6 +235,7 @@ export default function CollectionsPage() {
     if (matchType === 'manual') {
       formData.append('products', JSON.stringify(selectedProductIds));
     }
+    formData.append('excluded_products', JSON.stringify(excludedProductIds));
 
     try {
       if (editingCollection) {
@@ -288,24 +305,44 @@ export default function CollectionsPage() {
   };
 
   if (modalOpen) {
+    const selectedProducts = products.filter(p => selectedProductIds.includes(p.id));
+
     return (
-      <div className="flex flex-col gap-8 max-w-4xl mx-auto pb-12">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => setModalOpen(false)}
-            className="p-2.5 hover:bg-secondary border border-border rounded-xl transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground bg-card"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              {editingCollection ? 'Edit Collection' : 'Create Collection'}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              Configure collection layout, banner, and matching logic.
-            </p>
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12">
+        {/* Editor Top Bar Header */}
+        <div className="flex items-center justify-between border-b border-border pb-5">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setModalOpen(false)}
+              className="px-3 py-2 text-xs font-semibold hover:bg-secondary border border-border rounded-xl transition duration-200 cursor-pointer text-muted-foreground bg-card"
+            >
+              &larr; Back to Collections
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {editingCollection ? `Edit Collection: ${editingCollection.title}` : 'Create Collection'}
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Configure banner, manual products list, matching criteria, and SEO settings.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setModalOpen(false)}
+              className="px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-xl text-xs transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="px-5 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg transition duration-200 text-xs cursor-pointer"
+            >
+              {editingCollection ? 'Save Changes' : 'Create'}
+            </button>
           </div>
         </div>
 
@@ -315,12 +352,17 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* LEFT COLUMN: Main Collection Details */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            
+            {/* Title & Description Card */}
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Content</h2>
+              
               {/* Title */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Collection Title</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase">Title</label>
                 <input
                   type="text"
                   required
@@ -331,34 +373,260 @@ export default function CollectionsPage() {
                 />
               </div>
 
-              {/* Slug */}
+              {/* Description */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">URL Slug</label>
-                <input
-                  type="text"
-                  required
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="e.g. summer-best-sellers"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                <label className="text-xs font-semibold text-muted-foreground uppercase">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Write a descriptive collection banner text..."
+                  rows={6}
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground resize-none"
                 />
               </div>
             </div>
 
-            {/* Description */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="A description for this collection banner..."
-                rows={3}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground resize-none"
-              />
+            {/* Products Card (Shopify Style) */}
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-border pb-2.5">
+                <h2 className="text-sm font-bold text-foreground">Products in Collection</h2>
+                <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  {selectedProductIds.length} {selectedProductIds.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+
+              {matchType !== 'manual' && (
+                <div className="p-3 bg-muted/10 border border-border rounded-xl text-center">
+                  <p className="text-[11px] text-muted-foreground">
+                    This collection dynamically matches products by rule: 
+                    <span className="font-semibold text-foreground ml-1">
+                      {matchType.toUpperCase()} &middot; "{matchValue || 'Any'}"
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4">
+                {/* Search and Picker Input */}
+                {matchType === 'manual' && (
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground/75" />
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Search product inventory to add..."
+                      className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                    />
+                    
+                    {/* Add Product Dropdown Picker List */}
+                    {productSearch && (
+                      <div className="absolute z-10 w-full mt-1.5 max-h-60 overflow-y-auto bg-card border border-border rounded-xl shadow-lg divide-y divide-border/60">
+                        {filteredProducts.filter(p => !selectedProductIds.includes(p.id)).slice(0, 10).map((p) => (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedProductIds([...selectedProductIds, p.id]);
+                              setProductSearch('');
+                            }}
+                            className="flex items-center gap-3 p-3 hover:bg-muted/40 cursor-pointer transition"
+                          >
+                            <div className="w-8 h-8 rounded-lg border border-border overflow-hidden bg-background">
+                              {p.image ? (
+                                <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon className="w-4 h-4 text-muted-foreground/50 m-auto" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-foreground truncate">{p.title}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{p.brand} &middot; SKU: {p.sku}</p>
+                            </div>
+                            <span className="text-[10px] font-bold text-primary mr-1 hover:underline">+ Add</span>
+                          </div>
+                        ))}
+                        {filteredProducts.filter(p => !selectedProductIds.includes(p.id)).length === 0 && (
+                          <div className="p-4 text-center text-xs text-muted-foreground">
+                            No unselected products found.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected Products Table Grid list */}
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/20 text-muted-foreground font-semibold">
+                          <th className="p-3 w-12">Thumbnail</th>
+                          <th className="p-3">Product Name</th>
+                          <th className="p-3">SKU</th>
+                          <th className="p-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedProducts.map((p) => (
+                          <tr key={p.id} className="border-b border-border/40 hover:bg-muted/10 transition">
+                            <td className="p-3">
+                              <div className="w-10 h-10 rounded-lg border border-border bg-background overflow-hidden flex items-center justify-center">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                                ) : (
+                                  <ImageIcon className="w-5 h-5 text-muted-foreground/20" />
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <a
+                                href={`/products?edit=${p.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-foreground hover:text-primary hover:underline transition"
+                                title="Edit product in a new tab"
+                              >
+                                {p.title}
+                              </a>
+                            </td>
+                            <td className="p-3 font-mono text-muted-foreground">{p.sku}</td>
+                            <td className="p-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProductIds(selectedProductIds.filter(id => id !== p.id));
+                                  if (matchType !== 'manual') {
+                                    setExcludedProductIds(prev => [...prev, p.id]);
+                                  }
+                                }}
+                                className="p-1.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 rounded-lg transition cursor-pointer"
+                                title="Remove from Collection"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {selectedProducts.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-muted-foreground font-medium">
+                              {matchType === 'manual' 
+                                ? "No products selected. Use the search bar above to add products manually."
+                                : "No products are currently matched by this collection's automatic logic rule."
+                              }
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Match Type */}
+            {/* Bottom Card: Search Engine SEO Listing Preview */}
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Search Engine Listing Preview</h2>
+              
+              <div className="flex flex-col gap-3 p-4 bg-muted/20 border border-border rounded-xl">
+                <span className="text-xs font-semibold text-blue-400 hover:underline truncate block">
+                  https://perfumebooth.com/collections/{slug}
+                </span>
+                <span className="text-xs font-bold text-foreground block">
+                  {title || "Unreleased Collection Title"}
+                </span>
+                <span className="text-[11px] text-muted-foreground leading-relaxed block truncate max-w-xl">
+                  {description || "Add a description to see how this collection will look in search results."}
+                </span>
+              </div>
+
+              {/* Edit URL Handle */}
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">URL Handle Slug</label>
+                <div className="flex rounded-xl overflow-hidden border border-border focus-within:border-primary transition duration-200 bg-background text-sm">
+                  <span className="bg-muted px-3.5 py-2.5 text-muted-foreground select-none font-semibold border-r border-border">/collections/</span>
+                  <input
+                    type="text"
+                    required
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                    placeholder="e.g. summer-best-sellers"
+                    className="flex-1 bg-transparent px-3 py-2.5 focus:outline-none text-foreground"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Sidebar Configuration Settings */}
+          <div className="lg:col-span-1 flex flex-col gap-6">
+            
+            {/* Status Panel */}
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Status</h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-foreground">Status (Active)</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Show collection on shop pages.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsActive(!isActive)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${
+                    isActive ? 'bg-primary' : 'bg-muted border border-border'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${
+                      isActive ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Collection Image Upload */}
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Image</h2>
+              
+              <div className="flex flex-col gap-4 items-center p-5 border border-dashed border-border rounded-xl bg-muted/20 text-center">
+                <div className="relative w-full h-32 bg-background border border-border rounded-xl flex items-center justify-center overflow-hidden">
+                  {imagePreview ? (
+                    <>
+                      <img src={imagePreview} alt="Collection Banner Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageFile(null);
+                          setImagePreview(null);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition"
+                        title="Remove Image"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-foreground">Upload banner image</span>
+                  <span className="text-[10px] text-muted-foreground">Supported format: WEBP, PNG, JPG (Max 2MB)</span>
+                  <label className="mt-2.5 px-4 py-1.5 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-lg text-xs cursor-pointer inline-block text-center transition">
+                    Browse Image
+                    <input type="file" onChange={handleImageChange} className="hidden" accept="image/*" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Matching Logic Configuration */}
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
+              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Type</h2>
+              
+              {/* Match Type Selection */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase">Matching Logic</label>
                 <select
@@ -367,7 +635,7 @@ export default function CollectionsPage() {
                     setMatchType(e.target.value as any);
                     setMatchValue('');
                   }}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground font-medium"
                 >
                   <option value="manual">Manual Selection</option>
                   <option value="gender">Filter by Gender</option>
@@ -378,7 +646,7 @@ export default function CollectionsPage() {
                 </select>
               </div>
 
-              {/* Match Value */}
+              {/* Match Target Value */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase">Match Target Value</label>
                 {matchType === 'manual' ? (
@@ -386,7 +654,7 @@ export default function CollectionsPage() {
                     type="text"
                     disabled
                     placeholder="N/A for Manual Selection"
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-sm text-muted-foreground cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-xs text-muted-foreground cursor-not-allowed"
                   />
                 ) : (
                   <div className="relative">
@@ -395,17 +663,22 @@ export default function CollectionsPage() {
                       required
                       value={matchValue}
                       onChange={(e) => setMatchValue(e.target.value)}
-                      placeholder="Select or type a value"
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                      placeholder="Select or type a value..."
+                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground font-medium"
                     />
-                    {getSuggestions().length > 0 && (
+                    {showSuggestions && getSuggestions().length > 0 && (
                       <div className="absolute z-10 w-full mt-1 max-h-40 overflow-y-auto bg-card border border-border rounded-xl shadow-lg">
                         {getSuggestions().map((s) => (
                           <button
                             key={s}
                             type="button"
-                            onClick={() => setMatchValue(s)}
-                            className="w-full text-left px-4 py-2 hover:bg-muted text-sm text-foreground transition"
+                            onClick={() => {
+                              setMatchValue(s);
+                              setShowSuggestions(false);
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-muted text-xs text-foreground transition font-medium"
                           >
                             {s}
                           </button>
@@ -416,144 +689,33 @@ export default function CollectionsPage() {
                 )}
               </div>
 
-              {/* Sort Order */}
+              {/* Sort Order Priority */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase">Sort Order Priority</label>
                 <input
                   type="number"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground font-medium"
                 />
               </div>
             </div>
-
-            {/* Banner Image */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Collection Banner Image</label>
-              <div className="flex items-center gap-6 p-5 border border-dashed border-border rounded-2xl bg-muted/20">
-                <div className="relative w-32 h-20 bg-background border border-border rounded-xl flex items-center justify-center overflow-hidden">
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
-                  )}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-semibold text-foreground">Upload banner image</span>
-                  <span className="text-xs text-muted-foreground">Supported format: WEBP, PNG, JPG (Max 2MB)</span>
-                  <label className="mt-1 px-4 py-1.5 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-lg text-xs cursor-pointer inline-block text-center transition">
-                    Browse File
-                    <input type="file" onChange={handleImageChange} className="hidden" accept="image/*" />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Product Picker (Manual Match Only) */}
-            {matchType === 'manual' && (
-              <div className="flex flex-col gap-3 border border-border p-5 rounded-2xl bg-muted/10">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <label className="text-sm font-semibold text-foreground">Select Products ({selectedProductIds.length} selected)</label>
-                    <p className="text-xs text-muted-foreground">Choose products manually linked to this collection</p>
-                  </div>
-                  <div className="relative max-w-xs w-full">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/75" />
-                    <input
-                      type="text"
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      placeholder="Search products..."
-                      className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-2 mt-2">
-                  {filteredProducts.map((p) => {
-                    const isChecked = selectedProductIds.includes(p.id);
-                    return (
-                      <div
-                        key={p.id}
-                        onClick={() => handleProductToggle(p.id)}
-                        className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition ${
-                          isChecked
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:bg-muted/30'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}} // Swallowed: handled by div click
-                          className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
-                        />
-                        <div className="w-10 h-10 rounded-lg border border-border overflow-hidden bg-background">
-                          {p.image ? (
-                            <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted text-[10px]">No image</div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-foreground truncate">{p.title}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{p.brand} &middot; SKU: {p.sku}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filteredProducts.length === 0 && (
-                    <div className="col-span-2 text-center py-6 text-sm text-muted-foreground">
-                      No matching products found.
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Active Toggle */}
-            <div className="flex items-center justify-between p-4 border border-border rounded-2xl bg-muted/20">
-              <div>
-                <span className="text-sm font-semibold text-foreground">Collection Status</span>
-                <p className="text-xs text-muted-foreground">Determine if this collection is publicly visible in the shop.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsActive(!isActive)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${
-                  isActive ? 'bg-primary' : 'bg-muted border border-border'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${
-                    isActive ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 mt-4">
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="px-6 py-2.5 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-xl text-sm transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg transition duration-200 text-sm cursor-pointer"
-              >
-                {editingCollection ? 'Save Changes' : 'Create Collection'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     );
   }
+
+  const filteredCollections = collections.filter(c => {
+    const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase()) ||
+      c.slug.toLowerCase().includes(search.toLowerCase()) ||
+      (c.description && c.description.toLowerCase().includes(search.toLowerCase()));
+    const matchesStatus = !filterStatus ||
+      (filterStatus === 'active' && c.is_active) ||
+      (filterStatus === 'offline' && !c.is_active);
+    const matchesMatchType = !filterMatchType || c.match_type === filterMatchType;
+    return matchesSearch && matchesStatus && matchesMatchType;
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -574,6 +736,70 @@ export default function CollectionsPage() {
         </button>
       </div>
 
+      {/* Search & Filters */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-card border border-border p-5 rounded-2xl shadow-sm">
+        {/* Search Input Box */}
+        <div className="relative w-full xl:w-96 flex-shrink-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search collections by title, description or handle..."
+            className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition duration-200 text-sm text-foreground placeholder:text-muted-foreground/60"
+          />
+        </div>
+        
+        {/* Dropdown Filters Group */}
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Status</span>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Statuses</option>
+              <option value="active" className="bg-card text-foreground">Active</option>
+              <option value="offline" className="bg-card text-foreground">Offline</option>
+            </select>
+          </div>
+
+          {/* Matching Logic Filter */}
+          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Logic</span>
+            <select
+              value={filterMatchType}
+              onChange={(e) => setFilterMatchType(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Logic Types</option>
+              <option value="manual" className="bg-card text-foreground">Manual Selection</option>
+              <option value="gender" className="bg-card text-foreground">Gender Auto</option>
+              <option value="brand" className="bg-card text-foreground">Brand Auto</option>
+              <option value="category" className="bg-card text-foreground">Category Auto</option>
+              <option value="product_type" className="bg-card text-foreground">Product Type Auto</option>
+              <option value="tag" className="bg-card text-foreground">Tag Auto</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          {(filterStatus || filterMatchType || search) && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setFilterStatus('');
+                setFilterMatchType('');
+              }}
+              className="text-xs font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer ml-1"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Main Table */}
       <div className="glass-panel border border-border rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -582,8 +808,6 @@ export default function CollectionsPage() {
               <tr className="border-b border-border bg-muted/40">
                 <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Banner</th>
                 <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Collection</th>
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">URL Handle</th>
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Matching Logic</th>
                 <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Products</th>
                 <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                 <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
@@ -592,25 +816,25 @@ export default function CollectionsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center">
+                  <td colSpan={5} className="p-10 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <Loader2 className="w-8 h-8 text-primary animate-spin" />
                       <span className="text-sm text-muted-foreground">Loading collections...</span>
                     </div>
                   </td>
                 </tr>
-              ) : collections.length === 0 ? (
+              ) : filteredCollections.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center">
+                  <td colSpan={5} className="p-10 text-center">
                     <div className="flex flex-col items-center justify-center gap-3 py-6 text-muted-foreground">
                       <FolderOpen className="w-12 h-12 opacity-50" />
                       <span className="text-sm font-semibold">No Collections Found</span>
-                      <span className="text-xs max-w-xs">Create custom catalogs to dynamically structure your products storefront.</span>
+                      <span className="text-xs max-w-xs">Try adjusting your filters or create a new collection category.</span>
                     </div>
                   </td>
                 </tr>
               ) : (
-                collections.map((col) => (
+                filteredCollections.map((col) => (
                   <tr key={col.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
                     <td className="p-5">
                       <div className="w-16 h-10 rounded-lg border border-border bg-black overflow-hidden flex items-center justify-center">
@@ -622,19 +846,6 @@ export default function CollectionsPage() {
                       </div>
                     </td>
                     <td className="p-5 font-semibold text-foreground text-sm">{col.title}</td>
-                    <td className="p-5 text-muted-foreground text-xs font-mono">/{col.slug}</td>
-                    <td className="p-5">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs font-semibold text-foreground capitalize">
-                          {col.match_type.replace('_', ' ')}
-                        </span>
-                        {col.match_value && (
-                          <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full inline-block w-fit font-semibold border border-border">
-                            {col.match_value}
-                          </span>
-                        )}
-                      </div>
-                    </td>
                     <td className="p-5 text-sm text-muted-foreground font-semibold">{col.product_count} items</td>
                     <td className="p-5">
                       <button

@@ -1,5 +1,5 @@
-import { ShopifyCollection, ShopifyProduct } from './types';
-import { getProducts, getFacets, mapDjangoProductToShopifyProduct } from './products';
+import { Collection, Product } from './types';
+import { getProducts, getFacets, mapDjangoProductToProduct } from './products';
 
 export interface CollectionProductsResult {
   title: string;
@@ -14,7 +14,7 @@ export interface CollectionProductsResult {
   filters: any[];
 }
 
-export async function getAllCollections(first: number = 250): Promise<ShopifyCollection[]> {
+export async function getAllCollections(first: number = 250): Promise<Collection[]> {
   const isServer = typeof window === 'undefined';
   const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
 
@@ -29,7 +29,7 @@ export async function getAllCollections(first: number = 250): Promise<ShopifyCol
         handle: col.slug,
         title: col.title,
         description: col.description,
-        image: col.image ? { url: col.image } : undefined,
+        image: col.image ? { url: col.image.replace('http://django:8000', '') } : undefined,
         products: { edges: [] }
       }));
     }
@@ -73,7 +73,7 @@ export async function getCollection(
   handle: string,
   first: number = 30,
   after?: string
-): Promise<ShopifyCollection | null> {
+): Promise<Collection | null> {
   if (!handle) return null;
 
   const isServer = typeof window === 'undefined';
@@ -86,13 +86,13 @@ export async function getCollection(
     });
     if (res.ok) {
       const data = await res.json();
-      const shopifyProducts = data.products.map(mapDjangoProductToShopifyProduct);
+      const shopifyProducts = data.products.map(mapDjangoProductToProduct);
       return {
         id: data.id,
         handle: data.slug,
         title: data.title,
         description: data.description,
-        image: data.image ? { url: data.image } : undefined,
+        image: data.image ? { url: data.image.replace('http://django:8000', '') } : undefined,
         products: {
           edges: shopifyProducts.slice(0, first).map((p: any) => ({ node: p })),
           pageInfo: {
@@ -336,4 +336,32 @@ export async function getCollectionProducts(
     },
     filters
   };
+}
+
+export async function getBanner(slug: string): Promise<any | null> {
+  const isServer = typeof window === 'undefined';
+  const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
+  
+  console.log(`[getBanner] Fetching banner for slug: ${slug}`);
+
+  try {
+    const res = await fetch(`${API_URL}/api/shop/banners/${slug}/`, {
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Make media URLs relative so Next.js proxies them via rewrites (avoids cross-origin and localhost port issues)
+      if (data.images && isServer) {
+        data.images = data.images.map((img: any) => ({
+          ...img,
+          image_url: img.image_url?.replace('http://django:8000', ''),
+          mobile_image_url: img.mobile_image_url?.replace('http://django:8000', ''),
+        }));
+      }
+      return data;
+    }
+  } catch (err) {
+    console.error(`Error fetching banner for slug ${slug}:`, err);
+  }
+  return null;
 }

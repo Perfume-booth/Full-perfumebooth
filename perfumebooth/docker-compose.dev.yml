@@ -63,6 +63,8 @@ services:
     command: npm run dev
     environment:
       NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
 
   # ─────────────────────────────────────────────────────────────
   # POSTGRES — Expose for external DB tools (TablePlus, DBeaver)

@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   History,
   Users,
-  Lock
+  Lock,
+  Pencil
 } from 'lucide-react';
 
 interface StaffUser {
@@ -43,6 +44,7 @@ export default function StaffSettingsPage() {
   
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffUser | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -152,11 +154,23 @@ export default function StaffSettingsPage() {
   };
 
   const handleOpenCreate = () => {
+    setEditingStaff(null);
     setFirstName('');
     setLastName('');
     setEmail('');
     setPassword('');
     setRole('Admin');
+    setError('');
+    setModalOpen(true);
+  };
+
+  const handleOpenEdit = (user: StaffUser) => {
+    setEditingStaff(user);
+    setFirstName(user.first_name);
+    setLastName(user.last_name);
+    setEmail(user.email);
+    setPassword('');
+    setRole(user.roles?.[0] || 'Admin');
     setError('');
     setModalOpen(true);
   };
@@ -167,20 +181,31 @@ export default function StaffSettingsPage() {
     setError('');
 
     try {
-      await apiFetch('/auth/staff/', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          password,
-          first_name: firstName,
-          last_name: lastName,
-          role
-        })
-      });
+      if (editingStaff) {
+        await apiFetch(`/auth/staff/${editingStaff.id}/`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            role
+          })
+        });
+      } else {
+        await apiFetch('/auth/staff/', {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            password,
+            first_name: firstName,
+            last_name: lastName,
+            role
+          })
+        });
+      }
       setModalOpen(false);
       fetchStaff();
     } catch (err: any) {
-      setError(err.message || 'Failed to create staff member.');
+      setError(err.message || 'Failed to save staff member.');
     } finally {
       setSubmitLoading(false);
     }
@@ -304,6 +329,13 @@ export default function StaffSettingsPage() {
                         })}
                       </td>
                       <td className="p-5 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenEdit(user)}
+                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition duration-200 cursor-pointer"
+                          title="Edit Profile & Role"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleOpenResetPassword(user)}
                           className="p-2 text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition duration-200 cursor-pointer"
@@ -446,7 +478,7 @@ export default function StaffSettingsPage() {
           <div className="w-full max-w-md bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col gap-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-foreground">
-                Add Staff Member
+                {editingStaff ? 'Edit Staff Profile' : 'Add Staff Member'}
               </h2>
               <button 
                 onClick={() => setModalOpen(false)}
@@ -500,29 +532,32 @@ export default function StaffSettingsPage() {
                   <input
                     type="email"
                     required
+                    disabled={!!editingStaff}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@perfumebooth.com"
-                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm disabled:opacity-50"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Password</label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
-                  />
+              {!editingStaff && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Password</label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Role dropdown */}
               <div className="flex flex-col gap-2">
@@ -558,10 +593,10 @@ export default function StaffSettingsPage() {
                   {submitLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Creating...</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
-                    <span>Create User</span>
+                    <span>{editingStaff ? 'Save Changes' : 'Create User'}</span>
                   )}
                 </button>
               </div>

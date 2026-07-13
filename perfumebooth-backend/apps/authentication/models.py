@@ -11,14 +11,27 @@ from django.db import models
 
 
 class CustomUserManager(BaseUserManager):
-    """Manager for email-authenticated users."""
+    """Manager for email/phone authenticated users."""
 
-    def create_user(self, email: str, password: str = None, **extra_fields):
-        if not email:
-            raise ValueError('An email address is required.')
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+    def create_user(self, email: str = None, phone: str = None, password: str = None, **extra_fields):
+        if not email and not phone:
+            raise ValueError('Either an email address or phone number is required.')
+        
+        if email:
+            email = self.normalize_email(email)
+        else:
+            email = None
+            
+        if phone:
+            phone = phone.strip()
+        else:
+            phone = None
+
+        user = self.model(email=email, phone=phone, **extra_fields)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
         user.save(using=self._db)
         return user
 
@@ -29,16 +42,16 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
-        return self.create_user(email, password, **extra_fields)
+        return self.create_user(email=email, password=password, **extra_fields)
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     """
-    Custom User model using email as the unique identifier.
-    Replaces Django's default username-based User.
+    Custom User model supporting email or phone as identifiers.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True, db_index=True)
+    email = models.EmailField(unique=True, null=True, blank=True, db_index=True)
+    phone = models.CharField(max_length=20, unique=True, null=True, blank=True, db_index=True)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
     is_active = models.BooleanField(default=True)
@@ -56,14 +69,16 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = 'Users'
         indexes = [
             models.Index(fields=['email'], name='user_email_idx'),
+            models.Index(fields=['phone'], name='user_phone_idx'),
         ]
 
     def __str__(self) -> str:
-        return self.email
+        return self.email or self.phone or str(self.id)
 
     @property
     def full_name(self) -> str:
         return f'{self.first_name} {self.last_name}'.strip()
+
 
 
 class Role(models.Model):
@@ -126,4 +141,45 @@ class AuditLog(models.Model):
 
     def __str__(self) -> str:
         return f'{self.user.full_name or self.user.email} — {self.action} at {self.created_at}'
+
+
+class OTPVerification(models.Model):
+    """
+    Temporary table to check mobile number verification codes.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    phone = models.CharField(max_length=20, db_index=True)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    is_verified = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'auth_otp_verification'
+        verbose_name = 'OTP Verification'
+        verbose_name_plural = 'OTP Verifications'
+
+    def __str__(self) -> str:
+        return f'{self.phone} — {self.code} (verified: {self.is_verified})'
+
+
+class SocialAccount(models.Model):
+    """
+    Maps social logins to our CustomUser instance.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='social_accounts')
+    provider = models.CharField(max_length=50)  # 'google', 'facebook', 'apple'
+    uid = models.CharField(max_length=255, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'auth_social_account'
+        unique_together = ('provider', 'uid')
+        verbose_name = 'Social Account'
+        verbose_name_plural = 'Social Accounts'
+
+    def __str__(self) -> str:
+        return f'{self.user} — {self.provider} ({self.uid})'
+
 

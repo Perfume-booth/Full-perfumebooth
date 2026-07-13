@@ -13,6 +13,7 @@ export default async function MenFragrancePage({ searchParams }: { searchParams:
   return (
     <CollectionTemplate 
       handle="perfumes-for-men" 
+      bannerSlug="men"
       searchParams={sParams}
     />
   );

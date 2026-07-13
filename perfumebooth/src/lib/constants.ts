@@ -92,15 +92,15 @@ export const TOP_BRANDS = [
   "Otoori",
   "Lattafa",
   "Swiss Arabian",
-  "Tom Louis",
   "Scent Shot",
-  "Royal Mirage",
   "Ahmed",
   "Khadlaj",
   "Boys Perfume, Deo for Women, imported perfume, long lasting perfume, oriental fragrance, Perfume for Girls, Perfume for Men, Perfume for Women, Unisex Perfume, Unisex Perfumes",
   "Unisex Perfume",
+  "Royal Mirage",
   "Perfume for Girls, Perfume for Women",
   "Perfume for Boys, Perfume for Men",
+  "Tom Louis",
   "Perfume for Men, Perfume for Women, Unisex Perfume",
   "Arabiyat Prestige, long lasting perfume, Men & Women, Perfume for Boys, Perfume for Girls, Perfume for Men, Perfume for Women",
   "Arabiyat Prestige, Men & Women, Perfume for Boys, Perfume for Girls, Perfume for Men, Perfume for Women",
@@ -108,8 +108,7 @@ export const TOP_BRANDS = [
   "Arabiyat Prestige, Perfume for Men",
   "Arabiyat Prestige, Men & Women, Perfume for Boys, Perfume for Girls, Perfume for Men, Perfume for Women, Unisex Perfume, Unisex Perfumes",
   "imported perfume, long lasting perfume, Luxury Parfum, Men & Women, Perfume for Men, Perfume for Women, Unisex Perfume",
-  "Louis Cardian",
-];
+  "Louis Cardian"];
 
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
@@ -139,8 +138,8 @@ export const BRAND_MEDIA: Record<string, { type: "image" | "video", desktopSrc: 
   "oriental": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ORIENTAL_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ORIENTAL_jpg.jpg?v=1778239125" },
   "fresh": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh.jpg?v=1778136299", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh.jpg?v=1778136299" },
   "unisex": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/unisex.png?v=1780126452", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/unisex.png?v=1780126452" },
- 
-  
+
+
   // --- DEFAULT FALLBACK ---
   "default": { type: "image", desktopSrc: "", mobileSrc: "" }
 };

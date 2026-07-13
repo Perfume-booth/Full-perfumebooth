@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { cancelShopifyOrder } from '@/lib/actions/actions';
+import { cancelOrder } from '@/lib/actions/actions';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CancelButtonProps {
@@ -52,7 +52,7 @@ export default function CancelButton({
     setError(null);
     startTransition(async () => {
       try {
-        const result = await cancelShopifyOrder(orderId, customerId);
+        const result = await cancelOrder(orderId, customerId);
         
         if (result.success) {
           setIsSuccessfullyCancelled(true);

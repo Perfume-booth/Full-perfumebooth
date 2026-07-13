@@ -31,12 +31,23 @@ export async function apiFetch<T = any>(
     }
   }
 
-  // Ensure cookies (sessionid, csrftoken) are sent with cross-origin requests
-  const response = await fetch(`${BASE_URL}${path}`, {
+  // Convert Headers instance to a plain object for fetch
+  const headersObject: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    headersObject[key] = value;
+  });
+
+  const fetchOptions: RequestInit = {
     ...options,
     credentials: 'include',
-    headers,
-  });
+  };
+
+  if (Object.keys(headersObject).length > 0) {
+    fetchOptions.headers = headersObject;
+  }
+
+  // Ensure cookies (sessionid, csrftoken) are sent with cross-origin requests
+  const response = await fetch(`${BASE_URL}${path}`, fetchOptions);
 
   if (response.status === 401 || response.status === 403) {
     // Session expired or CSRF failed

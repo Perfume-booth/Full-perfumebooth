@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       discount_amount: parseFloat(discountAmount || '0')
     };
 
-    const res = await fetch('http://localhost:8000/api/orders/', {
+    const res = await fetch('http://django:8000/api/orders/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

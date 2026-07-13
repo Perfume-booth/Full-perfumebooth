@@ -12,6 +12,7 @@ interface CollectionBannerProps {
   bannerImages?: string[];
   bannerVideo?: string;
   backendBannerImage?: string | null;
+  cmsBannerImages?: string[];
 }
 
 export default function CollectionBanner({
@@ -21,18 +22,22 @@ export default function CollectionBanner({
   bannerImages,
   bannerVideo,
   backendBannerImage,
+  cmsBannerImages = [],
 }: CollectionBannerProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const slides = useMemo(() => {
-    // 1. Prioritize Shopify Backend collection image if available
+    // 1. Prioritize new CMS Page Banners if available
+    if (cmsBannerImages && cmsBannerImages.length > 0) return cmsBannerImages;
+
+    // 2. Fallback to Shopify Backend collection image if available
     if (backendBannerImage) return [backendBannerImage];
 
-    // 2. Fall back to custom overrides / slideshows
+    // 3. Fall back to custom overrides / slideshows
     if (bannerImages && bannerImages.length > 0) return bannerImages;
     if (bannerImage) return [bannerImage];
 
-    // 3. Fall back to local preset banners
+    // 4. Fall back to local preset banners
     if (collectionHandle) {
       const media = BRAND_MEDIA[collectionHandle] || BRAND_MEDIA["default"];
       if (media && media.type === "image") {
@@ -41,7 +46,7 @@ export default function CollectionBanner({
     }
 
     return [];
-  }, [backendBannerImage, bannerImages, bannerImage, collectionHandle]);
+  }, [cmsBannerImages, backendBannerImage, bannerImages, bannerImage, collectionHandle]);
 
   const activeVideo = useMemo(() => {
     if (bannerVideo) return bannerVideo;
@@ -97,14 +102,25 @@ export default function CollectionBanner({
                 transition={{ duration: 1.2, ease: "easeInOut" }}
                 className="absolute inset-0 z-0"
               >
-                <Image
-                  src={slides[currentSlide]}
-                  alt={title || "Collection banner"}
-                  fill
-                  priority
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 1200px"
-                />
+                {slides[currentSlide]?.match(/\.(mp4|webm|mov)$/i) ? (
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="object-cover w-full h-full"
+                    src={slides[currentSlide]}
+                  />
+                ) : (
+                  <Image
+                    src={slides[currentSlide]}
+                    alt={title || "Collection banner"}
+                    fill
+                    priority
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 1200px"
+                  />
+                )}
               </motion.div>
             ) : bannerImage && bannerImage !== "" ? (
               <motion.div
@@ -112,14 +128,25 @@ export default function CollectionBanner({
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 z-0"
               >
-                <Image
-                  src={bannerImage}
-                  alt={title || "Collection banner"}
-                  fill
-                  priority
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 1200px"
-                />
+                {bannerImage?.match(/\.(mp4|webm|mov)$/i) ? (
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="object-cover w-full h-full"
+                    src={bannerImage}
+                  />
+                ) : (
+                  <Image
+                    src={bannerImage}
+                    alt={title || "Collection banner"}
+                    fill
+                    priority
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 1200px"
+                  />
+                )}
               </motion.div>
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-[#2a2a2a] to-[#1a1a1a] z-0" />

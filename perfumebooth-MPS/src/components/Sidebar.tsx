@@ -53,7 +53,7 @@ export default function Sidebar() {
   };
 
   if (!mounted || !user) {
-    return <aside className="w-64 glass-panel border-r border-border min-h-screen"></aside>;
+    return <aside className="w-64 glass-panel border-r border-border h-screen sticky top-0"></aside>;
   }
 
   // Filter items by user role
@@ -62,7 +62,7 @@ export default function Sidebar() {
   );
 
   return (
-    <aside className="w-64 glass-panel border-r border-border min-h-screen flex flex-col justify-between p-6">
+    <aside className="w-64 glass-panel border-r border-border h-screen sticky top-0 flex flex-col justify-between p-6">
       <div className="flex flex-col gap-8">
         <div className="flex items-center justify-start h-10 w-full text-foreground">
           <PerfumeLogo />

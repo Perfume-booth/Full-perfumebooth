@@ -68,7 +68,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let dynamicRoutes: MetadataRoute.Sitemap = [];
 
   try {
-    const res = await fetch('http://localhost:8000/api/shop/products/');
+    const res = await fetch('http://django:8000/api/shop/products/');
     if (res.ok) {
       const products = await res.json();
       const productRoutes = products.map((p: any) => ({

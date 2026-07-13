@@ -52,14 +52,19 @@ export default function Navbar({ initialBrands = [] }: { initialBrands?: string[
   const [brands, setBrands] = useState<string[]>(initialBrands);
 
   useEffect(() => {
-    fetch("/api/shop/brands/")
-      .then(res => res.json())
+    fetch("/api/brands")
+      .then(res => {
+        if (!res.ok) throw new Error(`Brands fetch failed: ${res.status}`);
+        return res.json();
+      })
       .then(data => {
         if (Array.isArray(data)) {
           setBrands(data);
         }
       })
-      .catch(err => console.error("Error fetching brands in Navbar:", err));
+      .catch(() => {
+        // Silently fall back to initialBrands — brands dropdown will still work
+      });
   }, []);
 
   useEffect(() => {

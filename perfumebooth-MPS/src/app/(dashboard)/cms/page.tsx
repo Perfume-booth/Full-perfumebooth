@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { 
   Loader2, 
@@ -12,7 +13,8 @@ import {
   Settings, 
   Save, 
   PlusCircle,
-  Layout
+  Layout,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface CMSSection {
@@ -32,6 +34,7 @@ interface CMSPageSummary {
 }
 
 export default function CMSBuilderPage() {
+  const router = useRouter();
   const [pages, setPages] = useState<CMSPageSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -232,6 +235,13 @@ export default function CMSBuilderPage() {
             ))}
           </select>
           <button
+            onClick={() => router.push('/cms/banners')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-muted text-foreground border border-border font-semibold rounded-xl hover:bg-muted/80 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+          >
+            <ImageIcon className="w-4 h-4" />
+            Manage Banners
+          </button>
+          <button
             onClick={() => setNewPageOpen(true)}
             className="px-4 py-2.5 bg-muted text-foreground border border-border font-semibold rounded-xl hover:bg-muted/80 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
           >
@@ -420,6 +430,16 @@ export default function CMSBuilderPage() {
                           type="text"
                           value={sections[selectedSectionIdx].content.subtitle || ''}
                           onChange={(e) => handleUpdateContent('subtitle', e.target.value)}
+                          className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase">Background Image URL</label>
+                        <input
+                          type="text"
+                          value={sections[selectedSectionIdx].content.backgroundImage || ''}
+                          onChange={(e) => handleUpdateContent('backgroundImage', e.target.value)}
+                          placeholder="e.g. /images/hero-bg.jpg or https://..."
                           className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
                         />
                       </div>

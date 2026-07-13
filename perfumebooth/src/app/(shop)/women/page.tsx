@@ -13,6 +13,7 @@ export default async function WomenFragrancePage({ searchParams }: { searchParam
   return (
     <CollectionTemplate
       handle="perfumes-for-women"
+      bannerSlug="women"
       searchParams={sParams}
     />
   );

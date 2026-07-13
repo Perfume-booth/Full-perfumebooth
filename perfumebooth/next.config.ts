@@ -8,6 +8,7 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: ["@/components/ui/icons"],
   },
@@ -61,16 +62,20 @@ const nextConfig: NextConfig = {
     unoptimized: process.env.NODE_ENV === 'development',
   },
   async rewrites() {
-    return [
-      {
-        source: '/media/:path*',
-        destination: 'http://django:8000/media/:path*'
-      },
-      {
-        source: '/api/shop/:path*',
-        destination: 'http://django:8000/api/shop/:path*'
-      }
-    ];
+    return {
+      beforeFiles: [
+        {
+          source: '/media/:path*',
+          destination: 'http://django:8000/media/:path*'
+        },
+        {
+          source: '/api/shop/:path*',
+          destination: 'http://django:8000/api/shop/:path*'
+        }
+      ],
+      afterFiles: [],
+      fallback: []
+    };
   },
   async redirects() {
     return [

@@ -1,4 +1,4 @@
-export type ShopifyResponse<T> = {
+export type ApiResponse<T> = {
   status: number;
   body: T;
   error?: string;
@@ -8,7 +8,7 @@ export type Edge<T> = {
   node: T;
 };
 
-export interface ShopifyProduct {
+export interface Product {
   rating_count: any;
   rating: any;
   id: string;
@@ -36,7 +36,7 @@ export interface ShopifyProduct {
   metafields: { key: string; value: string }[];
 }
 
-export interface ShopifyCollection {
+export interface Collection {
   id: string;
   handle: string;
   title: string;
@@ -46,7 +46,7 @@ export interface ShopifyCollection {
     altText?: string;
   };
   products: {
-    edges: Edge<ShopifyProduct>[];
+    edges: Edge<Product>[];
     pageInfo?: {
       hasNextPage: boolean;
       endCursor: string | null;
@@ -81,3 +81,4 @@ export interface PageData {
   title: string;
   body: string;
 }
+

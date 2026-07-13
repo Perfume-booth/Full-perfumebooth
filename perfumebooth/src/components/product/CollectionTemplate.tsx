@@ -1,4 +1,4 @@
-import { getCollectionProducts, getBrands, getProductTypes } from "@/lib/shopify";
+import { getCollectionProducts, getBrands, getProductTypes, getBanner } from "@/lib/shopify";
 import SideFilter from "@/components/product/SideFilter";
 import CollectionProductGrid from "@/components/product/CollectionProductGrid";
 import CollectionBanner from "@/components/ui/CollectionBanner";
@@ -8,6 +8,7 @@ import { buildShopifyFilters, getSortConfig } from "@/lib/shop-utils";
 
 interface CollectionTemplateProps {
   handle: string;
+  bannerSlug?: string;
   searchParams?: { [key: string]: string | string[] | undefined };
   title?: string;
   bannerImages?: string[];
@@ -17,6 +18,7 @@ interface CollectionTemplateProps {
 
 export default async function CollectionTemplate({
   handle,
+  bannerSlug,
   searchParams = {},
   title: customTitle,
   bannerImages,
@@ -53,19 +55,13 @@ export default async function CollectionTemplate({
   });
 
   // Fetch full collection data with filters applied for SSR
-  // This ONE call returns products, totalCount, AND facets (filters)
-  const collection = await getCollectionProducts(
-    handle, 
-    defaultLimit, 
-    null, 
-    filterOptions, 
-    sortKey, 
-    reverse
-  );
+  // Fetch banner data concurrently
+  const [collection, totalVendors, cmsBanner] = await Promise.all([
+    getCollectionProducts(handle, defaultLimit, null, filterOptions, sortKey, reverse),
+    getBrands(),
+    getBanner(bannerSlug || handle)
+  ]);
   
-  // Fetch global brands for the manual filter injection fallback
-  const totalVendors = await getBrands();
-
   if (!collection) {
     return notFound();
   }
@@ -81,7 +77,7 @@ export default async function CollectionTemplate({
       id: 'filter.p.vendor',
       label: 'Brand',
       type: 'LIST',
-      values: totalVendors.map(v => ({
+      values: totalVendors.map((v: any) => ({
         id: v,
         label: v,
         count: 0,
@@ -91,6 +87,9 @@ export default async function CollectionTemplate({
   }
   
   const displayTitle = customTitle || title || "Collection";
+  
+  // Extract CMS images if available
+  const cmsImages = cmsBanner?.images?.map((img: any) => img.image_url) || [];
 
   return (
     <main className="pt-13 lg:pt-28">
@@ -110,6 +109,7 @@ export default async function CollectionTemplate({
           bannerImages={bannerImages}
           bannerImage={bannerImage}
           backendBannerImage={collection.bannerImage}
+          cmsBannerImages={cmsImages}
         />
         <CollectionProductGrid />
       </SideFilter>

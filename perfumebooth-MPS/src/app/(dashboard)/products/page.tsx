@@ -7,6 +7,8 @@ import {
   Search,
   Edit2,
   Trash2,
+  Copy,
+  Filter,
   Image as ImageIcon,
   Loader2,
   Check,
@@ -56,6 +58,11 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Filter States
+  const [filterBrand, setFilterBrand] = useState('');
+  const [filterStatus, setFilterStatus] = useState(''); // 'online', 'offline', or ''
+  const [filterStock, setFilterStock] = useState(''); // 'instock', 'outofstock', or ''
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -91,6 +98,26 @@ export default function ProductsPage() {
   const [imageAltText, setImageAltText] = useState('');
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
   const [manualTags, setManualTags] = useState<string[]>([]);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkActionType, setBulkActionType] = useState('price');
+  const [bulkActionOption, setBulkActionOption] = useState('percent_discount');
+  const [bulkActionValue, setBulkActionValue] = useState(0);
+  const [noteOptions, setNoteOptions] = useState<string[]>(NOTE_OPTIONS);
+
+  const handleAddCustomNote = (currentNotes: string[], setNotesFn: (val: string) => void) => {
+    const val = prompt('Enter a name for the new custom scent note:');
+    if (!val) return;
+    const cleaned = val.trim();
+    if (!cleaned) return;
+    // Capitalize note name nicely
+    const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    if (!noteOptions.includes(capitalized)) {
+      setNoteOptions(prev => [...prev, capitalized]);
+    }
+    if (!currentNotes.includes(capitalized)) {
+      setNotesFn([...currentNotes, capitalized].join(', '));
+    }
+  };
 
   // Helper to extract auto-generated tags from current taxonomy inputs
   const generateTagsFromInputs = () => {
@@ -181,6 +208,19 @@ export default function ProductsPage() {
     fetchBrands();
   }, []);
 
+  useEffect(() => {
+    if (!loading && products.length > 0 && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const editSlug = params.get('edit');
+      if (editSlug) {
+        const prod = products.find(p => p.slug === editSlug);
+        if (prod) {
+          handleOpenEdit(prod);
+        }
+      }
+    }
+  }, [loading, products]);
+
   const handleBulkDelete = async () => {
     if (confirm(`Are you sure you want to delete ${selectedSlugs.length} products?`)) {
       try {
@@ -196,6 +236,85 @@ export default function ProductsPage() {
         alert(err.message || 'Failed to delete selected products.');
       }
     }
+  };
+
+  const handleBulkStatusChange = async (publish: boolean) => {
+    const actionText = publish ? 'publish' : 'unpublish';
+    if (confirm(`Are you sure you want to ${actionText} ${selectedSlugs.length} products?`)) {
+      try {
+        await apiFetch('/shop/products/', {
+          method: 'PATCH',
+          body: JSON.stringify({ slugs: selectedSlugs, is_online: publish }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        setSelectedSlugs([]);
+        fetchProducts();
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || `Failed to ${actionText} selected products.`);
+      }
+    }
+  };
+
+  const handleApplyBulkAdjust = async () => {
+    try {
+      const payload: any = { slugs: selectedSlugs };
+      if (bulkActionType === 'price') {
+        payload.price_adjustment = { action: bulkActionOption, value: bulkActionValue };
+      } else {
+        payload.stock_adjustment = { action: bulkActionOption, value: bulkActionValue };
+      }
+      await apiFetch('/shop/products/', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setBulkEditOpen(false);
+      setSelectedSlugs([]);
+      fetchProducts();
+      alert('Successfully updated products in bulk.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to adjust products in bulk.');
+    }
+  };
+
+  const handleDuplicate = (product: Product) => {
+    setEditingProduct(null);
+    setTitle(`${product.title} (Copy)`);
+    
+    // Generate a unique slug and SKU using a random suffix
+    const suffix = Math.floor(1000 + Math.random() * 9000);
+    setSku(`${product.sku}-COPY-${suffix}`);
+    setSlug(`${product.slug}-copy-${suffix}`);
+    
+    setPrice(product.price);
+    setComparePrice(product.compare_at_price || '');
+    setDescription(product.attributes.description || '');
+    setStockLevel(product.stock);
+    setIsOnline(product.is_online);
+    setScentProfile(product.attributes.scent_notes || 'Citrus');
+    setVolume(product.attributes.volume_ml || '100ml');
+    setBrand(product.attributes.brand || 'PerfumeBooth');
+    setShowNewBrandInput(false);
+    setTopNotes(product.attributes.top_notes || '');
+    setMiddleNotes(product.attributes.middle_notes || '');
+    setBaseNotes(product.attributes.base_notes || '');
+    setOccasion(product.attributes.occasion || 'Daily Wear');
+    setGender(product.attributes.gender || 'Unisex');
+    setSeason(product.attributes.season || 'All Seasons');
+    setCategory(product.attributes.category || 'Eau de Parfum (EDP)');
+    setVendor(product.attributes.vendor || '');
+    setTags(Array.isArray(product.attributes.tags) ? product.attributes.tags.join(', ') : (product.attributes.tags || ''));
+    setProductType(product.attributes.productType || 'Eau de Parfum');
+    setBottleMaterial(product.attributes.bottle_material || 'Glass');
+    setMetaTitle(product.attributes.meta_title || '');
+    setMetaDescription(product.attributes.meta_description || '');
+    setImageAltText(product.attributes.image_alt_text || '');
+    
+    setImageFile(null);
+    setGalleryFiles(null);
+    setError('');
+    setModalOpen(true);
   };
 
   // Sync slug with title on creation
@@ -404,10 +523,18 @@ export default function ProductsPage() {
     }
   };
 
-  const filteredProducts = products.filter(p =>
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.sku.toLowerCase().includes(search.toLowerCase());
+    const matchesBrand = !filterBrand || p.brand === filterBrand;
+    const matchesStatus = !filterStatus ||
+      (filterStatus === 'online' && p.is_online) ||
+      (filterStatus === 'offline' && !p.is_online);
+    const matchesStock = !filterStock ||
+      (filterStock === 'instock' && p.stock > 0) ||
+      (filterStock === 'outofstock' && p.stock === 0);
+    return matchesSearch && matchesBrand && matchesStatus && matchesStock;
+  });
 
   if (modalOpen) {
     return (
@@ -746,16 +873,19 @@ export default function ProductsPage() {
                     const val = e.target.value;
                     if (!val) return;
                     const currentNotes = parseNotes(topNotes);
-                    if (!currentNotes.includes(val)) {
+                    if (val === 'ADD_NEW_NOTE') {
+                      handleAddCustomNote(currentNotes, setTopNotes);
+                    } else if (!currentNotes.includes(val)) {
                       setTopNotes([...currentNotes, val].join(', '));
                     }
                   }}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
                 >
                   <option value="">-- Add Scent Note --</option>
-                  {NOTE_OPTIONS.map(option => (
+                  {noteOptions.map(option => (
                     <option key={option} value={option}>{option}</option>
                   ))}
+                  <option value="ADD_NEW_NOTE" className="text-primary font-bold">+ Add Custom Scent Note...</option>
                 </select>
                 {parseNotes(topNotes).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
@@ -797,16 +927,19 @@ export default function ProductsPage() {
                     const val = e.target.value;
                     if (!val) return;
                     const currentNotes = parseNotes(middleNotes);
-                    if (!currentNotes.includes(val)) {
+                    if (val === 'ADD_NEW_NOTE') {
+                      handleAddCustomNote(currentNotes, setMiddleNotes);
+                    } else if (!currentNotes.includes(val)) {
                       setMiddleNotes([...currentNotes, val].join(', '));
                     }
                   }}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
                 >
                   <option value="">-- Add Scent Note --</option>
-                  {NOTE_OPTIONS.map(option => (
+                  {noteOptions.map(option => (
                     <option key={option} value={option}>{option}</option>
                   ))}
+                  <option value="ADD_NEW_NOTE" className="text-primary font-bold">+ Add Custom Scent Note...</option>
                 </select>
                 {parseNotes(middleNotes).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
@@ -848,16 +981,19 @@ export default function ProductsPage() {
                     const val = e.target.value;
                     if (!val) return;
                     const currentNotes = parseNotes(baseNotes);
-                    if (!currentNotes.includes(val)) {
+                    if (val === 'ADD_NEW_NOTE') {
+                      handleAddCustomNote(currentNotes, setBaseNotes);
+                    } else if (!currentNotes.includes(val)) {
                       setBaseNotes([...currentNotes, val].join(', '));
                     }
                   }}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
                 >
                   <option value="">-- Add Scent Note --</option>
-                  {NOTE_OPTIONS.map(option => (
+                  {noteOptions.map(option => (
                     <option key={option} value={option}>{option}</option>
                   ))}
+                  <option value="ADD_NEW_NOTE" className="text-primary font-bold">+ Add Custom Scent Note...</option>
                 </select>
                 {parseNotes(baseNotes).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
@@ -1017,23 +1153,7 @@ export default function ProductsPage() {
                     className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
                   />
                 </div>
-
-                {/* URL Handle */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">URL Handle</label>
-                  <div className="flex rounded-xl overflow-hidden border border-border bg-background focus-within:border-primary transition duration-200">
-                    <span className="px-4 py-2.5 bg-secondary text-muted-foreground text-sm border-r border-border select-none flex items-center">
-                      /products/
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      value={slug}
-                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-'))}
-                      className="w-full px-4 py-2.5 bg-transparent focus:outline-none text-sm text-foreground"
-                    />
-                  </div>
-                </div>
+                
               </div>
             </div>
 
@@ -1124,17 +1244,45 @@ export default function ProductsPage() {
               {products.length} {products.length === 1 ? 'product' : 'products'}
             </span>
           </div>
-          <p className="text-muted-foreground text-sm">Manage store products, stock levels, and S3 images</p>
+          <p className="text-muted-foreground text-sm">Manage store products, stock levels, and R2 images</p>
         </div>
-        <div className='flex justify-center item-center gap-3'>
+        <div className='flex justify-center items-center gap-3'>
           {selectedSlugs.length > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
-            >
-              <Trash2 className="w-5 h-5" />
-              <span>Delete ({selectedSlugs.length})</span>
-            </button>
+            <>
+              <button
+                onClick={() => handleBulkStatusChange(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-emerald-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+              >
+                <Check className="w-5 h-5" />
+                <span>Publish ({selectedSlugs.length})</span>
+              </button>
+              <button
+                onClick={() => handleBulkStatusChange(false)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-zinc-600 hover:bg-zinc-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-zinc-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+              >
+                <X className="w-5 h-5" />
+                <span>Unpublish ({selectedSlugs.length})</span>
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span>Delete ({selectedSlugs.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkActionType('price');
+                  setBulkActionOption('percent_discount');
+                  setBulkActionValue(10);
+                  setBulkEditOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+              >
+                <span>Bulk Edit ({selectedSlugs.length})</span>
+              </button>
+            </>
           )}
           <button
             onClick={handleImportExcel}
@@ -1161,16 +1309,77 @@ export default function ProductsPage() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex items-center gap-4 bg-card border border-border p-4 rounded-xl">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-card border border-border p-5 rounded-2xl shadow-sm">
+        {/* Search Input Box */}
+        <div className="relative w-full xl:w-96 flex-shrink-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products by title or SKU..."
-            className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+            placeholder="Search by title or SKU..."
+            className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition duration-200 text-sm text-foreground placeholder:text-muted-foreground/60"
           />
+        </div>
+        
+        {/* Dropdown Filters Group */}
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {/* Brand Filter */}
+          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Brand</span>
+            <select
+              value={filterBrand}
+              onChange={(e) => setFilterBrand(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Brands</option>
+              {brandsList.map(b => (
+                <option key={b} value={b} className="bg-card text-foreground">{b}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Status</span>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Statuses</option>
+              <option value="online" className="bg-card text-foreground">Online</option>
+              <option value="offline" className="bg-card text-foreground">Offline</option>
+            </select>
+          </div>
+
+          {/* Stock Filter */}
+          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Stock</span>
+            <select
+              value={filterStock}
+              onChange={(e) => setFilterStock(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Stock Levels</option>
+              <option value="instock" className="bg-card text-foreground">In Stock</option>
+              <option value="outofstock" className="bg-card text-foreground">Out of Stock</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          {(filterBrand || filterStatus || filterStock) && (
+            <button
+              onClick={() => {
+                setFilterBrand('');
+                setFilterStatus('');
+                setFilterStock('');
+              }}
+              className="text-xs font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer ml-1"
+            >
+              Clear All
+            </button>
+          )}
         </div>
       </div>
 
@@ -1202,8 +1411,6 @@ export default function ProductsPage() {
                   <th className="p-5 w-16">Preview</th>
                   <th className="p-5">Title / SKU</th>
                   <th className="p-5">Brand Name</th>
-                  <th className="p-5">Category</th>
-                  <th className="p-5">Concentration</th>
                   <th className="p-5">Price</th>
                   <th className="p-5">Stock Level</th>
                   <th className="p-5">Status</th>
@@ -1214,7 +1421,7 @@ export default function ProductsPage() {
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-10 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-10 text-center text-muted-foreground">
                       No products found. Add your first item!
                     </td>
                   </tr>
@@ -1265,12 +1472,6 @@ export default function ProductsPage() {
                         <div className="font-semibold text-foreground">{product.brand}</div>
                       </td>
                       <td className="p-5">
-                        <div className="font-semibold text-foreground">{product.category}</div>
-                      </td>
-                      <td className="p-5">
-                        <div className="font-semibold text-foreground">{product.productType}</div>
-                      </td>
-                      <td className="p-5">
                         <div className="text-foreground font-medium">₹{parseFloat(product.price).toLocaleString('en-IN')}</div>
                         {product.compare_at_price && (
                           <div className="text-xs text-muted-foreground line-through mt-0.5">
@@ -1279,9 +1480,19 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="p-5">
-                        <span className={`font-semibold ${product.stock === 0 ? 'text-red-400' : 'text-foreground'}`}>
-                          {product.stock} units
-                        </span>
+                        {product.stock === 0 ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1  text-[11px] font-semibold bg-red-500/10 text-red-400 ">
+                            Out of Stock
+                          </span>
+                        ) : product.stock <= 10 ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1  text-[11px] font-semibold bg-amber-500/10 text-amber-400 ">
+                            Low Stock: {product.stock} units
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1  text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 ">
+                            {product.stock} in stock
+                          </span>
+                        )}
                       </td>
                       <td className="p-5">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${product.is_online
@@ -1293,7 +1504,7 @@ export default function ProductsPage() {
                       </td>
                       <td className="p-5">
                         <div className="flex flex-col text-xs gap-0.5">
-                          <span className="text-foreground font-semibold">
+                          <span className="text-foreground font-semibold text-[10px]">
                             L: {product.created_by_name || 'System'}
                           </span>
                           <span className="text-muted-foreground text-[10px]">
@@ -1302,16 +1513,25 @@ export default function ProductsPage() {
                         </div>
                       </td>
                       <td className="p-5 text-right">
-                        <div className="flex justify-end gap-3">
+                        <div className="inline-flex gap-2 justify-end">
+                          <button
+                            onClick={() => handleDuplicate(product)}
+                            title="Duplicate Product"
+                            className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card transition cursor-pointer"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleOpenEdit(product)}
-                            className="p-2 text-muted-foreground hover:text-primary hover:bg-muted rounded-lg transition duration-200 cursor-pointer"
+                            title="Edit Product"
+                            className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card transition cursor-pointer"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(product.slug)}
-                            className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition duration-200 cursor-pointer"
+                            title="Delete Product"
+                            className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg border border-border hover:border-red-500/20 bg-card transition cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1322,6 +1542,99 @@ export default function ProductsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {bulkEditOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border p-6 rounded-2xl w-full max-w-md shadow-xl flex flex-col gap-5 animate-in fade-in zoom-in duration-150">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Bulk Edit Products ({selectedSlugs.length})</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Apply bulk updates to pricing or inventory levels.</p>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* Action Type */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Adjustment Type</label>
+                <div className="grid grid-cols-2 gap-2 bg-secondary/30 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkActionType('price');
+                      setBulkActionOption('percent_discount');
+                      setBulkActionValue(10);
+                    }}
+                    className={`py-1.5 text-xs font-semibold rounded-md transition ${bulkActionType === 'price' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Adjust Price
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkActionType('stock');
+                      setBulkActionOption('add');
+                      setBulkActionValue(10);
+                    }}
+                    className={`py-1.5 text-xs font-semibold rounded-md transition ${bulkActionType === 'stock' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Adjust Stock
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Options */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Adjustment Rule</label>
+                <select
+                  value={bulkActionOption}
+                  onChange={(e) => setBulkActionOption(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-xs text-foreground font-semibold"
+                >
+                  {bulkActionType === 'price' ? (
+                    <>
+                      <option value="percent_discount">Apply Percentage Discount (%)</option>
+                      <option value="fixed_discount">Apply Fixed Discount (₹)</option>
+                      <option value="set_compare">Set Compare-at Price (₹)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="add">Add to Stock (+ units)</option>
+                      <option value="set">Set Stock Level (fixed units)</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Value Input */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Value</label>
+                <input
+                  type="number"
+                  value={bulkActionValue}
+                  onChange={(e) => setBulkActionValue(parseFloat(e.target.value) || 0)}
+                  placeholder="e.g. 10"
+                  className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-xs text-foreground font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setBulkEditOpen(false)}
+                className="px-4 py-2 border border-border text-foreground font-semibold rounded-xl hover:bg-secondary transition text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyBulkAdjust}
+                className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition text-xs cursor-pointer"
+              >
+                Apply Updates
+              </button>
+            </div>
           </div>
         </div>
       )}

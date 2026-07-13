@@ -1,6 +1,5 @@
-import { ShopifyProduct } from './types';
+import { Product } from './types';
 
-// Central mapping utility from Django model payload to legacy ShopifyProduct type
 const isServer = typeof window === 'undefined';
 const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
 
@@ -9,7 +8,7 @@ function cleanImageUrl(url: string | null | undefined): string | undefined {
   return url.replace('http://django:8000', '').replace('http://localhost:8000', '');
 }
 
-export function mapDjangoProductToShopifyProduct(p: any): ShopifyProduct {
+export function mapDjangoProductToProduct(p: any): Product {
   const images = p.images?.map((img: any) => ({
     url: cleanImageUrl(img.url) || '',
     altText: img.altText || p.title
@@ -59,21 +58,21 @@ export function mapDjangoProductToShopifyProduct(p: any): ShopifyProduct {
   };
 }
 
-export async function getProducts(first: number = 30): Promise<ShopifyProduct[]> {
+export async function getProducts(first: number = 30): Promise<Product[]> {
   try {
     const res = await fetch(`${API_URL}/api/shop/products/`, {
       cache: 'no-store'
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.map(mapDjangoProductToShopifyProduct).slice(0, first);
+    return data.map(mapDjangoProductToProduct).slice(0, first);
   } catch (err) {
     console.error("Error in getProducts:", err);
     return [];
   }
 }
 
-export async function getProduct(handle: string): Promise<ShopifyProduct | null> {
+export async function getProduct(handle: string): Promise<Product | null> {
   if (!handle) return null;
   try {
     const res = await fetch(`${API_URL}/api/shop/products/${handle}/`, {
@@ -81,19 +80,19 @@ export async function getProduct(handle: string): Promise<ShopifyProduct | null>
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return mapDjangoProductToShopifyProduct(data);
+    return mapDjangoProductToProduct(data);
   } catch (err) {
     console.error("Error in getProduct:", err);
     return null;
   }
 }
 
-export async function getProductRecommendations(productId: string): Promise<ShopifyProduct[]> {
+export async function getProductRecommendations(productId: string): Promise<Product[]> {
   const products = await getProducts(10);
   return products.filter((p) => p.id !== productId);
 }
 
-export async function getBestSellingProducts(first: number = 30): Promise<ShopifyProduct[]> {
+export async function getBestSellingProducts(first: number = 30): Promise<Product[]> {
   return getProducts(first);
 }
 
@@ -153,29 +152,29 @@ export async function searchProducts(
   first: number = 30,
   sortKey: string = "RELEVANCE",
   reverse: boolean = false
-): Promise<{ totalCount: number; products: ShopifyProduct[] }> {
-  const allProducts = await getProducts(200);
-  
-  let products = allProducts;
-  if (query && query !== "*") {
-    const term = query.toLowerCase();
-    products = allProducts.filter(p => 
-      p.title.toLowerCase().includes(term) ||
-      p.description.toLowerCase().includes(term) ||
-      p.vendor.toLowerCase().includes(term) ||
-      p.tags?.some(t => t.toLowerCase().includes(term))
-    );
-  }
+): Promise<{ totalCount: number; products: Product[] }> {
+  try {
+    const searchParam = query && query !== "*" ? `?search=${encodeURIComponent(query)}` : "";
+    const res = await fetch(`${API_URL}/api/shop/products/${searchParam}`, {
+      cache: 'no-store'
+    });
+    if (!res.ok) return { totalCount: 0, products: [] };
+    const data = await res.json();
+    let products = data.map(mapDjangoProductToProduct);
 
-  if (sortKey === "PRICE") {
-    products.sort((a, b) => parseFloat(a.priceRange.minVariantPrice.amount) - parseFloat(b.priceRange.minVariantPrice.amount));
-  }
-  if (reverse) {
-    products.reverse();
-  }
+    if (sortKey === "PRICE") {
+      products.sort((a: { priceRange: { minVariantPrice: { amount: string; }; }; }, b: { priceRange: { minVariantPrice: { amount: string; }; }; }) => parseFloat(a.priceRange.minVariantPrice.amount) - parseFloat(b.priceRange.minVariantPrice.amount));
+    }
+    if (reverse) {
+      products.reverse();
+    }
 
-  return {
-    totalCount: products.length,
-    products: products.slice(0, first)
-  };
+    return {
+      totalCount: products.length,
+      products: products.slice(0, first)
+    };
+  } catch (err) {
+    console.error("Error in searchProducts:", err);
+    return { totalCount: 0, products: [] };
+  }
 }

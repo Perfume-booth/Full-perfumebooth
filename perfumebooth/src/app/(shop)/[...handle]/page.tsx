@@ -2,21 +2,23 @@ import { Metadata } from "next";
 import CollectionTemplate from "@/components/product/CollectionTemplate";
 
 interface CollectionPageProps {
-  params: Promise<{ handle: string }>;
+  params: Promise<{ handle: string | string[] }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
-  const { handle } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ handle: string | string[] }> }): Promise<Metadata> {
+  const resolvedParams = await params;
+  const handleString = Array.isArray(resolvedParams.handle) ? resolvedParams.handle.join('/') : resolvedParams.handle;
   return {
     alternates: {
-      canonical: `https://www.perfumebooth.com/${handle}`
+      canonical: `https://www.perfumebooth.com/${handleString}`
     }
   };
 }
 
 export default async function GenericCollectionPage({ params, searchParams }: CollectionPageProps) {
-  const { handle } = await params;
+  const resolvedParams = await params;
+  const handleString = Array.isArray(resolvedParams.handle) ? resolvedParams.handle.join('/') : resolvedParams.handle;
   const sParams = await searchParams;
 
   const breadcrumbLd = {
@@ -38,8 +40,8 @@ export default async function GenericCollectionPage({ params, searchParams }: Co
       {
         "@type": "ListItem",
         "position": 3,
-        "name": handle.replace(/-/g, ' ').toUpperCase(),
-        "item": `https://www.perfumebooth.com/${handle}`
+        "name": handleString.replace(/-/g, ' ').replace(/\//g, ' > ').toUpperCase(),
+        "item": `https://www.perfumebooth.com/${handleString}`
       }
     ]
   };
@@ -51,7 +53,7 @@ export default async function GenericCollectionPage({ params, searchParams }: Co
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
       <CollectionTemplate 
-        handle={handle} 
+        handle={handleString} 
         searchParams={sParams}
         defaultLimit={80}
       />

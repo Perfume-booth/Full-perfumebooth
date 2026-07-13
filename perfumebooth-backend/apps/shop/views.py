@@ -7,14 +7,17 @@ from rest_framework.views import APIView
 # pyrefly: ignore [missing-import]
 from django.core.cache import cache
 import json
+from decimal import Decimal
 
 from .models import Product, Inventory, ProductImage, Collection, AutoCollection
+# pyrefly: ignore [missing-import]
+from django.utils.text import slugify
 # pyrefly: ignore [missing-import]
 from apps.authentication.views import HasRolePermission
 # pyrefly: ignore [missing-import]
 from apps.authentication.helpers import log_action
 # pyrefly: ignore [missing-import]
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from .services import CollectionSyncService
 # pyrefly: ignore [missing-import]
 from django.utils import timezone
@@ -397,9 +400,17 @@ class ProductListView(APIView):
     allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
     def get(self, request):
-        # Cache key: catalog:products:<page>
-        page = request.query_params.get('page', 1)
-        cache_key = f'catalog:products:page:{page}'
+        # Retrieve filters from query parameters
+        search_query = request.query_params.get('search', '')
+        stock_status = request.query_params.get('stock_status', '')  # 'all', 'low', 'out'
+        brand = request.query_params.get('brand', '')
+        status_filter = request.query_params.get('status', '')  # 'online', 'offline'
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 50))  # Default 50 per page
+        paginate = request.query_params.get('paginate', 'false').lower() == 'true'
+
+        # Cache key: catalog:products:<params>
+        cache_key = f'catalog:products:page:{page}:size:{page_size}:search:{search_query}:stock:{stock_status}:brand:{brand}:status:{status_filter}:paginated:{paginate}'
         cached = cache.get(cache_key)
         if cached:
             return Response(cached)
@@ -415,15 +426,61 @@ class ProductListView(APIView):
             'created_by__roles__role',
             'updated_by__roles__role'
         ).order_by('title')
+
         if not is_merchant:
             products = products.filter(is_online=True)
-            
-        data = []
-        for product in products:
-            data.append(flatten_product(product, request))
+        else:
+            if status_filter == 'online':
+                products = products.filter(is_online=True)
+            elif status_filter == 'offline':
+                products = products.filter(is_online=False)
 
-        cache.set(cache_key, data, timeout=7200)  # TTL: 2 hours
-        return Response(data)
+        # Apply search filter
+        if search_query:
+            products = products.filter(
+                Q(title__icontains=search_query) | 
+                Q(sku__icontains=search_query) |
+                Q(attributes__brand__icontains=search_query)
+            )
+
+        # Apply stock filter
+        if stock_status == 'low':
+            products = products.filter(inventory__stock_level__gt=0, inventory__stock_level__lte=10)
+        elif stock_status == 'out':
+            products = products.filter(inventory__stock_level=0)
+
+        # Apply brand filter
+        if brand:
+            products = products.filter(attributes__brand=brand)
+
+        if not paginate:
+            # Return full list as an array for backward compatibility
+            data = []
+            for product in products:
+                data.append(flatten_product(product, request))
+            cache.set(cache_key, data, timeout=7200)
+            return Response(data)
+
+        # Pagination calculations
+        total_count = products.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_products = products[start:end]
+
+        results = []
+        for product in paginated_products:
+            results.append(flatten_product(product, request))
+
+        response_data = {
+            'results': results,
+            'total_count': total_count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total_count + page_size - 1) // page_size
+        }
+
+        cache.set(cache_key, response_data, timeout=30)  # cache 30 seconds for quick pagination changes
+        return Response(response_data)
 
     def delete(self, request):
         slugs = request.data.get('slugs', [])
@@ -431,10 +488,72 @@ class ProductListView(APIView):
             return Response({'detail': 'No products selected.'}, status=status.HTTP_400_BAD_REQUEST)
         
         count, _ = Product.objects.filter(slug__in=slugs).delete()
+        
+        # Clean up any collections left with 0 products
+        AutoCollection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
+        Collection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
+        
         cache.clear()
         
         log_action(request.user, f"Bulk deleted {count} products", request)
         return Response({'detail': f'Successfully deleted {count} products.'})
+
+    def patch(self, request):
+        slugs = request.data.get('slugs', [])
+        if not slugs:
+            return Response({'detail': 'No products selected.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_online = request.data.get('is_online')
+        price_adjustment = request.data.get('price_adjustment')
+        stock_adjustment = request.data.get('stock_adjustment')
+
+        if is_online is not None:
+            is_online_bool = str(is_online).lower() == 'true'
+            count = Product.objects.filter(slug__in=slugs).update(is_online=is_online_bool)
+            cache.clear()
+            action_word = "published" if is_online_bool else "unpublished"
+            log_action(request.user, f"Bulk {action_word} {count} products", request)
+            return Response({'detail': f'Successfully {action_word} {count} products.'})
+
+        if price_adjustment:
+            action = price_adjustment.get('action') # 'percent_discount', 'fixed_discount', 'set_compare'
+            val = float(price_adjustment.get('value', 0))
+            products = Product.objects.filter(slug__in=slugs)
+            count = 0
+            for p in products:
+                if action == 'percent_discount':
+                    p.compare_at_price = p.price
+                    p.price = p.price * Decimal(1 - val / 100)
+                elif action == 'fixed_discount':
+                    p.compare_at_price = p.price
+                    p.price = max(p.price - Decimal(val), Decimal(0))
+                elif action == 'set_compare':
+                    p.compare_at_price = Decimal(val)
+                p.save()
+                count += 1
+            cache.clear()
+            log_action(request.user, f"Bulk adjusted price for {count} products", request)
+            return Response({'detail': f'Successfully adjusted price for {count} products.'})
+
+        if stock_adjustment:
+            action = stock_adjustment.get('action') # 'set', 'add'
+            val = int(stock_adjustment.get('value', 0))
+            products = Product.objects.filter(slug__in=slugs)
+            count = 0
+            for p in products:
+                inventory = getattr(p, 'inventory', None)
+                if inventory:
+                    if action == 'set':
+                        inventory.stock_level = max(val, 0)
+                    elif action == 'add':
+                        inventory.stock_level = max(inventory.stock_level + val, 0)
+                    inventory.save()
+                    count += 1
+            cache.clear()
+            log_action(request.user, f"Bulk adjusted stock level for {count} products", request)
+            return Response({'detail': f'Successfully adjusted stock level for {count} products.'})
+
+        return Response({'detail': 'No valid action provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
     def post(self, request):
         title = request.data.get('title')
@@ -482,6 +601,8 @@ class ProductListView(APIView):
         gallery_images = request.FILES.getlist('gallery')
         for img in gallery_images:
             ProductImage.objects.create(product=product, image=img)
+
+
         # Auto sync collections
         synced = CollectionSyncService.syncProductCollections(product)
         
@@ -566,6 +687,8 @@ class ProductDetailView(APIView):
         for img in gallery_images:
             ProductImage.objects.create(product=product, image=img)
             
+
+
         # Auto sync collections
         synced = CollectionSyncService.syncProductCollections(product)
 
@@ -586,6 +709,11 @@ class ProductDetailView(APIView):
         product_title = product.title
         product_sku = product.sku
         product.delete()
+        
+        # Clean up any collections left with 0 products
+        AutoCollection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
+        Collection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
+        
         cache.clear()
         log_action(request.user, f"Deleted product '{product_title}' (SKU: {product_sku})", request)
         return Response({'detail': 'Product deleted successfully.'})
@@ -719,7 +847,8 @@ class CollectionListCreateView(APIView):
                 'is_active': col.status == 'active',
                 'sort_order': 0,
                 'product_count': col.products.count(),
-                'products': [str(p.id) for p in col.products.all()]
+                'products': [str(p.id) for p in col.products.all()],
+                'excluded_products': col.excluded_products or []
             })
         return Response(data)
 
@@ -755,9 +884,10 @@ class CollectionListCreateView(APIView):
                     product_ids = json.loads(request.data.get('products'))
                 except:
                     pass
-            if product_ids:
-                products = Product.objects.filter(id__in=product_ids)
-                collection.products.set(products)
+            if not product_ids:
+                return Response({'detail': 'A manual collection must contain at least 1 product.'}, status=status.HTTP_400_BAD_REQUEST)
+            products = Product.objects.filter(id__in=product_ids)
+            collection.products.set(products)
 
         cache.clear()
         log_action(request.user, f"Created collection '{collection.name}' (Slug: {collection.slug})", request)
@@ -814,6 +944,9 @@ class CollectionDetailView(APIView):
             else:
                 products_qs = base.none()
 
+        if col.excluded_products:
+            products_qs = products_qs.exclude(id__in=col.excluded_products)
+
         products_data = [flatten_product(p, request) for p in products_qs]
 
         data = {
@@ -827,7 +960,8 @@ class CollectionDetailView(APIView):
             'is_active': col.status == 'active',
             'sort_order': 0,
             'products': products_data,
-            'manual_product_ids': [str(p.id) for p in col.products.all()] if col.collection_type == 'manual' else []
+            'manual_product_ids': [str(p.id) for p in col.products.all()] if col.collection_type == 'manual' else [],
+            'excluded_products': col.excluded_products or []
         }
         return Response(data)
 
@@ -848,17 +982,61 @@ class CollectionDetailView(APIView):
         elif request.data.get('image') == 'null' or request.data.get('image') == '':
             col.image = None
 
+        # Handle excluded products list in put method
+        excluded_products_raw = request.data.get('excluded_products')
+        excluded_products = []
+        if excluded_products_raw:
+            try:
+                parsed = json.loads(excluded_products_raw)
+                if isinstance(parsed, list):
+                    excluded_products = parsed
+            except:
+                excluded_products = request.data.getlist('excluded_products')
+        else:
+            excluded_products = request.data.getlist('excluded_products')
+
+        excluded_products = [
+            item for item in excluded_products
+            if item and item != '[]' and item != ''
+        ]
+        
+        col.excluded_products = excluded_products
+        if col.excluded_products:
+            # Only remove products that have valid UUID values
+            valid_uuids = []
+            for item in col.excluded_products:
+                try:
+                    import uuid
+                    uuid.UUID(str(item))
+                    valid_uuids.append(item)
+                except ValueError:
+                    pass
+            if valid_uuids:
+                col.products.remove(*valid_uuids)
+
         col.save()
 
         if col.collection_type == 'manual':
-            product_ids = request.data.getlist('products')
-            if not product_ids and 'products' in request.data:
+            products_raw = request.data.get('products')
+            product_ids = []
+            if products_raw:
                 try:
-                    product_ids = json.loads(request.data.get('products'))
+                    parsed = json.loads(products_raw)
+                    if isinstance(parsed, list):
+                        product_ids = parsed
                 except:
-                    pass
-            
+                    product_ids = request.data.getlist('products')
+            else:
+                product_ids = request.data.getlist('products')
+
+            product_ids = [
+                item for item in product_ids
+                if item and item != '[]' and item != ''
+            ]
+
             if 'products' in request.data or product_ids:
+                if not product_ids:
+                    return Response({'detail': 'A manual collection must contain at least 1 product.'}, status=status.HTTP_400_BAD_REQUEST)
                 products = Product.objects.filter(id__in=product_ids)
                 col.products.set(products)
         else:
@@ -1066,16 +1244,27 @@ class ProductExcelImportView(APIView):
                 if image_url and (image_url.startswith('http://') or image_url.startswith('https://')):
                     try:
                         import requests
+                        import re
                         # pyrefly: ignore [missing-import]
                         from django.core.files.base import ContentFile
                         from urllib.parse import urlparse
                         import os
+
+                        # Transform Google Drive link to direct download link if needed
+                        if 'drive.google.com' in image_url:
+                            file_id_match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', image_url)
+                            if not file_id_match:
+                                file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', image_url)
+                            if file_id_match:
+                                file_id = file_id_match.group(1)
+                                image_url = f"https://drive.google.com/uc?export=download&id={file_id}"
                         
                         img_res = requests.get(image_url, timeout=15)
                         if img_res.status_code == 200:
                             parsed_url = urlparse(image_url)
                             file_name = os.path.basename(parsed_url.path)
-                            if not file_name:
+                            # If it's a drive.google.com link, parsed path basename might be 'uc', so check or fallback
+                            if not file_name or file_name == 'uc':
                                 file_name = f"{sku}.jpg"
                             product.image.save(file_name, ContentFile(img_res.content), save=True)
                     except Exception as img_err:
@@ -1103,4 +1292,341 @@ class ProductExcelImportView(APIView):
             return Response({'detail': f'Error reading Excel: {str(e)}'}, status=500)
 
 
+from .models import PageBanner
+
+class PageBannerDetailView(APIView):
+    """
+    Public API to fetch active banners by page slug.
+    Used by the storefront (Next.js) to display dynamic CMS banners.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, slug):
+        banner = PageBanner.objects.filter(page_slug=slug, is_active=True).first()
+        if not banner:
+            return Response({'detail': 'Banner not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        images = banner.images.all()
+        image_data = []
+        for img in images:
+            image_data.append({
+                'id': str(img.id),
+                'image_url': request.build_absolute_uri(img.image.url) if img.image else None,
+                'mobile_image_url': request.build_absolute_uri(img.mobile_image.url) if img.mobile_image else None,
+                'sort_order': img.sort_order,
+                'link_url': img.link_url
+            })
+            
+        return Response({
+            'id': str(banner.id),
+            'page_slug': banner.page_slug,
+            'title': banner.title,
+            'is_active': banner.is_active,
+            'images': image_data
+        })
+class ProductExcelImportView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        import openpyxl
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'detail': 'No file uploaded.'}, status=400)
+
+        try:
+            import csv
+            is_csv = file_obj.name.lower().endswith('.csv')
+            if is_csv:
+                decoded_file = file_obj.read().decode('utf-8-sig').splitlines()
+                reader = csv.reader(decoded_file)
+                rows = list(reader)
+            else:
+                wb = openpyxl.load_workbook(file_obj, read_only=True)
+                ws = wb.active
+                rows = list(ws.iter_rows(values_only=True))
+
+            if not rows:
+                return Response({'detail': 'Uploaded sheet/file is empty.'}, status=400)
+
+            headers = [str(h).strip().lower() for h in rows[0] if h is not None]
+            header_map = {h: i for i, h in enumerate(headers)}
+
+            def get_val(row, aliases, default=''):
+                if isinstance(aliases, str):
+                    aliases = [aliases]
+                for alias in aliases:
+                    idx = header_map.get(alias.lower())
+                    if idx is not None and idx < len(row):
+                        val = row[idx]
+                        if val is not None:
+                            if isinstance(val, str):
+                                val = val.strip()
+                                if val.startswith("'"):
+                                    val = val[1:]
+                            return val
+                return default
+
+            def safe_int(val, default=0):
+                try:
+                    return int(float(str(val).strip()))
+                except:
+                    return default
+
+            def safe_float(val, default=None):
+                try:
+                    return float(str(val).strip())
+                except:
+                    return default
+
+            products_imported = 0
+            for row in rows[1:]:
+                if not any(row):
+                    continue
+
+                sku = get_val(row, 'sku')
+                title = get_val(row, ['title', 'product title', 'name', 'product name'])
+                
+                # Skip if both Title and SKU are completely missing
+                if not sku and not title:
+                    continue
+                
+                # Generate fallback Title if SKU exists but Title is missing
+                if not title:
+                    title = f"Product {sku}"
+                
+                # Generate fallback SKU if Title exists but SKU is missing
+                if not sku:
+                    import random
+                    title_slug = slugify(title)
+                    sku = f"PB-AUTO-{title_slug[:20].upper()}-{random.randint(1000, 9999)}"
+
+                price = safe_float(get_val(row, ['price', 'price (₹)', 'selling price']), 0.0)
+                compare_price = safe_float(get_val(row, ['compare at price', 'compare at price (₹)', 'mrp']))
+                description = get_val(row, ['description', 'product description', 'body'], '')
+                is_online = str(get_val(row, ['is online', 'status', 'is_online'], 'true')).lower() == 'true'
+                stock_level = safe_int(get_val(row, ['stock level', 'stock quantity', 'stock', 'quantity']), 0)
+                slug = get_val(row, ['slug', 'handle'])
+                if not slug:
+                    slug = slugify(title)
+
+                attributes = {
+                    'brand': get_val(row, ['brand', 'brand name']),
+                    'vendor': get_val(row, ['vendor'], 'PerfumeBooth') or 'PerfumeBooth',
+                    'category': get_val(row, ['category', 'product category']),
+                    'gender': get_val(row, ['gender', 'target gender']),
+                    'productType': get_val(row, ['product type', 'concentration', 'productType']),
+                    'top_notes': get_val(row, ['top notes', 'top_notes']),
+                    'middle_notes': get_val(row, ['middle notes', 'middle_notes', 'heart notes', 'heart_notes']),
+                    'base_notes': get_val(row, ['base notes', 'base_notes']),
+                    'occasion': get_val(row, ['occasion']),
+                    'season': get_val(row, ['season']),
+                    'image_alt_text': get_val(row, ['image alt text', 'image alt', 'alt text', 'alt_text'])
+                }
+
+                attributes = {k: (v if v is not None else '') for k, v in attributes.items()}
+                attributes['tags'] = auto_generate_tags(attributes)
+
+                user = request.user if request.user and request.user.is_authenticated else None
+                defaults = {
+                    'title': title,
+                    'slug': slug,
+                    'price': price,
+                    'compare_at_price': compare_price if compare_price else None,
+                    'description': description,
+                    'is_online': is_online,
+                    'attributes': attributes,
+                    'updated_by': user
+                }
+                if not Product.objects.filter(sku=sku).exists():
+                    defaults['created_by'] = user
+
+                product, created = Product.objects.update_or_create(
+                    sku=sku,
+                    defaults=defaults
+                )
+
+                # Download and save image if an image URL is provided in the Excel/CSV sheet
+                image_url = get_val(row, ['image src', 'image', 'image url', 'image_url'])
+                if image_url and (image_url.startswith('http://') or image_url.startswith('https://')):
+                    try:
+                        import requests
+                        import re
+                        # pyrefly: ignore [missing-import]
+                        from django.core.files.base import ContentFile
+                        from urllib.parse import urlparse
+                        import os
+
+                        # Transform Google Drive link to direct download link if needed
+                        if 'drive.google.com' in image_url:
+                            file_id_match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', image_url)
+                            if not file_id_match:
+                                file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', image_url)
+                            if file_id_match:
+                                file_id = file_id_match.group(1)
+                                image_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+                        
+                        img_res = requests.get(image_url, timeout=15)
+                        if img_res.status_code == 200:
+                            parsed_url = urlparse(image_url)
+                            file_name = os.path.basename(parsed_url.path)
+                            # If it's a drive.google.com link, parsed path basename might be 'uc', so check or fallback
+                            if not file_name or file_name == 'uc':
+                                file_name = f"{sku}.jpg"
+                            product.image.save(file_name, ContentFile(img_res.content), save=True)
+                    except Exception as img_err:
+                        print(f"Error downloading image {image_url} for SKU {sku}: {img_err}")
+
+                # Auto-save brand to brands list
+                brand_name = attributes.get('brand')
+                if brand_name:
+                    save_brand(brand_name)
+
+                Inventory.objects.update_or_create(
+                    product=product,
+                    defaults={'stock_level': stock_level}
+                )
+
+                CollectionSyncService.syncProductCollections(product)
+                products_imported += 1
+
+            cache.clear()
+            return Response({
+                'success': True,
+                'detail': f'Successfully imported {products_imported} products.'
+            })
+        except Exception as e:
+            return Response({'detail': f'Error reading Excel: {str(e)}'}, status=500)
+
+
+from .models import PageBanner
+
+class PageBannerDetailView(APIView):
+    """
+    Public API to fetch active banners by page slug.
+    Used by the storefront (Next.js) to display dynamic CMS banners.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, slug):
+        banner = PageBanner.objects.filter(page_slug=slug, is_active=True).first()
+        if not banner:
+            return Response({'detail': 'Banner not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        images = banner.images.all()
+        image_data = []
+        for img in images:
+            image_data.append({
+                'id': str(img.id),
+                'image_url': request.build_absolute_uri(img.image.url) if img.image else None,
+                'mobile_image_url': request.build_absolute_uri(img.mobile_image.url) if img.mobile_image else None,
+                'sort_order': img.sort_order,
+                'link_url': img.link_url
+            })
+
+        return Response({
+            'id': str(banner.id),
+            'page_slug': banner.page_slug,
+            'title': banner.title,
+            'images': image_data
+        })
+
+class PageBannerListCreateView(APIView):
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+    
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def get(self, request):
+        banners = PageBanner.objects.all().order_by('-created_at')
+        data = []
+        for banner in banners:
+            images = banner.images.all()
+            image_list = []
+            for img in images:
+                image_list.append({
+                    'id': str(img.id),
+                    'image_url': request.build_absolute_uri(img.image.url) if img.image else None,
+                    'mobile_image_url': request.build_absolute_uri(img.mobile_image.url) if img.mobile_image else None,
+                    'sort_order': img.sort_order,
+                    'link_url': img.link_url
+                })
+            
+            data.append({
+                'id': str(banner.id),
+                'page_slug': banner.page_slug,
+                'title': banner.title,
+                'is_active': banner.is_active,
+                'image_count': images.count(),
+                'primary_image': image_list[0]['image_url'] if image_list else None,
+                'images': image_list
+            })
+        return Response(data)
+
+    def post(self, request):
+        page_slug = request.data.get('page_slug')
+        if not page_slug:
+            return Response({'detail': 'page_slug is required'}, status=400)
+            
+        page_slug = page_slug.strip().strip('/')
+            
+        banner, created = PageBanner.objects.get_or_create(
+            page_slug=page_slug,
+            defaults={
+                'title': request.data.get('title', ''),
+                'is_active': str(request.data.get('is_active', 'true')).lower() == 'true'
+            }
+        )
+        
+        # Handle image upload if provided
+        if 'image' in request.FILES:
+            from .models import PageBannerImage
+            images = request.FILES.getlist('image')
+            mobile_images = request.FILES.getlist('mobile_image')
+            base_sort_order = int(request.data.get('sort_order', 0))
+            
+            for i, img in enumerate(images):
+                mobile_img = mobile_images[i] if i < len(mobile_images) else None
+                PageBannerImage.objects.create(
+                    banner=banner,
+                    image=img,
+                    mobile_image=mobile_img,
+                    link_url=request.data.get('link_url', ''),
+                    sort_order=base_sort_order + i
+                )
+
+        log_action(request.user, f"Created/Updated banner for {page_slug}", request)
+        return Response({'detail': 'Banner saved successfully', 'id': str(banner.id)})
+
+class PageBannerDeleteView(APIView):
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+    
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager']
+    
+    def delete(self, request, id):
+        try:
+            banner = PageBanner.objects.get(id=id)
+            slug = banner.page_slug
+            banner.delete()
+            log_action(request.user, f"Deleted banner for {slug}", request)
+            return Response({'detail': 'Deleted successfully'})
+        except PageBanner.DoesNotExist:
+            return Response({'detail': 'Not found'}, status=404)
+
+class PageBannerImageDeleteView(APIView):
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+    
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager']
+    
+    def delete(self, request, id):
+        try:
+            from .models import PageBannerImage
+            image = PageBannerImage.objects.get(id=id)
+            slug = image.banner.page_slug
+            image.delete()
+            log_action(request.user, f"Deleted image from banner {slug}", request)
+            return Response({'detail': 'Deleted successfully'})
+        except Exception:
+            return Response({'detail': 'Not found'}, status=404)
 
