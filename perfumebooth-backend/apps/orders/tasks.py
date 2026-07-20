@@ -38,16 +38,37 @@ def send_order_email_receipt(self, order_id: str) -> dict:
         return {'status': 'skipped', 'reason': 'order not found'}
 
     try:
-        # ── Plug in your email sending logic here ──────────────────────────
-        # from django.core.mail import send_mail
-        # send_mail(
-        #     subject=f'Order #{order.order_number} Confirmed — PerfumeBooth',
-        #     message=f'Thank you! Your order #{order.order_number} is confirmed.',
-        #     from_email='orders@perfumebooth.com',
-        #     recipient_list=[order.user.email],
-        # )
-        # ──────────────────────────────────────────────────────────────────
-        pass
+        from django.core.mail import send_mail
+        from django.conf import settings
+        
+        if not order.user or not order.user.email:
+            return {'status': 'skipped', 'reason': 'user email not found'}
+            
+        subject = f'Order #{order.order_number} Confirmed — PerfumeBooth'
+        message = f'Thank you! Your order #{order.order_number} is confirmed. Total: ₹{order.total}'
+        
+        items_html = "".join([
+            f"<li>{item.product.title} (x{item.quantity}) - ₹{item.price}</li>"
+            for item in order.items.all() if item.product
+        ])
+        
+        html_message = f"""
+            <h2>Thank you for your order!</h2>
+            <p>Your order <strong>#{order.order_number}</strong> is confirmed.</p>
+            <p><strong>Total Amount Paid:</strong> ₹{order.total}</p>
+            <h3>Order Details:</h3>
+            <ul>{items_html}</ul>
+            <p>If you have any questions, please contact support.</p>
+        """
+        
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'PerfumeBooth <onboarding@resend.dev>'),
+            recipient_list=[order.user.email],
+            html_message=html_message,
+            fail_silently=False
+        )
 
     except Exception as exc:
         raise self.retry(exc=exc)

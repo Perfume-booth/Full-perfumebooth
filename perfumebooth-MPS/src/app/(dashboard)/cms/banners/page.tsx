@@ -195,8 +195,9 @@ export default function BannersPage() {
                           <div className="relative w-24 h-12 bg-white/10 rounded overflow-hidden">
                             <Image 
                               src={banner.primary_image} 
-                              alt={banner.title} 
+                              alt={banner.title || 'Banner'} 
                               fill 
+                              sizes="96px"
                               className="object-cover" 
                             />
                           </div>
@@ -244,6 +245,7 @@ export default function BannersPage() {
                                     src={img.image_url} 
                                     alt={`Banner ${index + 1}`} 
                                     fill 
+                                    sizes="(max-width: 768px) 50vw, 25vw"
                                     className="object-cover"
                                   />
                                 </div>
@@ -314,7 +316,7 @@ export default function BannersPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Internal Title</label>
+                <label className="block text-sm text-gray-400 mb-1">Alt Text</label>
                 <input
                   type="text"
                   value={title}

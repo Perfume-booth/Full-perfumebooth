@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useAuthStore } from '@/store/useAuthStore';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -103,6 +104,7 @@ const defaultLowStock: LowStockItem[] = [
 ];
 
 export default function DashboardPage() {
+  const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<KPI[]>(defaultKPIs);
@@ -159,8 +161,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-    fetchDashboardData();
-  }, []);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   if (!mounted) {
     return <div className="h-screen w-full bg-background animate-pulse"></div>;

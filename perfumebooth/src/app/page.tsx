@@ -1,6 +1,6 @@
 import HeroBanner from "@/components/home/HeroBanner";
 import TopCategories from "@/components/home/CategoryList";
-import { getCollection } from "@/lib/shopify";
+import { getBanner } from "@/lib/shopify";
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { CollectionSkeleton } from "@/components/ui/CollectionSkeleton";
@@ -29,19 +29,26 @@ const GenderSection = dynamic(() => import("@/components/home/GenderSection"), {
 });
 
 export default async function HomePage() {
-  // Only fetch Hero Banner data to unblock initial render
-  const heroData = await getCollection("home-hero");
+  const cmsBanner = await getBanner("home");
+  
+  // Default fallback if CMS doesn't have the 'home' banner
+  const slides = cmsBanner?.images?.length > 0 
+    ? cmsBanner.images.map((img: any) => ({
+        id: img.id,
+        image: img.image_url,
+        mobileImage: img.mobile_image_url || img.image_url,
+        href: img.link_url || undefined,
+      }))
+    : [
+        { id: 1, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-1.jpg?v=1778129692", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ap.jpg?v=1778130171", href: "/arabiyat-prestige", alt_text: "Arabiyat Prestige Premium Fragrances" },
+        { id: 2, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-2.jpg?v=1778129694", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-banner.jpg?v=1778130178", href: "/al-haramain", alt_text: "Al Haramain Exclusive Perfumes" },
+        { id: 3, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-3.jpg?v=1778129693", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.jpg?v=1778130173", href: "/otoori", alt_text: "Otoori Luxury Attars and Perfumes" },
+        { id: 4, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-4.jpg?v=1778129691", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf.jpg?v=1778130170", href: "/mpf", alt_text: "MPF Signature Scents Collection" },
+      ];
 
   return (
     <>
-      <HeroBanner
-        slides={[
-          { id: 1, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-1.jpg?v=1778129692", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ap.jpg?v=1778130171", href: "/arabiyat-prestige", alt_text: "Arabiyat Prestige Premium Fragrances" },
-          { id: 2, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-2.jpg?v=1778129694", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-banner.jpg?v=1778130178", href: "/al-haramain", alt_text: "Al Haramain Exclusive Perfumes" },
-          { id: 3, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-3.jpg?v=1778129693", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.jpg?v=1778130173", href: "/otoori", alt_text: "Otoori Luxury Attars and Perfumes" },
-          { id: 4, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-4.jpg?v=1778129691", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf.jpg?v=1778130170", href: "/mpf", alt_text: "MPF Signature Scents Collection" },
-        ]}
-      />
+      <HeroBanner slides={slides} />
 
       <TopCategories />
 

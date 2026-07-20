@@ -11,6 +11,8 @@ import ProductReviews from "@/components/product/ProductReviews";
 import RelatedProducts from "@/components/product/RelatedProducts";
 import RecentlyViewed from "@/components/product/RecentlyViewed";
 import ExpandableNarrative from "@/components/product/ExpandableNarrative";
+import { FaqSection } from "@/components/ui/faq-section";
+
 // @ts-ignore: side-effect import for CSS without type declarations
 import './pdp.css';
 
@@ -66,30 +68,44 @@ export interface Product {
     rating_count?: number;
     reviewsHtml?: string;
     availableForSale?: boolean;
-    variants?: { id?: string; title: string; price: number | string }[];
+    variants?: { id?: string; title: string; price: number | string; sku?: string }[];
     coupons?: { code: string; label: string; description: string }[];
 }
 
 // Server-side fetching
 function cleanImageUrl(url: string | null | undefined): string | null {
     if (!url) return null;
-    return url.replace('http://django:8000', '').replace('http://localhost:8000', '');
+    
+    const isDocker = process.env.WATCHPACK_POLLING === "true";
+    const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
+    
+    // Append cache buster to force browser to ignore old application/octet-stream cache
+    const cacheBuster = '?v=1';
+    
+    if (url.startsWith('/media/')) return `${API_URL}${url}${cacheBuster}`;
+    if (url.includes('http://django:8000') || url.includes('http://localhost:8000')) {
+        const newUrl = url.replace('http://django:8000', API_URL).replace('http://localhost:8000', API_URL);
+        return newUrl.includes('?') ? newUrl : `${newUrl}${cacheBuster}`;
+    }
+    return url;
 }
 
 async function getProduct(slug: string): Promise<Product | null> {
     try {
-        const res = await fetch(`http://django:8000/api/shop/products/${slug}/`, {
-            cache: 'no-store'
+        const isDocker = process.env.WATCHPACK_POLLING === "true";
+        const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
+        const res = await fetch(`${API_URL}/api/shop/products/${slug}/`, {
+            next: { revalidate: 3600 }
         });
         if (!res.ok) return null;
         const p = await res.json();
-        
+
         const images = p.images?.map((img: any, i: number) => ({
             id: i,
             image: cleanImageUrl(img.url || img.image) || '',
             alt_text: img.altText || img.alt_text || p.title
         })) || [];
-        
+
         if (images.length === 0 && p.image) {
             images.push({
                 id: 0,
@@ -121,30 +137,30 @@ async function getRecommendedProducts(productId: string): Promise<Product[]> {
     return recommendations
         .filter(p => p.availableForSale) // Only show available products
         .map(p => {
-        const { rating: parsedRating, reviewCount: parsedRatingCount } = parseRating(p);
+            const { rating: parsedRating, reviewCount: parsedRatingCount } = parseRating(p);
 
-        return {
-            id: p.id,
-            title: p.title,
-            slug: p.handle,
-            brand: getBrandFromTags(p.tags) || 'Perfume Booth',
-            tags: p.tags || [],
-            category : p.productType,
-            image: p.featuredImage?.url,
-            price: p.priceRange?.minVariantPrice?.amount || "0",
-            discount_price: p.compareAtPriceRange?.minVariantPrice?.amount || null,
-            has_discount: !!p.compareAtPriceRange?.minVariantPrice?.amount && parseFloat(p.compareAtPriceRange.minVariantPrice.amount) > parseFloat(p.priceRange?.minVariantPrice?.amount || "0"),
-            stock_count: (() => {
-                const firstVariant = (p as any).variants?.edges?.[0]?.node;
-                return firstVariant && typeof firstVariant.quantityAvailable === 'number'
-                    ? firstVariant.quantityAvailable
-                    : (p.availableForSale ? 50 : 0);
-            })(),
-            is_scent_shot: p.title.toLowerCase().includes('scent shot'),
-            rating: parsedRating || 0,
-            rating_count: parsedRatingCount || 0
-        };
-    }) as unknown as Product[];
+            return {
+                id: p.id,
+                title: p.title,
+                slug: p.handle,
+                brand: getBrandFromTags(p.tags) || 'Perfume Booth',
+                tags: p.tags || [],
+                category: p.productType,
+                image: p.featuredImage?.url,
+                price: p.priceRange?.minVariantPrice?.amount || "0",
+                discount_price: p.compareAtPriceRange?.minVariantPrice?.amount || null,
+                has_discount: !!p.compareAtPriceRange?.minVariantPrice?.amount && parseFloat(p.compareAtPriceRange.minVariantPrice.amount) > parseFloat(p.priceRange?.minVariantPrice?.amount || "0"),
+                stock_count: (() => {
+                    const firstVariant = (p as any).variants?.edges?.[0]?.node;
+                    return firstVariant && typeof firstVariant.quantityAvailable === 'number'
+                        ? firstVariant.quantityAvailable
+                        : (p.availableForSale ? 50 : 0);
+                })(),
+                is_scent_shot: p.title.toLowerCase().includes('scent shot'),
+                rating: parsedRating || 0,
+                rating_count: parsedRatingCount || 0
+            };
+        }) as unknown as Product[];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -166,10 +182,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     };
 }
 
-export default async function ProductPage({ 
+export default async function ProductPage({
     params,
     searchParams
-}: { 
+}: {
     params: Promise<{ slug: string }>;
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
@@ -189,23 +205,27 @@ export default async function ProductPage({
     // Build dynamic collection path
     let collectionLabel = '';
     let collectionHref = '';
-    
+
     if (fromParam && fromParam.toLowerCase() !== 'all') {
-      const parts = fromParam.split('/');
-      const lastPart = parts[parts.length - 1];
-      collectionLabel = lastPart
-        .split('-')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-      collectionHref = `/${fromParam}`;
+        const parts = fromParam.split('/');
+        const lastPart = parts[parts.length - 1];
+        collectionLabel = lastPart
+            .split('-')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+        collectionHref = `/${fromParam}`;
     }
 
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",
         name: product.title,
-        image: product.image,
+        image: product.images && product.images.length > 0 ? product.images.map(img => img.image) : (product.image ? [product.image] : []),
         description: stripHtml(product.description).substring(0, 160),
+        sku: product.variants && product.variants.length > 0 ? product.variants[0].sku : String(product.id),
+        mpn: product.variants && product.variants.length > 0 ? product.variants[0].sku : String(product.id),
+        url: `https://www.perfumebooth.com/products/${product.slug}`,
+        category: product.category || product.type,
         brand: {
             "@type": "Brand",
             name: product.brand
@@ -215,9 +235,23 @@ export default async function ProductPage({
             url: `https://www.perfumebooth.com/products/${product.slug}`,
             priceCurrency: "INR",
             price: product.price,
+            priceValidUntil: `${new Date().getFullYear() + 1}-12-31`,
             availability: product.availableForSale ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-            itemCondition: "https://schema.org/NewCondition"
-        }
+            itemCondition: "https://schema.org/NewCondition",
+            seller: {
+                "@type": "Organization",
+                name: "Perfume Booth"
+            }
+        },
+        ...(product.rating_count && product.rating_count > 0 ? {
+            aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: product.rating,
+                reviewCount: product.rating_count,
+                bestRating: "5",
+                worstRating: "1"
+            }
+        } : {})
     };
 
     const breadcrumbLd = {
@@ -290,8 +324,8 @@ export default async function ProductPage({
                         {/* 3. Narrative - 3rd on Mobile, Below Gallery on Desktop */}
                         <div className="w-full h-fit order-3">
                             <article className="max-w-2xl md:border-l border-none md:border-[var(--color-gold)]/20 pl-0 md:pl-8 py-4">
-                                <ExpandableNarrative 
-                                    description={product.description} 
+                                <ExpandableNarrative
+                                    description={product.description}
                                     details={{
                                         fragrance: product.fragrance || product.title,
                                         gender: product.gender,
@@ -318,6 +352,43 @@ export default async function ProductPage({
             <div className="w-full">
                 <ProductReviews productHandle={product.slug} />
             </div>
+
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
+                            <FaqSection
+                                title="Frequently Asked Questions"
+                                description="Everything you need to know about our products, authenticity, shipping, and policies."
+                                items={[
+                                    {
+                                        question: "1. Are all perfumes sold on Perfume Booth authentic?",
+                                        answer: "Yes. Every product sold on Perfume Booth is 100% authentic and sourced through trusted brands, authorised importers, and verified distribution partners. We do not sell counterfeit, refilled, diluted, or imitation fragrances."
+                                    },
+                                    {
+                                        question: "2. Does Perfume Booth offer Cash on Delivery?",
+                                        answer: "Yes, Cash on Delivery is available for eligible orders and serviceable PIN codes across India. COD availability and any applicable charges will be clearly displayed during checkout before you place your order."
+                                    },
+                                    {
+                                        question: "3. How quickly will my order be shipped?",
+                                        answer: "Most confirmed orders are packed and dispatched within 12–24 working hours. Once your order is shipped, tracking details will be shared with you so you can follow its delivery status."
+                                    },
+                                    {
+                                        question: "4. How long does delivery take?",
+                                        answer: "Most orders are delivered within 2–7 business days, depending on your location and PIN code. Delivery may take slightly longer for remote areas, public holidays, weather disruptions, or courier delays."
+                                    },
+                                    {
+                                        question: "5. What is Perfume Booth’s return and refund policy?",
+                                        answer: (
+                                            <span>
+                                                You can read our full shipping and return policy{" "}
+                                                <Link href="/info/policies/refund" className="underline hover:text-[var(--color-gold)] transition-colors">
+                                                    here
+                                                </Link>
+                                                .
+                                            </span>
+                                        )
+                                    }
+                                ]}
+                            />
+                        </div>
 
             {/* Product Discovery Sections */}
             <div className="w-full mt-12">

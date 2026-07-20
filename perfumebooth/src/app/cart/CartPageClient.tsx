@@ -374,7 +374,7 @@ export default function CartPageClient() {
               <div className="mt-5 grid grid-cols-3 gap-3 text-center">
                 {[
                   { icon: <AnimatedShield size={16} animateOn="view" />, label: "100% Secure" },
-                  { icon: <AnimatedRotateCcw size={16} animateOn="view" />, label: "Easy Returns" },
+                  { icon: <AnimatedRotateCcw size={16} animateOn="view" />, label: "Transit Damage Protection" },
                   { icon: <AnimatedTruck size={16} animateOn="view" />, label: "Fast Delivery" },
                 ].map((b) => (
                   <div key={b.label} className="flex flex-col items-center gap-1">
@@ -389,7 +389,7 @@ export default function CartPageClient() {
             <div className="bg-[var(--color-surface)] rounded-lg shadow-[var(--shadow-card)] px-5 py-4 flex items-center gap-3">
               <AnimatedShield size={20} className="text-[var(--color-success)] flex-shrink-0" animateOn="view" />
               <p className="text-[11px] text-[var(--color-text-muted)] leading-relaxed">
-                <span className="font-semibold text-[var(--color-text-primary)]">Safe & Secure Payments.</span> 100% authentic products. Easy returns.
+                <span className="font-semibold text-[var(--color-text-primary)]">Safe & Secure Payments.</span> 100% authentic products. Transit Damage Guarantee.
               </p>
             </div>
           </aside>

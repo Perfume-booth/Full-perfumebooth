@@ -39,7 +39,7 @@ export default function ProductCard({
     const [pincode, setPincode] = useState<string | null>(null);
 
     const getProductUrl = () => {
-        const productHandle = rawProduct.handle || '';
+        const productHandle = rawProduct.handle ||rawProduct.slug || '';
         if (!pathname || pathname === '/' || pathname.startsWith('/products')) {
             return `/products/${productHandle}`;
         }

@@ -1,39 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mapDjangoProductToProduct } from "@/lib/backend/products";
+import { isRateLimited } from "@/lib/rate-limit";
 
 const BACKEND_URL = process.env.BACKEND_API_URL || "http://django:8000";
 
-function cleanImageUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
-  return url.replace('http://django:8000', '').replace('http://localhost:8000', '');
-}
-
-function mapProduct(p: any) {
-  const images = p.images?.map((img: any) => ({
-    url: cleanImageUrl(img.url) || '',
-    altText: img.altText || p.title
-  })) || [];
-  const priceVal = parseFloat(p.price || "0").toFixed(2);
-  const comparePriceVal = p.compare_at_price ? parseFloat(p.compare_at_price).toFixed(2) : undefined;
-
-  return {
-    id: String(p.id),
-    handle: p.slug,
-    title: p.title,
-    description: p.description || '',
-    availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
-    vendor: p.vendor || p.brand || 'Perfume Booth',
-    tags: p.tags || [],
-    productType: p.productType || p.category || '',
-    priceRange: { minVariantPrice: { amount: priceVal, currencyCode: "INR" } },
-    compareAtPriceRange: comparePriceVal ? { minVariantPrice: { amount: comparePriceVal, currencyCode: "INR" } } : undefined,
-    featuredImage: images.length > 0 ? images[0] : (p.image ? { url: cleanImageUrl(p.image) || '', altText: p.title } : undefined),
-    images: { edges: images.map((img: any) => ({ node: img })), nodes: images },
-    rating: p.rating || 0,
-    rating_count: p.rating_count || 0,
-  };
-}
-
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "127.0.0.1";
+  if (isRateLimited(ip, 60, 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q") || "*";
   const sortKey = searchParams.get("sort") || "RELEVANCE";
@@ -49,7 +28,7 @@ export async function GET(request: NextRequest) {
       fetch(`${BACKEND_URL}/api/shop/facets/`, { cache: "no-store" }),
     ]);
 
-    let products = productsRes.ok ? (await productsRes.json()).map(mapProduct) : [];
+    let products = productsRes.ok ? (await productsRes.json()).map(mapDjangoProductToProduct) : [];
     const brands = brandsRes.ok ? await brandsRes.json() : [];
     const facets = facetsRes.ok ? await facetsRes.json() : null;
     const productTypes = facets?.productTypes?.map((f: any) => f.value) || [];

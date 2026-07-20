@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '@/app/products/[slug]/page';
 import { addCartItemAction, updateCartItemAction, removeCartItemAction, updateCartDiscountAction } from '@/lib/actions/actions';
+import { toast } from 'react-hot-toast';
 
 export interface CartItem extends Product {
   cartQuantity: number;
@@ -413,6 +414,14 @@ export const useCartStore = create<CartState>()(
 
         const formattedVariantId = String(variantId).includes('gid://') ? String(variantId) : `gid://shopify/ProductVariant/${variantId}`;
 
+        // Save pre-mutation state snapshot for rollback
+        const rollbackState = {
+          items: get().items,
+          totalQuantity: get().totalQuantity,
+          subtotalAmount: get().subtotalAmount,
+          totalAmount: get().totalAmount,
+        };
+
         // Check if item already exists in cart — match by variantId ONLY for precise dedup
         const existingItem = get().items.find((item) =>
           item.selectedVariantId === formattedVariantId
@@ -439,20 +448,31 @@ export const useCartStore = create<CartState>()(
             };
           });
 
-          // Server Action: UPDATE the existing line in Shopify (not add a new line)
+          // Server Action with Rollback
           const lineId = existingItem.lineId;
-          if (lineId) {
-            const updatedCart = await updateCartItemAction(lineId, newQty, get().shopifyCartId || undefined);
-            if (updatedCart) get().syncShopifyCart(updatedCart);
-          } else {
-            // No lineId yet — fall back to addToCartLines for initial server sync
-            const currentItems = get().items;
-            const allItemsForShopify = currentItems.map(item => ({
-              merchandiseId: item.selectedVariantId || '',
-              quantity: item.cartQuantity
-            })).filter(line => line.merchandiseId !== '');
-            const updatedCart = await addCartItemAction(formattedVariantId, quantity, allItemsForShopify);
-            if (updatedCart) get().syncShopifyCart(updatedCart);
+          try {
+            let updatedCart;
+            if (lineId) {
+              updatedCart = await updateCartItemAction(lineId, newQty, get().shopifyCartId || undefined);
+            } else {
+              // No lineId yet — fall back to addToCartLines for initial server sync
+              const currentItems = get().items;
+              const allItemsForShopify = currentItems.map(item => ({
+                merchandiseId: item.selectedVariantId || '',
+                quantity: item.cartQuantity
+              })).filter(line => line.merchandiseId !== '');
+              updatedCart = await addCartItemAction(formattedVariantId, quantity, allItemsForShopify);
+            }
+            if (updatedCart) {
+              get().syncShopifyCart(updatedCart);
+              toast.success(`Updated "${product.title}" quantity in cart!`);
+            } else {
+              throw new Error("Failed to update cart on server.");
+            }
+          } catch (err) {
+            console.error("Cart update error, rolling back:", err);
+            set(rollbackState);
+            toast.error(`Could not update "${product.title}" quantity. Reverted changes.`);
           }
         } else {
           // New item: add to cart
@@ -467,16 +487,25 @@ export const useCartStore = create<CartState>()(
             };
           });
 
-          // Server Action: Add to Shopify Cart
-          const currentItems = get().items;
-          const allItemsForShopify = currentItems.map(item => ({
-            merchandiseId: item.selectedVariantId || '',
-            quantity: item.cartQuantity
-          })).filter(line => line.merchandiseId !== '');
+          // Server Action with Rollback
+          try {
+            const currentItems = get().items;
+            const allItemsForShopify = currentItems.map(item => ({
+              merchandiseId: item.selectedVariantId || '',
+              quantity: item.cartQuantity
+            })).filter(line => line.merchandiseId !== '');
 
-          const updatedCart = await addCartItemAction(formattedVariantId, initialQty, allItemsForShopify);
-          if (updatedCart) {
-            get().syncShopifyCart(updatedCart);
+            const updatedCart = await addCartItemAction(formattedVariantId, initialQty, allItemsForShopify);
+            if (updatedCart) {
+              get().syncShopifyCart(updatedCart);
+              toast.success(`Added "${product.title}" to cart!`);
+            } else {
+              throw new Error("Failed to add item to cart on server.");
+            }
+          } catch (err) {
+            console.error("Cart add error, rolling back:", err);
+            set(rollbackState);
+            toast.error(`Could not add "${product.title}" to cart. Reverted changes.`);
           }
         }
       },
@@ -485,6 +514,14 @@ export const useCartStore = create<CartState>()(
         // Find lineId to remove from Shopify
         const itemToRemove = get().items.find((item) => String(item.id) === String(productId) && (!variantId || item.selectedVariantId === variantId));
         const lineId = itemToRemove?.lineId;
+
+        // Save pre-mutation state snapshot for rollback
+        const rollbackState = {
+          items: get().items,
+          totalQuantity: get().totalQuantity,
+          subtotalAmount: get().subtotalAmount,
+          totalAmount: get().totalAmount,
+        };
 
         // Optimistic UI Update
         set((state) => {
@@ -499,10 +536,21 @@ export const useCartStore = create<CartState>()(
           };
         });
 
-        // Server Action: Remove from Shopify Cart
+        // Server Action: Remove from Shopify Cart with Rollback
         if (lineId) {
-          const updatedCart = await removeCartItemAction(lineId, get().shopifyCartId || undefined);
-          if (updatedCart) get().syncShopifyCart(updatedCart);
+          try {
+            const updatedCart = await removeCartItemAction(lineId, get().shopifyCartId || undefined);
+            if (updatedCart) {
+              get().syncShopifyCart(updatedCart);
+              toast.success(`Removed item from cart.`);
+            } else {
+              throw new Error("Failed to remove item from cart on server.");
+            }
+          } catch (err) {
+            console.error("Cart remove error, rolling back:", err);
+            set(rollbackState);
+            toast.error(`Could not remove item. Reverted changes.`);
+          }
         }
       },
 
@@ -515,6 +563,14 @@ export const useCartStore = create<CartState>()(
 
         // Skip if quantity hasn't changed
         if (safeQty === itemToUpdate.cartQuantity) return;
+
+        // Save pre-mutation state snapshot for rollback
+        const rollbackState = {
+          items: get().items,
+          totalQuantity: get().totalQuantity,
+          subtotalAmount: get().subtotalAmount,
+          totalAmount: get().totalAmount,
+        };
 
         // Optimistic UI Update
         set((state) => {
@@ -531,7 +587,7 @@ export const useCartStore = create<CartState>()(
           };
         });
 
-        // Server Action: Update Shopify Cart (Debounced)
+        // Server Action: Update Shopify Cart (Debounced) with Rollback
         if (lineId) {
           if (updateQuantityTimeouts[lineId]) {
             clearTimeout(updateQuantityTimeouts[lineId]);
@@ -540,9 +596,15 @@ export const useCartStore = create<CartState>()(
           updateQuantityTimeouts[lineId] = setTimeout(async () => {
             try {
               const updatedCart = await updateCartItemAction(lineId, safeQty, get().shopifyCartId || undefined);
-              if (updatedCart) get().syncShopifyCart(updatedCart);
+              if (updatedCart) {
+                get().syncShopifyCart(updatedCart);
+              } else {
+                throw new Error("Failed to update cart quantity on server.");
+              }
             } catch (error) {
-              console.error("Failed to sync cart quantity with Shopify:", error);
+              console.error("Failed to sync cart quantity with Shopify, rolling back:", error);
+              set(rollbackState);
+              toast.error("Could not update item quantity. Reverted changes.");
             } finally {
               delete updateQuantityTimeouts[lineId];
             }

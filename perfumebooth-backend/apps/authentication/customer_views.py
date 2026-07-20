@@ -10,8 +10,13 @@ import requests
 import jwt
 
 from .models import CustomUser, OTPVerification, SocialAccount
+from core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
 
 logger = logging.getLogger(__name__)
+
+# Initialize circuit breakers for Google and Facebook OAuth endpoints
+google_breaker = CircuitBreaker(name="GoogleOAuth", failure_threshold=3, recovery_timeout=15.0)
+facebook_breaker = CircuitBreaker(name="FacebookOAuth", failure_threshold=3, recovery_timeout=15.0)
 
 
 def get_tokens_for_user(user):
@@ -217,13 +222,19 @@ class CustomerSocialAuthView(APIView):
                 first_name = 'Google'
                 last_name = 'User'
             else:
-                # We expect an access_token here from useGoogleLogin, but it could also be an id_token if using GoogleLogin component
-                # Try userinfo endpoint first (for access_token)
-                resp = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}")
-                if resp.status_code != 200:
-                    # Fallback to tokeninfo for id_token
-                    resp = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}")
-                
+                def fetch_google_data():
+                    resp = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}", timeout=5)
+                    if resp.status_code != 200:
+                        resp = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}", timeout=5)
+                    return resp
+
+                try:
+                    resp = google_breaker.call(fetch_google_data)
+                except CircuitBreakerOpenException:
+                    return Response({'detail': 'Google auth service is temporarily offline (circuit breaker tripped). Please try again later.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                except Exception:
+                    return Response({'detail': 'Google auth service unavailable or invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 if resp.status_code != 200:
                     return Response({'detail': 'Invalid Google token.'}, status=status.HTTP_400_BAD_REQUEST)
                 
@@ -240,7 +251,13 @@ class CustomerSocialAuthView(APIView):
                 first_name = 'Facebook'
                 last_name = 'User'
             else:
-                resp = requests.get(f"https://graph.facebook.com/me?fields=id,name,email&access_token={token}")
+                try:
+                    resp = facebook_breaker.call(lambda: requests.get(f"https://graph.facebook.com/me?fields=id,name,email&access_token={token}", timeout=5))
+                except CircuitBreakerOpenException:
+                    return Response({'detail': 'Facebook auth service is temporarily offline (circuit breaker tripped). Please try again later.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                except Exception:
+                    return Response({'detail': 'Facebook auth service unavailable or invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 if resp.status_code != 200:
                     return Response({'detail': 'Invalid Facebook token.'}, status=status.HTTP_400_BAD_REQUEST)
                 data = resp.json()

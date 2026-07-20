@@ -1,9 +1,13 @@
 """
 PerfumeBooth Global URL Router
 """
+import mimetypes
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+
+# Ensure WEBP images are served with the correct Content-Type in dev mode
+mimetypes.add_type("image/webp", ".webp", True)
 
 
 def health_check(request):

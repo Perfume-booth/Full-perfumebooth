@@ -62,15 +62,17 @@ const nextConfig: NextConfig = {
     unoptimized: process.env.NODE_ENV === 'development',
   },
   async rewrites() {
+    const isDocker = process.env.WATCHPACK_POLLING === "true";
+    const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
     return {
       beforeFiles: [
         {
           source: '/media/:path*',
-          destination: 'http://django:8000/media/:path*'
+          destination: `${API_URL}/media/:path*`
         },
         {
           source: '/api/shop/:path*',
-          destination: 'http://django:8000/api/shop/:path*'
+          destination: `${API_URL}/api/shop/:path*`
         }
       ],
       afterFiles: [],

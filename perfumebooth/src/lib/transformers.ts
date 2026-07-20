@@ -132,9 +132,21 @@ export function getBrandFromTags(tags: any): string | null {
     return null;
 }
 
-function cleanImageUrl(url: string | null | undefined): string | undefined {
+export function cleanImageUrl(url: string | null | undefined): string | undefined {
     if (!url) return undefined;
-    return url.replace('http://django:8000', '').replace('http://localhost:8000', '');
+    
+    // Always use localhost:8000 in dev so the browser on the host machine can resolve and load the images.
+    const API_URL = 'http://localhost:8000';
+    
+    // Append cache buster to force browser to ignore old application/octet-stream cache
+    const cacheBuster = '?v=1';
+    
+    if (url.startsWith('/media/')) return `${API_URL}${url}${cacheBuster}`;
+    if (url.includes('http://django:8000') || url.includes('http://localhost:8000')) {
+      const newUrl = url.replace('http://django:8000', API_URL).replace('http://localhost:8000', API_URL);
+      return newUrl.includes('?') ? newUrl : `${newUrl}${cacheBuster}`;
+    }
+    return url;
 }
 
 /**

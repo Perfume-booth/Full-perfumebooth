@@ -312,13 +312,13 @@ export default function AccountHero({ customer }: AccountHeroProps) {
               Hello,
             </p>
             <h1
-              className="text-xl sm:text-2xl font-bold leading-tight text-white truncate"
+              className="text-xl sm:text-2xl font-bold leading-tight text-black/30 truncate"
               style={{ fontFamily: "var(--font-serif)" }}
             >
               {customer.firstName} {customer.lastName}
             </h1>
             <p
-              className="text-xs mt-0.5 truncate"
+              className="text-xs mt-0.5 truncate text-black/30"
               style={{ color: "rgba(225,226,233,0.5)" }}
             >
               {customer.email}

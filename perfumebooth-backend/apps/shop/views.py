@@ -253,13 +253,20 @@ class BrandListView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def get(self, request):
+        cache_key = 'catalog:brands'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
         brands = load_brands()
+        cache.set(cache_key, brands, timeout=86400)  # Cache 24 hours
         return Response(brands)
 
     def post(self, request):
         brand_name = request.data.get('brand')
         if brand_name:
             save_brand(brand_name)
+            cache.delete('catalog:brands')
+            cache.clear()  # Clear related product/facet caches
             return Response({'status': 'success', 'brands': load_brands()})
         return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -303,6 +310,8 @@ class BrandListView(APIView):
             except Exception:
                 pass
                 
+        cache.delete('catalog:brands')
+        cache.clear()  # Clear related product/facet caches
         return Response({'status': 'success', 'brands': load_brands()})
 
 
@@ -924,6 +933,11 @@ class CollectionDetailView(APIView):
         if not is_merchant and col.status != 'active':
             return Response({'detail': 'Collection not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+        cache_key = f'catalog:collection:{slug}:merchant:{is_merchant}'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
         image_url = request.build_absolute_uri(col.image.url) if col.image else None
         
         if col.collection_type == 'manual':
@@ -963,6 +977,7 @@ class CollectionDetailView(APIView):
             'manual_product_ids': [str(p.id) for p in col.products.all()] if col.collection_type == 'manual' else [],
             'excluded_products': col.excluded_products or []
         }
+        cache.set(cache_key, data, timeout=7200)  # Cache 2 hours
         return Response(data)
 
     def put(self, request, slug):
@@ -1302,6 +1317,11 @@ class PageBannerDetailView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, slug):
+        cache_key = f'catalog:banner:{slug}'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
         banner = PageBanner.objects.filter(page_slug=slug, is_active=True).first()
         if not banner:
             return Response({'detail': 'Banner not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1317,13 +1337,15 @@ class PageBannerDetailView(APIView):
                 'link_url': img.link_url
             })
             
-        return Response({
+        data = {
             'id': str(banner.id),
             'page_slug': banner.page_slug,
             'title': banner.title,
             'is_active': banner.is_active,
             'images': image_data
-        })
+        }
+        cache.set(cache_key, data, timeout=7200)  # Cache 2 hours
+        return Response(data)
 class ProductExcelImportView(APIView):
     permission_classes = [permissions.AllowAny]
     
@@ -1576,6 +1598,14 @@ class PageBannerListCreateView(APIView):
                 'is_active': str(request.data.get('is_active', 'true')).lower() == 'true'
             }
         )
+        
+        if not created:
+            if 'title' in request.data:
+                banner.title = request.data.get('title', '')
+            if 'is_active' in request.data:
+                banner.is_active = str(request.data.get('is_active', 'true')).lower() == 'true'
+            banner.save()
+
         
         # Handle image upload if provided
         if 'image' in request.FILES:

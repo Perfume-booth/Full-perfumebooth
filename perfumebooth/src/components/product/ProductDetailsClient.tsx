@@ -384,313 +384,269 @@ export default function ProductDetailsClient({ product }: Props) {
         </div>
       </div>
 
-      {/* 3. Scent Profile Area */}
-      {(product.top_notes || product.middle_notes || product.base_notes || product.ideal_for || product.category) && (
-        <div className="py-4 border-y border-[var(--color-border)]/50 space-y-4">
-          {/* Notes Mapping */}
-          {(product.top_notes || product.middle_notes || product.base_notes) && (
-            <div className="space-y-4">
-              <h5 className="text-[12px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">Scent Journey</h5>
-              <div className="space-y-3">
-                {product.top_notes && (
-                  <div className="flex items-start gap-4">
-                    <span className="text-[12px] uppercase tracking-[0.2em] font-bold text-[var(--color-text-muted)] w-16 shrink-0 mt-0.5">Top</span>
-                    <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">{product.top_notes}</span>
-                  </div>
-                )}
-                {product.middle_notes && (
-                  <div className="flex items-start gap-4">
-                    <span className="text-[12px] uppercase tracking-[0.2em] font-bold text-[var(--color-text-muted)] w-16 shrink-0 mt-0.5">Heart</span>
-                    <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">{product.middle_notes}</span>
-                  </div>
-                )}
-                {product.base_notes && (
-                  <div className="flex items-start gap-4">
-                    <span className="text-[12px]  uppercase tracking-[0.2em] font-bold text-[var(--color-text-muted)] w-16 shrink-0 mt-0.5">Base</span>
-                    <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">{product.base_notes}</span>
-                  </div>
-                )}
+      {/* 3. Scent Profile Area (Olfactory Pyramid) */}
+      <div className="py-4 border-y border-[var(--color-border)]/50 space-y-4">
+        <h5 className="text-[12px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">Olfactory Pyramid</h5>
+        <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
+          {/* Visual Pyramid */}
+          <div className="relative w-36 h-28 shrink-0 flex items-center justify-center">
+            <svg viewBox="0 0 100 80" className="w-full h-full drop-shadow-sm">
+              {/* Top Section (Triangle) */}
+              <path d="M50 5 L33 30 L67 30 Z" fill="url(#topGrad)" className="transition-all duration-300 hover:opacity-90 cursor-help" />
+              <text x="50" y="23" textAnchor="middle" fill="#7b0d1e" fontSize="5.5" fontWeight="900" letterSpacing="0.5">TOP</text>
+
+              {/* Middle Section (Trapezoid) */}
+              <path d="M31 33 L18 55 L82 55 L69 33 Z" fill="url(#midGrad)" className="transition-all duration-300 hover:opacity-90 cursor-help" />
+              <text x="50" y="47" textAnchor="middle" fill="#ffffff" fontSize="5.5" fontWeight="900" letterSpacing="0.5">HEART</text>
+
+              {/* Base Section (Trapezoid) */}
+              <path d="M16 58 L3 80 L97 80 L84 58 Z" fill="url(#baseGrad)" className="transition-all duration-300 hover:opacity-90 cursor-help" />
+              <text x="50" y="72" textAnchor="middle" fill="#ffffff" fontSize="5.5" fontWeight="900" letterSpacing="0.5">BASE</text>
+
+              <defs>
+                <linearGradient id="topGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fdfcfb" />
+                  <stop offset="100%" stopColor="#d4bfa0" />
+                </linearGradient>
+                <linearGradient id="midGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#d4a96a" />
+                  <stop offset="100%" stopColor="#b8924a" />
+                </linearGradient>
+                <linearGradient id="baseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#a01428" />
+                  <stop offset="100%" stopColor="#7b0d1e" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+
+          {/* Scent Description List */}
+          <div className="flex-1 space-y-3 w-full">
+            <div className="flex items-start gap-3 border-l-2 border-[#b8924a]/30 pl-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-[var(--color-gold)]">Top Notes</span>
+                <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">
+                  {product.top_notes || "Citrus, Bergamot & Fresh Ozone"}
+                </span>
               </div>
             </div>
-          )}
 
+            <div className="flex items-start gap-3 border-l-2 border-[#b8924a]/60 pl-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-[var(--color-gold)]">Heart (Middle) Notes</span>
+                <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">
+                  {product.middle_notes || "Jasmine, Lavender & Soft Floral Accords"}
+                </span>
+              </div>
+            </div>
 
-        </div>
-      )}
-
-      {/* 4. Exclusive  Offers Area */}
-      {/* {product.coupons && product.coupons.length > 0 && (
-        <div className="space-y-4 pt-2">
-          <h5 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-text-primary)]">Exclusive  Offers</h5>
-          <div className="grid grid-cols-1 gap-3">
-            {(product.coupons && product.coupons.length > 0) ? (
-              product.coupons.map((coupon, index) => (
-                <div key={index} className="group relative p-4 bg-[#fbfcfa] border border-dashed border-[var(--color-border)] rounded-xl flex items-center justify-between transition-all hover:border-[var(--color-gold)]/50">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-[var(--color-text-primary)] uppercase tracking-wider">{coupon.label}</p>
-                    <p className="text-[9px] text-[var(--color-text-muted)] font-medium">{coupon.description}</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(coupon.code);
-                      setCopiedCoupon(coupon.code);
-                      setTimeout(() => setCopiedCoupon(null), 2000);
-                    }}
-                    className={`px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-300 min-w-[100px] border ${
-                      copiedCoupon === coupon.code 
-                        ? "bg-green-50 border-green-200 text-green-600" 
-                        : "bg-white border-[var(--color-border)] text-gray-900 hover:bg-[#1a1410] hover:text-white hover:border-[#1a1410]"
-                    }`}
-                  >
-                    {copiedCoupon === coupon.code ? "Copied!" : coupon.code}
-                  </button>
-                </div>
-              ))
-            ) : (
-              // Fallback default coupons if none in backend
-              <>
-                <div className="group relative p-4 bg-[#fbfcfa] border border-dashed border-[var(--color-border)] rounded-xl flex items-center justify-between transition-all hover:border-[var(--color-gold)]/50">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-[var(--color-text-primary)] uppercase tracking-wider">Extra 10% OFF</p>
-                    <p className="text-[9px] text-[var(--color-text-muted)] font-medium">Use code on your first purchase</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText("WELCOME10");
-                      setCopiedCoupon("WELCOME10");
-                      setTimeout(() => setCopiedCoupon(null), 2000);
-                    }}
-                    className={`px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-300 min-w-[100px] border ${
-                      copiedCoupon === "WELCOME10" 
-                        ? "bg-green-50 border-green-200 text-green-600" 
-                        : "bg-white border-[var(--color-border)] text-gray-900 hover:bg-[#1a1410] hover:text-white hover:border-[#1a1410]"
-                    }`}
-                  >
-                    {copiedCoupon === "WELCOME10" ? "Copied!" : "WELCOME10"}
-                  </button>
-                </div>
-
-                <div className="group relative p-4 bg-[#fbfcfa] border border-dashed border-[var(--color-border)] rounded-xl flex items-center justify-between transition-all hover:border-[var(--color-gold)]/50">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-[var(--color-text-primary)] uppercase tracking-wider">Exclusive Gift</p>
-                    <p className="text-[9px] text-[var(--color-text-muted)] font-medium">Free tester on orders above ₹2999</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText("FREEDEO");
-                      setCopiedCoupon("FREEDEO");
-                      setTimeout(() => setCopiedCoupon(null), 2000);
-                    }}
-                    className={`px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all duration-300 min-w-[100px] border ${
-                      copiedCoupon === "FREEDEO" 
-                        ? "bg-green-50 border-green-200 text-green-600" 
-                        : "bg-white border-[var(--color-border)] text-gray-900 hover:bg-[#1a1410] hover:text-white hover:border-[#1a1410]"
-                    }`}
-                  >
-                    {copiedCoupon === "FREEDEO" ? "Copied!" : "FREEDEO"}
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="flex items-start gap-3 border-l-2 border-[#7b0d1e]/80 pl-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-[var(--color-maroon)]">Base Notes</span>
+                <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">
+                  {product.base_notes || "Warm Amber, Patchouli, Sensual Musk & Cedarwood"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      )} */}
+      </div>
 
       {/* 4. Persistence & Cart Controls */}
       <div className="space-y-3 pt-2">
-        <div className="flex gap-4">
-          {/* Quantity Picker */}
-          <div
-            className={`flex items-center justify-between border border-[var(--color-border)] px-6 py-4 min-w-[140px] bg-[#fbfcfa] ${isSoldOut ? 'opacity-50 pointer-events-none' : ''}`}
-            aria-label="Select quantity"
-          >
-            <button
-              onClick={decreaseQuantity}
-              disabled={isSoldOut || quantity <= 1}
-              className="text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label={`Decrease quantity of ${product.title}`}
+          <div className="flex gap-4">
+            {/* Quantity Picker */}
+            <div
+              className={`flex items-center justify-between border border-[var(--color-border)] px-6 py-4 min-w-[140px] bg-[#fbfcfa] ${isSoldOut ? 'opacity-50 pointer-events-none' : ''}`}
+              aria-label="Select quantity"
             >
-              <Minus size={14} animateOn="hover" />
-            </button>
-            <span className="text-sm font-bold text-[var(--color-text-primary)]" aria-live="polite">{quantity}</span>
+              <button
+                onClick={decreaseQuantity}
+                disabled={isSoldOut || quantity <= 1}
+                className="text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label={`Decrease quantity of ${product.title}`}
+              >
+                <Minus size={14} animateOn="hover" />
+              </button>
+              <span className="text-sm font-bold text-[var(--color-text-primary)]" aria-live="polite">{quantity}</span>
+              <button
+                onClick={increaseQuantity}
+                disabled={isSoldOut || quantity >= maxQuantity}
+                className="text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label={`Increase quantity of ${product.title}`}
+              >
+                <Plus size={14} animateOn="hover" />
+              </button>
+            </div>
+
+            {/* Add to Cart */}
             <button
-              onClick={increaseQuantity}
-              disabled={isSoldOut || quantity >= maxQuantity}
-              className="text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label={`Increase quantity of ${product.title}`}
+              disabled={isAdding || (isSoldOut && !isInCart)}
+              onClick={handleAddToCart}
+              aria-label={isSoldOut ? `Cannot add ${product.title} to cart - Sold Out` : isInCart ? `Go to cart` : `Add ${product.title} to your collection`}
+              className={`flex-grow py-4 gap-2 flex flex-row justify-center items-center text-[11px] md:text-[15px] uppercase tracking-[0.25em] font-bold transition-all shadow-xl shadow-black/5 ${(isSoldOut && !isInCart) || isAdding
+                ? 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] cursor-not-allowed'
+                : isInCart
+                  ? 'bg-[var(--color-gold)] text-white hover:bg-[#1a1410]'
+                  : 'bg-[#1a1410] text-white hover:bg-[#b8924a]'
+                }`}
             >
-              <Plus size={14} animateOn="hover" />
+              <AnimatedShoppingCart size={14} />
+              {isAdding ? 'Adding...' : (isSoldOut && !isInCart) ? 'Sold Out' : isInCart ? 'Go to Cart' : 'Add to Collection'}
             </button>
           </div>
 
-          {/* Add to Cart */}
           <button
-            disabled={isAdding || (isSoldOut && !isInCart)}
-            onClick={handleAddToCart}
-            aria-label={isSoldOut ? `Cannot add ${product.title} to cart - Sold Out` : isInCart ? `Go to cart` : `Add ${product.title} to your collection`}
-            className={`flex-grow py-4 gap-2 flex flex-row justify-center items-center text-[11px] md:text-[15px] uppercase tracking-[0.25em] font-bold transition-all shadow-xl shadow-black/5 ${(isSoldOut && !isInCart) || isAdding
-              ? 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] cursor-not-allowed'
-              : isInCart
-                ? 'bg-[var(--color-gold)] text-white hover:bg-[#1a1410]'
-                : 'bg-[#1a1410] text-white hover:bg-[#b8924a]'
+            onClick={handleBuyNow}
+            disabled={isSoldOut || isBuyingNow}
+            aria-disabled={isBuyingNow || isSoldOut}
+            className={`w-full py-4 text-[11px] md:text-[15px] uppercase tracking-[0.25em] font-bold border transition-all duration-500 flex items-center justify-center gap-2 ${isSoldOut
+              ? "border-[var(--color-border)] bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] cursor-not-allowed opacity-80"
+              : "border-[#1a1410] text-white bg-[#1a1410] hover:bg-[#b8924a] hover:border-[#b8924a]"
               }`}
           >
-            <AnimatedShoppingCart size={14} />
-            {isAdding ? 'Adding...' : (isSoldOut && !isInCart) ? 'Sold Out' : isInCart ? 'Go to Cart' : 'Add to Collection'}
+            <span aria-live="polite" className="flex items-center gap-2">
+              {isBuyingNow ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Finalizing...
+                </>
+              ) : isSoldOut ? (
+                "Out of Stock"
+              ) : (
+                <>
+                  <span>Buy Now</span>
+
+                  <span className="inline-flex items-center  ml-1 normal-case tracking-normal">
+                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-gray-100 z-30">
+                      <SiPaytm className="w-4.5 h-4.5 text-[#002970]" />
+                    </span>
+
+                    <span className="w-6 h-6 rounded-full bg-[#5f259f] flex items-center justify-center shadow-sm shrink-0 -ml-1.5 z-20">
+                      <SiPhonepe className="w-4.5 h-4.5 text-white" />
+                    </span>
+
+                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-gray-100 -ml-1.5 z-10">
+                      <FaGooglePay className="w-4.5 h-4.5 text-[#4285F4]" />
+                    </span>
+
+                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-gray-100 -ml-1.5 z-0">
+                      <FaAmazonPay className="w-[18px] h-[18px] text-[#ff9900]" />
+                    </span>
+                  </span>
+                </>
+              )}
+            </span>
           </button>
+
         </div>
 
-        <button
-          onClick={handleBuyNow}
-          disabled={isSoldOut || isBuyingNow}
-          aria-disabled={isBuyingNow || isSoldOut}
-          className={`w-full py-4 text-[11px] md:text-[15px] uppercase tracking-[0.25em] font-bold border transition-all duration-500 flex items-center justify-center gap-2 ${isSoldOut
-            ? "border-[var(--color-border)] bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] cursor-not-allowed opacity-80"
-            : "border-[#1a1410] text-white bg-[#1a1410] hover:bg-[#b8924a] hover:border-[#b8924a]"
-            }`}
-        >
-          <span aria-live="polite" className="flex items-center gap-2">
-            {isBuyingNow ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Finalizing...
-              </>
-            ) : isSoldOut ? (
-              "Out of Stock"
-            ) : (
-              <>
-                <span>Buy Now</span>
-
-                <span className="inline-flex items-center  ml-1 normal-case tracking-normal">
-                  <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-gray-100 z-30">
-                    <SiPaytm className="w-4.5 h-4.5 text-[#002970]" />
-                  </span>
-
-                  <span className="w-6 h-6 rounded-full bg-[#5f259f] flex items-center justify-center shadow-sm shrink-0 -ml-1.5 z-20">
-                    <SiPhonepe className="w-4.5 h-4.5 text-white" />
-                  </span>
-
-                  <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-gray-100 -ml-1.5 z-10">
-                    <FaGooglePay className="w-4.5 h-4.5 text-[#4285F4]" />
-                  </span>
-
-                  <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 border border-gray-100 -ml-1.5 z-0">
-                   <FaAmazonPay className="w-[18px] h-[18px] text-[#ff9900]" />
-                  </span>
-                </span>
-              </>
-            )}
-          </span>
-        </button>
-
-      </div>
-
-      {/* Delivery Status and Pincode Checkers */}
-      <div className="space-y-4 pt-1">
-        {pincode && (
-          <div className="p-4 bg-[#fdfcfb] border border-[#ede8e0] rounded-xl flex items-start gap-3.5 transition-all shadow-sm">
-            <div className="w-8 h-8 rounded-full bg-[#b8924a]/10 flex items-center justify-center text-[#b8924a] shrink-0 mt-0.5 animate-fadeIn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="1" y="3" width="15" height="13" />
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                <circle cx="5.5" cy="18.5" r="2.5" />
-                <circle cx="18.5" cy="18.5" r="2.5" />
-              </svg>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-gray-900 leading-normal">
-                FREE delivery <span className="text-[#b8924a]">{getDeliveryDateStr()}</span>.
-              </p>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#807667] font-medium uppercase tracking-wider">
-                <span className="flex items-center gap-1">
-                  <MapPin size={11} className="text-[#b8924a] inline" />
-                  Delivering to {city || "India"} {pincode}
-                </span>
-                <span className="text-[#ede8e0] hidden sm:inline">|</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCheckerExpanded(true);
-                    setTimeout(() => {
-                      document.getElementById("pincode-input")?.focus();
-                    }, 100);
-                  }}
-                  className="text-[#b8924a] hover:underline font-bold transition-all text-[9px]"
-                >
-                  Update location
-                </button>
+        {/* Delivery Status and Pincode Checkers */}
+        <div className="space-y-4 pt-1">
+          {pincode && (
+            <div className="p-4 bg-[#fdfcfb] border border-[#ede8e0] rounded-xl flex items-start gap-3.5 transition-all shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-[#b8924a]/10 flex items-center justify-center text-[#b8924a] shrink-0 mt-0.5 animate-fadeIn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1" y="3" width="15" height="13" />
+                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                  <circle cx="5.5" cy="18.5" r="2.5" />
+                  <circle cx="18.5" cy="18.5" r="2.5" />
+                </svg>
               </div>
-            </div>
-          </div>
-        )}
-
-        <div className="border border-[#ede8e0] rounded-xl overflow-hidden bg-white shadow-sm transition-all duration-300">
-          <button
-            type="button"
-            onClick={() => setIsCheckerExpanded(!isCheckerExpanded)}
-            className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#faf7f2] transition-colors"
-          >
-            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-900">
-              Check Delivery Date
-            </span>
-            <AnimatedChevronDown
-              size={14}
-              className={`text-[#807667] transition-transform duration-300 ${isCheckerExpanded ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {isCheckerExpanded && (
-            <div className="px-5 pb-5 pt-1 border-t border-[#ede8e0]/60 space-y-4 animate-fade-in">
-              <div className="flex gap-2">
-                <div className="relative flex-grow">
-                  <input
-                    id="pincode-input"
-                    type="text"
-                    maxLength={6}
-                    placeholder="Enter your pincode"
-                    value={inputPincode}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "");
-                      setInputPincode(val);
-                      if (pincodeError) setPincodeError("");
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-gray-900 leading-normal">
+                  FREE delivery <span className="text-[#b8924a]">{getDeliveryDateStr()}</span>.
+                </p>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#807667] font-medium uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <MapPin size={11} className="text-[#b8924a] inline" />
+                    Delivering to {city || "India"} {pincode}
+                  </span>
+                  <span className="text-[#ede8e0] hidden sm:inline">|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCheckerExpanded(true);
+                      setTimeout(() => {
+                        document.getElementById("pincode-input")?.focus();
+                      }, 100);
                     }}
-                    className={`w-full px-4 py-3 bg-[#fdfcfb] border rounded-lg text-xs font-semibold placeholder:text-[#807667]/60 focus:outline-none focus:ring-1 focus:ring-[#b8924a] transition-all ${pincodeError ? "border-red-400" : "border-[#ede8e0]"
-                      }`}
-                  />
-                  {pincodeError && (
-                    <p className="absolute left-1 -bottom-4 text-[9px] text-red-500 font-bold uppercase tracking-wider">
-                      {pincodeError}
-                    </p>
-                  )}
+                    className="text-[#b8924a] hover:underline font-bold transition-all text-[9px]"
+                  >
+                    Update location
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={isChecking}
-                  onClick={handleCheckDelivery}
-                  className="px-5 py-3 bg-[#1a1410] text-[var(--color-gold)] hover:bg-[#b8924a] hover:text-white disabled:opacity-50 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2"
-                >
-                  {isChecking ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Checking
-                    </>
-                  ) : (
-                    "Check Delivery"
-                  )}
-                </button>
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* 5. Trust Signals */}
-      <div className="pt-2">
-        <ProductTrustBadges />
-        <div className="mt-6 border-t border-[var(--color-border)] pt-8 mb-[10px]">
-          <ProductPaymentInfo />
+          <div className="border border-[#ede8e0] rounded-xl overflow-hidden bg-white shadow-sm transition-all duration-300">
+            <button
+              type="button"
+              onClick={() => setIsCheckerExpanded(!isCheckerExpanded)}
+              className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#faf7f2] transition-colors"
+            >
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-900">
+                Check Delivery Date
+              </span>
+              <AnimatedChevronDown
+                size={14}
+                className={`text-[#807667] transition-transform duration-300 ${isCheckerExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {isCheckerExpanded && (
+              <div className="px-5 pb-5 pt-1 border-t border-[#ede8e0]/60 space-y-4 animate-fade-in">
+                <div className="flex gap-2">
+                  <div className="relative flex-grow">
+                    <input
+                      id="pincode-input"
+                      type="text"
+                      maxLength={6}
+                      placeholder="Enter your pincode"
+                      value={inputPincode}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        setInputPincode(val);
+                        if (pincodeError) setPincodeError("");
+                      }}
+                      className={`w-full px-4 py-3 bg-[#fdfcfb] border rounded-lg text-xs font-semibold placeholder:text-[#807667]/60 focus:outline-none focus:ring-1 focus:ring-[#b8924a] transition-all ${pincodeError ? "border-red-400" : "border-[#ede8e0]"
+                        }`}
+                    />
+                    {pincodeError && (
+                      <p className="absolute left-1 -bottom-4 text-[9px] text-red-500 font-bold uppercase tracking-wider">
+                        {pincodeError}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isChecking}
+                    onClick={handleCheckDelivery}
+                    className="px-5 py-3 bg-[#1a1410] text-[var(--color-gold)] hover:bg-[#b8924a] hover:text-white disabled:opacity-50 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2"
+                  >
+                    {isChecking ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Checking
+                      </>
+                    ) : (
+                      "Check Delivery"
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+
+        {/* 5. Trust Signals */}
+        <div className="pt-2">
+          <ProductTrustBadges />
+          <div className="mt-6 border-t border-[var(--color-border)] pt-8 mb-[10px]">
+            <ProductPaymentInfo />
+          </div>
+        </div>
 
     </div>
   );

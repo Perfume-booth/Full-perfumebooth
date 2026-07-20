@@ -10,8 +10,6 @@ import {
   loginAction, 
   registerAction, 
   forgotPasswordAction,
-  sendOtpAction,
-  verifyOtpAction,
   socialAuthAction
 } from "@/lib/actions/auth";
 import { AnimatedLoader2 as Loader2 } from "@/components/ui/icons/AnimatedLoader2";
@@ -48,14 +46,7 @@ function AppleIcon() {
   );
 }
 
-function MobileIcon() {
-  return (
-    <svg className="w-5 h-5 text-neutral-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-      <line x1="12" y1="18" x2="12.01" y2="18"></line>
-    </svg>
-  );
-}
+
 
 interface CloudWatchFormProps {
   type?: "signin" | "signup" | "forgot";
@@ -74,11 +65,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
   const [success, setSuccess] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">(type);
 
-  // Custom Storefront Auth Mode toggles
-  const [authMethod, setAuthMethod] = useState<"email" | "phone">("email");
-  const [phone, setPhone] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -106,7 +93,6 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
     setMode(newMode);
     setError(null);
     setSuccess(null);
-    setOtpSent(false);
     onModeChange?.(newMode);
   };
 
@@ -114,8 +100,17 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
     setMode(type);
     setError(null);
     setSuccess(null);
-    setOtpSent(false);
   }, [type]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlError = params.get("error");
+      if (urlError) {
+        setError(decodeURIComponent(urlError));
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handleMouse = (e: MouseEvent) => {
@@ -135,50 +130,49 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
     return () => clearInterval(interval);
   }, []);
 
-  const handleSendOtp = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!phone) {
-      setError("Please enter a valid phone number.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
+  useEffect(() => {
+    // Load Facebook SDK
+    const fbAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
+    if (!fbAppId) return;
 
-    const result = await sendOtpAction(phone);
-    setLoading(false);
+    (window as any).fbAsyncInit = function() {
+      (window as any).FB.init({
+        appId      : fbAppId,
+        cookie     : true,
+        xfbml      : true,
+        version    : 'v16.0'
+      });
+    };
 
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setOtpSent(true);
-      setSuccess("Verification code sent successfully!");
+    if (!document.getElementById('facebook-jssdk')) {
+      const js = document.createElement('script');
+      js.id = 'facebook-jssdk';
+      js.src = "https://connect.facebook.net/en_US/sdk.js";
+      document.body.appendChild(js);
     }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone || !otpCode) {
-      setError("Please fill out both phone number and verification code.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    const result = await verifyOtpAction(phone, otpCode, returnUrl);
-    if (result.error) {
-      setError(result.error);
-      setLoading(false);
-    } else {
-      setSuccess("Logged in successfully! Redirecting...");
-      window.location.href = result.redirectUrl || "/";
-    }
-  };
+  }, []);
 
   const handleSocialClick = async (provider: string) => {
     if (provider === "google") {
       googleLogin();
+      return;
+    }
+
+    if (provider === "facebook") {
+      const fbAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
+      if (!fbAppId) {
+        setError("Facebook Login is not configured (missing App ID).");
+        return;
+      }
+      
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      const redirectUri = `${window.location.origin}/api/auth/callback/facebook`;
+      const oauthUrl = `https://www.facebook.com/v16.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email,public_profile&state=${encodeURIComponent(returnUrl || "/")}`;
+      
+      window.location.href = oauthUrl;
       return;
     }
 
@@ -188,7 +182,6 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
 
     // Mock OAuth tokens to simulate user login process for evaluation/testing
     const mockTokens: { [key: string]: string } = {
-      facebook: "mock-facebook-access-token-12345",
       apple: "mock-apple-identity-token-12345"
     };
 
@@ -306,132 +299,64 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
 
         
         {/* Forms */}
-        {authMethod === "email" || mode === "forgot" ? (
-          <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
-            <input type="hidden" name="returnUrl" value={returnUrl} />
-            {mode === "signup" && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="name" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Full Name</Label>
-                <Input name="name" id="name" placeholder="John Doe" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
-              </div>
-            )}
-            
+        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
+          <input type="hidden" name="returnUrl" value={returnUrl} />
+          {mode === "signup" && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Email Address</Label>
-              <Input name="email" id="email" type="email" placeholder="john@example.com" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
+              <Label htmlFor="name" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Full Name</Label>
+              <Input name="name" id="name" placeholder="John Doe" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
             </div>
+          )}
+          
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Email Address</Label>
+            <Input name="email" id="email" type="email" placeholder="john@example.com" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
+          </div>
 
-            {mode !== "forgot" && (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Password</Label>
-                  {mode === "signin" && (
-                    <button 
-                      type="button" 
-                      onClick={() => handleModeChange("forgot")}
-                      className="text-[10px] font-bold text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
-                    >
-                      Forgot Password?
-                    </button>
-                  )}
-                </div>
-                <Input
-                  name="password"
-                  id="password"
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  onFocus={() => setIsTyping(true)}
-                  onBlur={() => setIsTyping(false)}
-                  className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all"
-                />
-              </div>
-            )}
-
-            <Button 
-              disabled={loading}
-              className="mt-2 w-full h-11 rounded-full bg-[var(--color-maroon)] hover:bg-[var(--color-black)] text-white hover:text-white font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-maroon/20"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : (mode === "signup" ? "Sign Up" : mode === "signin" ? "Sign In" : "Send Recovery Email")}
-            </Button>
-
-            {mode === "forgot" && (
-              <button 
-                type="button" 
-                onClick={() => handleModeChange("signin")}
-                className="mt-2 text-[10px] font-black text-center text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
-              >
-                Back to Sign In
-              </button>
-            )}
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} className="w-full flex flex-col gap-4">
+          {mode !== "forgot" && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="phone" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Mobile Number</Label>
-              <div className="flex gap-2">
-                <Input 
-                  name="phone" 
-                  id="phone" 
-                  type="tel"
-                  placeholder="+919999999999" 
-                  required 
-                  disabled={otpSent}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="flex-1 rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" 
-                />
-                {!otpSent && (
-                  <Button 
-                    onClick={handleSendOtp}
-                    disabled={loading || !phone}
-                    className="rounded-full h-11 px-5 bg-neutral-900 text-white text-[10px] uppercase font-bold tracking-wider hover:bg-black transition-all"
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Password</Label>
+                {mode === "signin" && (
+                  <button 
+                    type="button" 
+                    onClick={() => handleModeChange("forgot")}
+                    className="text-[10px] font-bold text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
                   >
-                    Send OTP
-                  </Button>
+                    Forgot Password?
+                  </button>
                 )}
               </div>
+              <Input
+                name="password"
+                id="password"
+                type="password"
+                required
+                placeholder="••••••••"
+                onFocus={() => setIsTyping(true)}
+                onBlur={() => setIsTyping(false)}
+                className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all"
+              />
             </div>
+          )}
 
-            {otpSent && (
-              <div className="flex flex-col gap-1.5 animate-fadeIn">
-                <Label htmlFor="otp" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Verification Code (OTP)</Label>
-                <Input 
-                  name="otp" 
-                  id="otp" 
-                  placeholder="Enter 6-digit OTP" 
-                  required 
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all text-center tracking-[0.5em] font-bold" 
-                />
-              </div>
-            )}
+          <Button 
+            disabled={loading}
+            className="mt-2 w-full h-11 rounded-full bg-[var(--color-maroon)] hover:bg-[var(--color-black)] text-white hover:text-white font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-maroon/20"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : (mode === "signup" ? "Sign Up" : mode === "signin" ? "Sign In" : "Send Recovery Email")}
+          </Button>
 
-            {otpSent ? (
-              <div className="flex flex-col gap-2 mt-2">
-                <Button 
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-11 rounded-full bg-[var(--color-maroon)] hover:bg-[var(--color-black)] text-white hover:text-white font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-maroon/20"
-                >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : "Verify & Log In"}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setOtpSent(false)}
-                  className="text-[10px] font-bold text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors mt-1"
-                >
-                  Change Phone Number
-                </button>
-              </div>
-            ) : (
-              <p className="text-[10px] text-neutral-400 text-center italic mt-1">
-                Enter your mobile number and click "Send OTP" to receive a verification code.
-              </p>
-            )}
-          </form>
-        )}
+          {mode === "forgot" && (
+            <button 
+              type="button" 
+              onClick={() => handleModeChange("signin")}
+              className="mt-2 text-[10px] font-black text-center text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
+            >
+              Back to Sign In
+            </button>
+          )}
+        </form>
 
         {/* Social Login Separator */}
         {mode !== "forgot" && (
@@ -444,20 +369,6 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
 
             {/* Premium Social Login Buttons */}
             <div className="flex items-center justify-between gap-3 w-full">
-              <Button
-                type="button"
-                onClick={() => {
-                  if (authMethod === "email") {
-                    setAuthMethod("phone");
-                  } else {
-                    setAuthMethod("email");
-                  }
-                }}
-                disabled={loading}
-                className="flex-1 h-12 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300"
-              >
-                <MobileIcon />
-              </Button>
               <Button
                 type="button"
                 onClick={() => handleSocialClick("google")}

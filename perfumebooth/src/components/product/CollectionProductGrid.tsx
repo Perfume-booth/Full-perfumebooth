@@ -28,7 +28,9 @@ export default function CollectionProductGrid() {
   }, [title, isFiltering, products.length === 0]);
 
   const [cols, setCols] = useState(2);
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     const handleResize = () => {
       const width = window.innerWidth;
       if (width >= 1280) setCols(4);
@@ -82,7 +84,7 @@ export default function CollectionProductGrid() {
   return (
     <div className="flex-1 min-w-0">
 
-      {isFiltering ? (
+      {!mounted || isFiltering ? (
         <CollectionSkeleton count={8} />
       ) : products.length === 0 ? (
         <div className="py-32 text-center flex flex-col items-center">

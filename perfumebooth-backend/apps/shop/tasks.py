@@ -42,28 +42,56 @@ def process_bulk_csv_import(self, file_url: str) -> dict:
 
     csv_data = response.text.splitlines()
     reader = csv.DictReader(csv_data)
-    total_records = len(csv_data) - 1  # Exclude header row
+    rows = list(reader)
+    total_records = len(rows)
     processed = 0
+    batch_size = 500
 
-    for row in reader:
-        with transaction.atomic():
-            product, _ = Product.objects.update_or_create(
+    for i in range(0, total_records, batch_size):
+        batch = rows[i:i + batch_size]
+        
+        # 1. Bulk upsert Products
+        products_to_upsert = []
+        for row in batch:
+            products_to_upsert.append(Product(
                 slug=row['slug'],
-                defaults={
-                    'title': row['title'],
-                    'description': row.get('description', ''),
-                    'price': float(row['price']),
-                    'sku': row.get('sku', row['slug']),
-                    'is_online': row.get('is_online', 'true').lower() == 'true',
-                },
+                title=row['title'],
+                description=row.get('description', ''),
+                price=float(row['price']),
+                sku=row.get('sku', row['slug']),
+                is_online=row.get('is_online', 'true').lower() == 'true',
+            ))
+            
+        with transaction.atomic():
+            Product.objects.bulk_create(
+                products_to_upsert,
+                update_conflicts=True,
+                unique_fields=['slug'],
+                update_fields=['title', 'description', 'price', 'sku', 'is_online']
             )
-            Inventory.objects.update_or_create(
-                product=product,
-                defaults={'stock_level': int(row.get('stock_level', 0))},
+            
+            # Fetch the upserted products to map slugs to product IDs
+            slugs = [row['slug'] for row in batch]
+            db_products = {p.slug: p for p in Product.objects.filter(slug__in=slugs)}
+            
+            # 2. Bulk upsert Inventory
+            inventories_to_upsert = []
+            for row in batch:
+                product = db_products.get(row['slug'])
+                if product:
+                    inventories_to_upsert.append(Inventory(
+                        product=product,
+                        stock_level=int(row.get('stock_level', 0))
+                    ))
+            
+            Inventory.objects.bulk_create(
+                inventories_to_upsert,
+                update_conflicts=True,
+                unique_fields=['product'],
+                update_fields=['stock_level']
             )
 
-        processed += 1
-        # Publish progress for frontend polling
+        processed += len(batch)
         self.update_state(
             state='PROGRESS',
             meta={'current': processed, 'total': total_records},

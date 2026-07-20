@@ -37,9 +37,9 @@ export default function Breadcrumb({ items, title, totalProducts: propTotalProdu
   const pathSegments = pathname.split("/").filter(Boolean);
 
   const defaultItems = (() => {
-    // Filter out "collections", "brands", and "all" segments from the breadcrumb trail
+    // Filter out "collections" and "brands" segments from the breadcrumb trail
     const filtered = pathSegments.filter(
-      (seg) => seg.toLowerCase() !== "collections" && seg.toLowerCase() !== "brands" && seg.toLowerCase() !== "all"
+      (seg) => seg.toLowerCase() !== "collections" && seg.toLowerCase() !== "brands"
     );
 
     // Build items from the remaining segments

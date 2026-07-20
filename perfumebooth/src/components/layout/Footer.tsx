@@ -64,7 +64,7 @@ export default function Footer() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 pb-8 md:pb-10 border-b border-[#d1c5b3]/30 mb-8 md:mb-12 px-2 md:px-0">
                             {[
                                 { icon: AnimatedTruck, title: "Free Shipping", sub: "On all prepaid orders" },
-                                { icon: AnimatedRotateCcw, title: "Easy Returns", sub: "5-day hassle-free returns" },
+                                { icon: AnimatedRotateCcw, title: "Transit Damage Protection", sub: "100% safe transit guarantee" },
                                 { icon: AnimatedLock, title: "Secure Payments", sub: "100% SSL Protected" },
                                 { icon: AnimatedCheckCircle, title: "100% Authentic", sub: "Genuine products only" },
                             ].map((badge) => (

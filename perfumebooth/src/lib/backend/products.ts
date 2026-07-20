@@ -1,12 +1,10 @@
 import { Product } from './types';
+import { cleanImageUrl } from '../transformers';
 
 const isServer = typeof window === 'undefined';
-const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
+const isDocker = process.env.WATCHPACK_POLLING === "true";
+const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
 
-function cleanImageUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
-  return url.replace('http://django:8000', '').replace('http://localhost:8000', '');
-}
 
 export function mapDjangoProductToProduct(p: any): Product {
   const images = p.images?.map((img: any) => ({

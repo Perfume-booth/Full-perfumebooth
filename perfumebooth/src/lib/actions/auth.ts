@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
-const BACKEND_URL = process.env.BACKEND_API_URL || "http://django:8000";
+const isDocker = process.env.WATCHPACK_POLLING === "true";
+const BACKEND_URL = process.env.BACKEND_API_URL || (isDocker ? "http://django:8000" : "http://localhost:8000");
 
 // Helper to set token cookies
 async function setAuthCookies(accessToken: string, refreshToken: string) {

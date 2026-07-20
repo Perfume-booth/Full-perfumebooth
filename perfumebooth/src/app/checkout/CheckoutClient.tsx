@@ -1213,7 +1213,7 @@ export default function CheckoutClient({ customer }: Props) {
                 <div className="flex items-center gap-3 border-t border-gray-100 pt-4">
                   <AnimatedRotateCcw size={18} className="text-[#b8924a]" animateOn="view" />
                   <p className="text-[11px] text-gray-600 font-medium leading-normal">
-                    <span className="font-bold text-gray-800">Hassle-Free Fragrance Swapping.</span> Unopened perfume items are protected by our premier return policies.
+                    <span className="font-bold text-gray-800">Transit Damage Guarantee.</span> All orders are covered against damage or loss during transit.
                   </p>
                 </div>
               </div>

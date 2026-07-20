@@ -1,5 +1,6 @@
 import { Collection, Product } from './types';
 import { getProducts, getFacets, mapDjangoProductToProduct } from './products';
+import { cleanImageUrl } from '../transformers';
 
 export interface CollectionProductsResult {
   title: string;
@@ -16,7 +17,8 @@ export interface CollectionProductsResult {
 
 export async function getAllCollections(first: number = 250): Promise<Collection[]> {
   const isServer = typeof window === 'undefined';
-  const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
+  const isDocker = process.env.WATCHPACK_POLLING === "true";
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
 
   try {
     const res = await fetch(`${API_URL}/api/shop/collections/`, {
@@ -29,7 +31,7 @@ export async function getAllCollections(first: number = 250): Promise<Collection
         handle: col.slug,
         title: col.title,
         description: col.description,
-        image: col.image ? { url: col.image.replace('http://django:8000', '') } : undefined,
+        image: col.image ? { url: cleanImageUrl(col.image) || '' } : undefined,
         products: { edges: [] }
       }));
     }
@@ -77,7 +79,8 @@ export async function getCollection(
   if (!handle) return null;
 
   const isServer = typeof window === 'undefined';
-  const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
+  const isDocker = process.env.WATCHPACK_POLLING === "true";
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
 
   // 1. Try to fetch from backend collections API first
   try {
@@ -92,7 +95,7 @@ export async function getCollection(
         handle: data.slug,
         title: data.title,
         description: data.description,
-        image: data.image ? { url: data.image.replace('http://django:8000', '') } : undefined,
+        image: data.image ? { url: cleanImageUrl(data.image) || '' } : undefined,
         products: {
           edges: shopifyProducts.slice(0, first).map((p: any) => ({ node: p })),
           pageInfo: {
@@ -101,6 +104,7 @@ export async function getCollection(
           }
         }
       };
+
     }
   } catch (err) {
     console.error("Error fetching collection from backend API:", err);
@@ -340,22 +344,23 @@ export async function getCollectionProducts(
 
 export async function getBanner(slug: string): Promise<any | null> {
   const isServer = typeof window === 'undefined';
-  const API_URL = isServer ? 'http://django:8000' : 'http://localhost:8000';
+  const isDocker = process.env.WATCHPACK_POLLING === "true";
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
   
   console.log(`[getBanner] Fetching banner for slug: ${slug}`);
 
   try {
     const res = await fetch(`${API_URL}/api/shop/banners/${slug}/`, {
-      cache: 'no-store'
+      next: { revalidate: 3600 }
     });
     if (res.ok) {
       const data = await res.json();
-      // Make media URLs relative so Next.js proxies them via rewrites (avoids cross-origin and localhost port issues)
+      // Use absolute URLs for Next.js Image component optimization
       if (data.images && isServer) {
         data.images = data.images.map((img: any) => ({
           ...img,
-          image_url: img.image_url?.replace('http://django:8000', ''),
-          mobile_image_url: img.mobile_image_url?.replace('http://django:8000', ''),
+          image_url: cleanImageUrl(img.image_url) || null,
+          mobile_image_url: cleanImageUrl(img.mobile_image_url) || null,
         }));
       }
       return data;
