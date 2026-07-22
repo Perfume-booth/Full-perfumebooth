@@ -40,10 +40,10 @@ export default async function HomePage() {
         href: img.link_url || undefined,
       }))
     : [
-        { id: 1, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-1.jpg?v=1778129692", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ap.jpg?v=1778130171", href: "/arabiyat-prestige", alt_text: "Arabiyat Prestige Premium Fragrances" },
-        { id: 2, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-2.jpg?v=1778129694", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-banner.jpg?v=1778130178", href: "/al-haramain", alt_text: "Al Haramain Exclusive Perfumes" },
-        { id: 3, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-3.jpg?v=1778129693", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.jpg?v=1778130173", href: "/otoori", alt_text: "Otoori Luxury Attars and Perfumes" },
-        { id: 4, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-4.jpg?v=1778129691", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf.jpg?v=1778130170", href: "/mpf", alt_text: "MPF Signature Scents Collection" },
+        { id: 1, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ARABIYAT_PRESTIGE.webp?v=1784546289", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ap.jpg?v=1778130171", href: "/arabiyat-prestige", alt_text: "Arabiyat Prestige Premium Fragrances" },
+          { id: 2, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-haramain-banner-24001030.webp?v=17845462886", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-banner.jpg?v=1778130178", href: "/al-haramain", alt_text: "Al Haramain Exclusive Perfumes" },
+          { id: 3, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori-website.webp?v=1784546289", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.jpg?v=1778130173", href: "/otoori", alt_text: "Otoori Luxury Attars and Perfumes" },
+          { id: 4, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/banner-4.jpg?v=177812https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf-website.webp?v=1784546288", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf.jpg?v=1778130170", href: "/mpf", alt_text: "MPF Signature Scents Collection" },
       ];
 
   return (

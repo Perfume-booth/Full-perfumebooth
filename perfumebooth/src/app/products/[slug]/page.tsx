@@ -12,9 +12,13 @@ import RelatedProducts from "@/components/product/RelatedProducts";
 import RecentlyViewed from "@/components/product/RecentlyViewed";
 import ExpandableNarrative from "@/components/product/ExpandableNarrative";
 import { FaqSection } from "@/components/ui/faq-section";
-
+import ProductBreadcrumbs from "@/components/product/ProductBreadcrumbs";
+import { Suspense } from "react";
 // @ts-ignore: side-effect import for CSS without type declarations
 import './pdp.css';
+
+// Cache PDP on server for 15 minutes via ISR
+export const revalidate = 900;
 
 // Preserving API_URL for mocked recommendation array bindings
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -75,13 +79,13 @@ export interface Product {
 // Server-side fetching
 function cleanImageUrl(url: string | null | undefined): string | null {
     if (!url) return null;
-    
+
     const isDocker = process.env.WATCHPACK_POLLING === "true";
     const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
-    
+
     // Append cache buster to force browser to ignore old application/octet-stream cache
     const cacheBuster = '?v=1';
-    
+
     if (url.startsWith('/media/')) return `${API_URL}${url}${cacheBuster}`;
     if (url.includes('http://django:8000') || url.includes('http://localhost:8000')) {
         const newUrl = url.replace('http://django:8000', API_URL).replace('http://localhost:8000', API_URL);
@@ -267,8 +271,8 @@ export default async function ProductPage({
             {
                 "@type": "ListItem",
                 "position": 2,
-                "name": collectionLabel || brandName,
-                "item": collectionHref ? `https://www.perfumebooth.com${collectionHref}` : `https://www.perfumebooth.com/${brandSlug}`
+                "name": brandName,
+                "item": `https://www.perfumebooth.com/${brandSlug}`
             },
             {
                 "@type": "ListItem",
@@ -291,24 +295,20 @@ export default async function ProductPage({
             />
 
             {/* Breadcrumbs */}
-            <div className=" max-w-7xl mx-auto md:py-4 px-4 md:px-6 md:mt-3 text-[8px] md:text-[9px] uppercase tracking-[0.2em] text-[var(--color-text-muted)] font-semibold border-l-[3px] border-[#b8924a] bg-gradient-to-r from-[#b8924a]/5">
-                <div className="flex flex-wrap items-center">
-                    <Link href="/" className="hover:text-[var(--color-text-primary)] transition-colors">Home</Link>
-                    <span className="mx-2 md:mx-3 opacity-50">/</span>
-                    {collectionLabel ? (
-                        <>
-                            <Link href={collectionHref} className="hover:text-[var(--color-text-primary)] transition-colors">{collectionLabel}</Link>
-                            <span className="mx-2 md:mx-3 opacity-50">/</span>
-                        </>
-                    ) : (
-                        <>
-                            <Link href={`/${brandSlug}`} className="hover:text-[var(--color-text-primary)] transition-colors">{brandName}</Link>
-                            <span className="mx-2 md:mx-3 opacity-50">/</span>
-                        </>
-                    )}
-                    <span className="text-[var(--color-text-primary)] truncate max-w-[150px] md:max-w-none">{product.title}</span>
+            <Suspense fallback={
+                <div className="max-w-7xl mx-auto md:py-4 px-4 md:px-6 md:mt-3 text-[8px] md:text-[9px] uppercase tracking-[0.2em] text-[var(--color-text-muted)] font-semibold border-l-[3px] border-[#b8924a] bg-gradient-to-r from-[#b8924a]/5">
+                    <div className="flex flex-wrap items-center animate-pulse">
+                        <span>Home</span>
+                        <span className="mx-2 md:mx-3 opacity-50">/</span>
+                        <span>{brandName}</span>
+                        <span className="mx-2 md:mx-3 opacity-50">/</span>
+                        <span className="text-[var(--color-text-primary)] truncate max-w-[150px] md:max-w-none">{product.title}</span>
+                    </div>
                 </div>
-            </div>
+            }>
+                <ProductBreadcrumbs brandName={brandName} brandSlug={brandSlug} productTitle={product.title} />
+            </Suspense>
+
 
             {/* Layout Container */}
             <div className="max-w-7xl mx-auto px-4 md:px-6 pt-16 md:pt-8">
@@ -354,41 +354,41 @@ export default async function ProductPage({
             </div>
 
             <div className="max-w-7xl mx-auto px-4 md:px-6">
-                            <FaqSection
-                                title="Frequently Asked Questions"
-                                description="Everything you need to know about our products, authenticity, shipping, and policies."
-                                items={[
-                                    {
-                                        question: "1. Are all perfumes sold on Perfume Booth authentic?",
-                                        answer: "Yes. Every product sold on Perfume Booth is 100% authentic and sourced through trusted brands, authorised importers, and verified distribution partners. We do not sell counterfeit, refilled, diluted, or imitation fragrances."
-                                    },
-                                    {
-                                        question: "2. Does Perfume Booth offer Cash on Delivery?",
-                                        answer: "Yes, Cash on Delivery is available for eligible orders and serviceable PIN codes across India. COD availability and any applicable charges will be clearly displayed during checkout before you place your order."
-                                    },
-                                    {
-                                        question: "3. How quickly will my order be shipped?",
-                                        answer: "Most confirmed orders are packed and dispatched within 12–24 working hours. Once your order is shipped, tracking details will be shared with you so you can follow its delivery status."
-                                    },
-                                    {
-                                        question: "4. How long does delivery take?",
-                                        answer: "Most orders are delivered within 2–7 business days, depending on your location and PIN code. Delivery may take slightly longer for remote areas, public holidays, weather disruptions, or courier delays."
-                                    },
-                                    {
-                                        question: "5. What is Perfume Booth’s return and refund policy?",
-                                        answer: (
-                                            <span>
-                                                You can read our full shipping and return policy{" "}
-                                                <Link href="/info/policies/refund" className="underline hover:text-[var(--color-gold)] transition-colors">
-                                                    here
-                                                </Link>
-                                                .
-                                            </span>
-                                        )
-                                    }
-                                ]}
-                            />
-                        </div>
+                <FaqSection
+                    title="Frequently Asked Questions"
+                    description="Everything you need to know about our products, authenticity, shipping, and policies."
+                    items={[
+                        {
+                            question: "1. Are all perfumes sold on Perfume Booth authentic?",
+                            answer: "Yes. Every product sold on Perfume Booth is 100% authentic and sourced through trusted brands, authorised importers, and verified distribution partners. We do not sell counterfeit, refilled, diluted, or imitation fragrances."
+                        },
+                        {
+                            question: "2. Does Perfume Booth offer Cash on Delivery?",
+                            answer: "Yes, Cash on Delivery is available for eligible orders and serviceable PIN codes across India. COD availability and any applicable charges will be clearly displayed during checkout before you place your order."
+                        },
+                        {
+                            question: "3. How quickly will my order be shipped?",
+                            answer: "Most confirmed orders are packed and dispatched within 12–24 working hours. Once your order is shipped, tracking details will be shared with you so you can follow its delivery status."
+                        },
+                        {
+                            question: "4. How long does delivery take?",
+                            answer: "Most orders are delivered within 2–7 business days, depending on your location and PIN code. Delivery may take slightly longer for remote areas, public holidays, weather disruptions, or courier delays."
+                        },
+                        {
+                            question: "5. What is Perfume Booth’s return and refund policy?",
+                            answer: (
+                                <span>
+                                    You can read our full shipping and return policy{" "}
+                                    <Link href="/info/policies/refund" className="underline hover:text-[var(--color-gold)] transition-colors">
+                                        here
+                                    </Link>
+                                    .
+                                </span>
+                            )
+                        }
+                    ]}
+                />
+            </div>
 
             {/* Product Discovery Sections */}
             <div className="w-full mt-12">

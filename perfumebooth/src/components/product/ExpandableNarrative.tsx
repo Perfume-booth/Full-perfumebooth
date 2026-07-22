@@ -193,11 +193,10 @@ export default function ExpandableNarrative({ description, details }: Props) {
                   <div>
                     <h4 className="text-[12px] uppercase tracking-[0.1em] font-bold text-[var(--color-text-primary)] mb-1">5-Day Replacement</h4>
                     <p className="text-sm font-light text-[var(--color-text-secondary)] leading-relaxed">
-                      This item is non-returnable due to the nature of the product.
-                      For a Damaged, Defective, Wrong or expired item, you can request a refund or replacement within 5 days of delivery.
+                      This item is non-returnable due to hygiene and authenticity reasons. If you receive a damaged, defective, incorrect, or expired item, you may request a replacement or refund within 5 days of delivery.
                     </p>
                     <p className="text-sm font-light text-[var(--color-text-secondary)] leading-relaxed pt-3">
-                      You will need to share the <strong className="font-bold">unboxing video and image</strong> of the item and its defects through Your Orders for a refund/replacement.
+                      Please provide an <strong className="font-bold">unboxing video and clear images</strong>for verification.
                     </p>
                   </div>
                 </div>
