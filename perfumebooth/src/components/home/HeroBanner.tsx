@@ -118,7 +118,7 @@ export default function HeroBanner({ title, subtitle, imageUrl, slides = [] }: H
                   <motion.h1 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-4xl md:text-6xl lg:text-7xl font-serif mb-4"
+                    className="text-2xl md:text-6xl lg:text-7xl font-serif mb-4"
                   >
                     {title}
                   </motion.h1>
@@ -128,7 +128,7 @@ export default function HeroBanner({ title, subtitle, imageUrl, slides = [] }: H
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="text-lg md:text-xl font-light tracking-widest uppercase"
+                    className="text-sm md:text-xl font-light tracking-widest uppercase"
                   >
                     {subtitle}
                   </motion.p>

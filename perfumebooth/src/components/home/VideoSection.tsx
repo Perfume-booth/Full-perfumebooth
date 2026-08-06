@@ -172,7 +172,7 @@ function VideoCard({ item, index, isActive, activeIndex, totalSlides, sectionInV
 
           <div className="absolute inset-x-8 bottom-10 z-10">
 
-            <h3 className="text-3xl md:text-3xl font-serif text-white mb-6 group-hover:translate-x-2 transition-transform duration-500">
+            <h3 className="text-2xl md:text-3xl font-serif text-white mb-6 group-hover:translate-x-2 transition-transform duration-500">
               {item.label}
             </h3>
 

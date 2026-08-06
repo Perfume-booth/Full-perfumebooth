@@ -34,7 +34,7 @@ export default function SectionHeader({
                     viewport={{ once: true, margin: "-100px" }}
                     transition={{ duration: 0.8 }}
                 >
-                    <h2 className="font-serif text-lg lg:text-xl lg:text-2xl text-[var(--color-text-primary)] leading-normal font-bold flex items-baseline gap-1">
+                    <h2 className="font-serif text-base lg:text-xl lg:text-2xl text-[var(--color-text-primary)] leading-normal font-bold flex items-baseline gap-1">
                         {title} {italicPart && <span className="italic text-[var(--color-gold)]">{italicPart}</span>} {suffix}
                     </h2>
                 </motion.div>
@@ -49,7 +49,7 @@ export default function SectionHeader({
                     >
                         <Link
                             href={viewAllLink}
-                            className="group flex items-center gap-1 lg:gap-2 text-[8px] lg:text-xs font-bold uppercase tracking-[0.3em] text-[#807667] hover:text-[#b8924a] transition-colors duration-300 border-[#b8924a] border rounded-full lg:p-2 p-2"
+                            className="group flex items-center gap-1 lg:gap-2 text-[7px] lg:text-xs font-bold uppercase tracking-[0.3em] text-[#807667] hover:text-[#b8924a] transition-colors duration-300 border-[#b8924a] border rounded-full lg:p-2 p-1.5"
                         >
                             {viewAllText}
                             <AnimatedArrowRight size={12} animateOn="hover" />

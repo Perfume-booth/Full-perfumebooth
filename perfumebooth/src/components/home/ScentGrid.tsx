@@ -102,7 +102,7 @@ export default function ScentGrid() {
                       <p className="text-[var(--color-gold)] text-[9px] uppercase tracking-[0.4em] font-bold mb-3 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500">
                         {note.mood}
                       </p>
-                      <h3 className="text-3xl md:text-4xl font-serif text-white mb-6 group-hover:translate-x-2 transition-transform duration-500">
+                      <h3 className="text-2xl md:text-4xl font-serif text-white mb-6 group-hover:translate-x-2 transition-transform duration-500">
                         {note.label}
                       </h3>
                       <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-all duration-500 delay-100">

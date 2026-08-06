@@ -13,7 +13,7 @@ const Label = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttributes<HTMLL
       )}
       {...props}
     />
-  ),
+        )
 );
 Label.displayName = "Label";
 

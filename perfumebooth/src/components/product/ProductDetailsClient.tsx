@@ -283,7 +283,7 @@ export default function ProductDetailsClient({ product }: Props) {
                 {brandName}
               </span>
             </Link>
-            <h1 className="md:text-2xl font-bold text-[var(--color-gold)] capitalize">
+            <h1 className="text-lg md:text-2xl font-bold text-[var(--color-gold)] capitalize">
               {product.title}
             </h1>
           </div>
@@ -353,7 +353,7 @@ export default function ProductDetailsClient({ product }: Props) {
       {/* 2. Price & Badges Area (Compact) */}
       <div className="space-y-4">
         <div className="flex items-baseline gap-3">
-          <span className="text-xl md:text-3xl text-[var(--color-text-primary)]">Rs. {product.price}</span>
+          <span className="text-lg md:text-3xl text-[var(--color-text-primary)]">Rs. {product.price}</span>
           {product.compare_at_price && parseFloat(product.compare_at_price) > parseFloat(product.price) && (
             <>
               <span className="text-sm md:text-lg text-[var(--color-text-muted)] line-through opacity-70">Rs. {product.compare_at_price}</span>
