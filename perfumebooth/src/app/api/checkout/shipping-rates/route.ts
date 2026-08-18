@@ -20,28 +20,56 @@ export async function POST(request: Request) {
         message: "Please enter a valid 6-digit PIN Code." 
       }, { status: 400 });
     }
-
-    // Determine subtotal for free shipping eligibility from request payload
     const subtotal = bodySubtotal !== undefined ? parseFloat(String(bodySubtotal)) : 0;
     const isFree = subtotal >= 999;
 
-    const shippingRates = isFree 
-      ? [
-          {
-            handle: "free-shipping",
-            title: "Complimentary Free Shipping",
-            amount: 0,
-            currency: "INR"
-          }
-        ]
-      : [
-          {
-            handle: "default-paid",
-            title: "Standard Shipping",
-            amount: 119,
-            currency: "INR"
-          }
-        ];
+    const isDocker = process.env.WATCHPACK_POLLING === "true";
+    const BACKEND_URL = process.env.BACKEND_API_URL || (isDocker ? "http://django:8000" : "http://localhost:8000");
+
+    let liveRates: any[] = [];
+    try {
+      const backendRes = await fetch(`${BACKEND_URL}/api/orders/shipping-rates/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pincode: cleanZip, weight: 0.5 }),
+      });
+      if (backendRes.ok) {
+        const backendData = await backendRes.json();
+        if (backendData?.rates && Array.isArray(backendData.rates)) {
+          liveRates = backendData.rates;
+        }
+      }
+    } catch (e) {
+      console.warn("Backend shipping rate lookup fallback:", e);
+    }
+
+    let shippingRates = [];
+    if (isFree) {
+      shippingRates = [
+        {
+          handle: "free-shipping",
+          title: "Complimentary Free Shipping",
+          amount: 0,
+          currency: "INR"
+        }
+      ];
+    } else if (liveRates.length > 0) {
+      shippingRates = liveRates.map((r: any, idx: number) => ({
+        handle: `shiprocket-courier-${idx}`,
+        title: `${r.courier_name} (${r.etd || '3-5 Days'})`,
+        amount: Math.round(r.rate),
+        currency: "INR"
+      }));
+    } else {
+      shippingRates = [
+        {
+          handle: "standard-shipping",
+          title: "Standard Express Shipping",
+          amount: 99,
+          currency: "INR"
+        }
+      ];
+    }
 
     return NextResponse.json({
       success: true,

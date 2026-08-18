@@ -52,6 +52,17 @@ export function mapDjangoProductToProduct(p: any): Product {
       { key: "occasion", value: p.occasion || "" },
       { key: "concentration", value: p.concentration || "" },
       { key: "origin_country", value: p.origin_country || "India" },
+    ],
+    variants: [
+      {
+        id: `gid://shopify/ProductVariant/${p.id}`,
+        title: "Default Title",
+        price: priceVal,
+        compareAtPrice: comparePriceVal,
+        availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
+        quantityAvailable: p.stock_count || p.stock || 50,
+        requiresShipping: true
+      }
     ]
   };
 }

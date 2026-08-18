@@ -256,3 +256,62 @@ class PageBannerImage(models.Model):
 
     def __str__(self) -> str:
         return f"Image for {self.banner.page_slug} (Order: {self.sort_order})"
+
+
+class WishlistItem(models.Model):
+    """
+    Stores user's saved wishlist products.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.CASCADE,
+        related_name='wishlist_items'
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='wishlisted_by'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'shop_wishlist'
+        unique_together = ('user', 'product')
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"Wishlist item {self.product.title} for {self.user.email}"
+
+
+class ProductReview(models.Model):
+    """
+    Customer product ratings and written reviews.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='reviews'
+    )
+    user = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.CASCADE,
+        related_name='reviews'
+    )
+    rating = models.PositiveSmallIntegerField(help_text="1 to 5 star rating")
+    title = models.CharField(max_length=255, blank=True, default='')
+    comment = models.TextField(blank=True, default='')
+    is_verified_buyer = models.BooleanField(default=False)
+    is_approved = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'shop_product_review'
+        unique_together = ('user', 'product')
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.rating}* Review for {self.product.title} by {self.user.email}"
+

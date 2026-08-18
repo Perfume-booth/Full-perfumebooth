@@ -35,6 +35,7 @@ export default function Sidebar() {
   const menuItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Products', href: '/products', icon: ShoppingBag, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'CSV Safe Editor', href: '/csv-editor', icon: FileSpreadsheet, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Collections', href: '/collections', icon: FolderOpen, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive', 'Content Manager'] },
     { name: 'Inventory', href: '/inventory', icon: Package, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Orders', href: '/orders', icon: FileText, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },

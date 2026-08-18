@@ -35,7 +35,7 @@ export default function ResetPasswordForm({ id, token }: ResetPasswordFormProps)
       return;
     }
 
-    const result = await resetPasswordAction(null, formData);
+    const result: any = await resetPasswordAction(null, formData);
 
     if (result?.error) {
       setError(result.error);

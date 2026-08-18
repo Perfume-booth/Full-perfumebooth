@@ -35,7 +35,7 @@ export default function CompareModal() {
               }
               const fullDetails = await getProductAction(item.handle);
               if (fullDetails) {
-                return { ...item, ...fullDetails, isFull: true } as Product;
+                return { ...item, ...(fullDetails as any), isFull: true } as Product;
               }
               // Mark as full and ensure tags are defined to prevent endless retries on failure
               return { ...item, tags: item.tags || [], isFull: true } as Product;

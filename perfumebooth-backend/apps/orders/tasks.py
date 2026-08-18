@@ -74,3 +74,78 @@ def send_order_email_receipt(self, order_id: str) -> dict:
         raise self.retry(exc=exc)
 
     return {'status': 'sent', 'order_number': order.order_number}
+
+
+@shared_task(
+    bind=True,
+    queue='default',
+    max_retries=3,
+    default_retry_delay=60,
+    name='apps.orders.tasks.push_order_to_shiprocket_task',
+)
+def push_order_to_shiprocket_task(self, order_id: str) -> dict:
+    """
+    Pushes a paid order to Shiprocket for fulfillment.
+    """
+    try:
+        order = Order.objects.prefetch_related('items__product').get(id=order_id)
+    except Order.DoesNotExist:
+        return {'status': 'skipped', 'reason': 'order not found'}
+
+    from .shiprocket import create_shiprocket_order
+    res = create_shiprocket_order(order)
+    return res
+
+
+@shared_task(
+    bind=True,
+    queue='emails',
+    max_retries=5,
+    default_retry_delay=120,
+    name='apps.orders.tasks.send_shipping_dispatch_email',
+)
+def send_shipping_dispatch_email(self, order_id: str) -> dict:
+    """
+    Sends a transactional dispatch email with AWB & tracking details.
+    """
+    try:
+        order = Order.objects.select_related('user').get(id=order_id)
+    except Order.DoesNotExist:
+        return {'status': 'skipped', 'reason': 'order not found'}
+
+    recipient_email = order.user.email if order.user else (order.shipping_address or {}).get('email')
+    if not recipient_email:
+        return {'status': 'skipped', 'reason': 'recipient email not found'}
+
+    try:
+        from django.core.mail import send_mail
+        from django.conf import settings
+
+        subject = f'Your Order #{order.order_number} Has Been Dispatched! — PerfumeBooth'
+        courier = order.courier_name or 'Shiprocket Courier Partner'
+        awb = order.awb_code or 'N/A'
+        track_url = order.tracking_url or f"https://shiprocket.co/tracking/{awb}"
+
+        message = f"Great news! Your order #{order.order_number} has been dispatched via {courier}. AWB: {awb}. Track: {track_url}"
+        html_message = f"""
+            <h2>Your Order is On Its Way!</h2>
+            <p>Order <strong>#{order.order_number}</strong> has been handed over to our courier partner.</p>
+            <p><strong>Courier Partner:</strong> {courier}</p>
+            <p><strong>AWB Code / Tracking ID:</strong> {awb}</p>
+            <p><a href="{track_url}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Track Shipment Live</a></p>
+            <p>Thank you for shopping with PerfumeBooth!</p>
+        """
+
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'PerfumeBooth <onboarding@resend.dev>'),
+            recipient_list=[recipient_email],
+            html_message=html_message,
+            fail_silently=False
+        )
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+    return {'status': 'sent', 'order_number': order.order_number, 'awb': order.awb_code}
+

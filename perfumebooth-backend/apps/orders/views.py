@@ -31,12 +31,36 @@ class OrderListView(APIView):
             for role in request.user.roles.values_list('role__name', flat=True)
         )
 
-        orders_query = Order.objects.all()
+        orders_query = Order.objects.prefetch_related('items').all()
         if not is_merchant:
             orders_query = orders_query.filter(user=request.user)
 
         data = []
         for order in orders_query:
+            item_qty = sum(item.quantity for item in order.items.all())
+            
+            shipping = order.shipping_address or {}
+            delivery_method = shipping.get('shipping_carrier', 'Standard Shipping')
+            pay_method = shipping.get('payment_method', 'COD')
+
+            payment_status = "Pending"
+            if order.status in ['Paid', 'Shipped', 'Delivered']:
+                payment_status = "Paid"
+            elif order.status == 'Refunded':
+                payment_status = "Refunded"
+            elif order.status == 'Cancelled':
+                payment_status = "Cancelled"
+                
+            fulfillment_status = "Unfulfilled"
+            if order.status == 'Shipped':
+                fulfillment_status = "Shipped"
+            elif order.status == 'Delivered':
+                fulfillment_status = "Delivered"
+            elif order.status == 'Cancelled':
+                fulfillment_status = "Cancelled"
+            elif order.status == 'Processing':
+                fulfillment_status = "Processing"
+
             data.append({
                 'id': str(order.id),
                 'order_number': order.order_number,
@@ -45,6 +69,11 @@ class OrderListView(APIView):
                 'created_at': order.created_at,
                 'customer_name': order.user.full_name if order.user else 'N/A',
                 'customer_email': order.user.email if order.user else 'N/A',
+                'payment_status': payment_status,
+                'fulfillment_status': fulfillment_status,
+                'item_quantity': item_qty,
+                'delivery_method': delivery_method,
+                'payment_method': pay_method,
             })
             
         return Response(data)
@@ -105,6 +134,10 @@ class OrderListView(APIView):
 
                 order_user = request.user if request.user and request.user.is_authenticated else None
 
+                # Inject payment method into shipping address JSON to save it without database schema changes
+                if isinstance(shipping_address, dict):
+                    shipping_address['payment_method'] = payment_method
+
                 order = Order.objects.create(
                     user=order_user,
                     order_number=order_number,
@@ -160,8 +193,26 @@ class OrderDetailView(APIView):
 
         items_data = []
         for item in order.items.all():
+            prod_img = None
+            if item.product:
+                if item.product.image:
+                    try:
+                        prod_img = item.product.image.url
+                    except Exception:
+                        prod_img = str(item.product.image)
+                elif hasattr(item.product, 'images'):
+                    first_img_obj = item.product.images.first()
+                    if first_img_obj and first_img_obj.image:
+                        try:
+                            prod_img = first_img_obj.image.url
+                        except Exception:
+                            prod_img = str(first_img_obj.image)
+
             items_data.append({
                 'id': str(item.id),
+                'product_id': str(item.product.id) if item.product else None,
+                'product_slug': item.product.slug if item.product else None,
+                'product_image': prod_img,
                 'product_title': item.product.title if item.product else 'Deleted Product',
                 'sku': item.product.sku if item.product else 'N/A',
                 'quantity': item.quantity,
@@ -259,4 +310,78 @@ class RazorpayWebhookView(APIView):
         )
 
         return Response({'detail': 'OK'}, status=status.HTTP_200_OK)
+
+
+class ShippingRatesAPIView(APIView):
+    """
+    POST /api/orders/shipping-rates/
+    Calculates live courier rates & serviceability based on pincode & weight.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        pincode = request.data.get('pincode', '').strip()
+        weight = float(request.data.get('weight', 0.5))
+        is_cod = bool(request.data.get('cod', False))
+
+        if not pincode:
+            return Response({'detail': 'Pincode is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .shiprocket import check_serviceability
+        res = check_serviceability(delivery_postcode=pincode, weight=weight, is_cod=is_cod)
+        return Response(res, status=status.HTTP_200_OK)
+
+
+class ShiprocketWebhookView(APIView):
+    """
+    POST /api/orders/shiprocket/webhook/
+    Receives order status updates (AWB_ASSIGNED, SHIPPED, DELIVERED) from Shiprocket.
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        data = request.data
+        order_number = data.get('order_id')
+        current_status = data.get('current_status', '').upper()
+        awb_code = data.get('awb', data.get('awb_code'))
+        courier_name = data.get('courier_name')
+        tracking_url = data.get('tracking_url')
+
+        if not order_number:
+            return Response({'detail': 'Missing order_id'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            order = Order.objects.get(order_number=order_number)
+        except Order.DoesNotExist:
+            return Response({'detail': f'Order #{order_number} not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        from django.utils import timezone
+
+        if awb_code:
+            order.awb_code = awb_code
+        if courier_name:
+            order.courier_name = courier_name
+        if tracking_url:
+            order.tracking_url = tracking_url
+
+        if current_status in ['AWB ASSIGNED', 'SHIPPED', 'IN TRANSIT', 'OUT FOR DELIVERY'] and order.status != Order.Status.SHIPPED:
+            order.status = Order.Status.SHIPPED
+            order.shipped_at = timezone.now()
+            order.save()
+
+            # Trigger transactional dispatch email
+            from .tasks import send_shipping_dispatch_email
+            send_shipping_dispatch_email.delay(str(order.id))
+
+        elif current_status in ['DELIVERED'] and order.status != Order.Status.DELIVERED:
+            order.status = Order.Status.DELIVERED
+            order.delivered_at = timezone.now()
+            order.save()
+
+        else:
+            order.save()
+
+        return Response({'detail': 'Webhook processed.'}, status=status.HTTP_200_OK)
+
 

@@ -22,7 +22,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   if (!article) notFound();
 
-  const relatedArticles = allArticles.filter((rel) => rel.id !== article.id);
+  const relatedArticles = allArticles.filter((rel: any) => rel.id !== article.id);
 
   const formattedDate = new Date(article.publishedAt).toLocaleDateString("en-US", {
     month: "long",

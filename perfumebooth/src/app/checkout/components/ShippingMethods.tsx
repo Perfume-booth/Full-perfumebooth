@@ -91,22 +91,21 @@ export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) 
         const cheapestRate = [...mappedRates].sort((a, b) => a.amount - b.amount)[0];
         setSelectedShippingRate(cheapestRate);
       } else {
-        setShippingRates([]);
-        setErrorMsg(data.message || "No shipping rates available for this location.");
-        // Revert to standard fallback so checkout is never blocked
-        setSelectedShippingRate(isFreeEligible 
+        const fallback = isFreeEligible 
           ? { title: "Complimentary Free Shipping", amount: 0, handle: "free-shipping" }
-          : { title: "Standard Shipping", amount: 119, handle: "default-paid" }
-        );
+          : { title: "Standard Shipping", amount: 119, handle: "default-paid" };
+        setShippingRates([fallback]);
+        setErrorMsg(data.message || "No shipping rates available for this location.");
+        setSelectedShippingRate(fallback);
       }
     } catch (error) {
       console.error("Shipping calculation failure:", error);
       setErrorMsg("Unable to calculate rates for this pin code.");
-      // Standard safe fallback
-      setSelectedShippingRate(isFreeEligible 
+      const fallback = isFreeEligible 
         ? { title: "Complimentary Free Shipping", amount: 0, handle: "free-shipping" }
-        : { title: "Standard Shipping", amount: 119, handle: "default-paid" }
-      );
+        : { title: "Standard Shipping", amount: 119, handle: "default-paid" };
+      setShippingRates([fallback]);
+      setSelectedShippingRate(fallback);
     } finally {
       setIsCalculating(false);
     }

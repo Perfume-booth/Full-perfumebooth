@@ -70,6 +70,7 @@ interface CartState {
   setOrderNotes: (notes: string) => void;
   setShippingRates: (rates: ShippingRate[]) => void;
   setSelectedShippingRate: (rate: ShippingRate | null) => void;
+  validateCartStock: () => Promise<{ is_valid: boolean; has_stock_alerts: boolean; items: any[] }>;
 
   // Computed values (Now backed by Shopify API, returning fallback optimistic if not yet synced)
   totalItems: () => number;
@@ -251,15 +252,15 @@ export const useCartStore = create<CartState>()(
         if (cartIdToUse) {
           try {
             const updatedCart = await updateCartDiscountAction([upperCode], cartIdToUse || undefined);
-            if (updatedCart) {
-              // Read the discount codes list returned by Shopify
-              const discountCodes = updatedCart.discountCodes || [];
+            const cartObj: any = updatedCart;
+            if (cartObj) {
+              const discountCodes = cartObj.discountCodes || [];
               const appliedNode = discountCodes.find((dc: any) => dc.code.toUpperCase() === upperCode && dc.applicable);
 
               if (appliedNode) {
                 if (state.buyNowItem) {
-                  const subtotalVal = parseFloat(updatedCart.cost?.subtotalAmount?.amount || "0");
-                  const totalVal = parseFloat(updatedCart.cost?.totalAmount?.amount || "0");
+                  const subtotalVal = parseFloat(cartObj.cost?.subtotalAmount?.amount || "0");
+                  const totalVal = parseFloat(cartObj.cost?.totalAmount?.amount || "0");
                   const discountAmt = Math.max(0, subtotalVal - totalVal);
                   const couponDiscount = subtotalVal > 0 ? (discountAmt / subtotalVal) * 100 : 0;
                   set({
@@ -269,7 +270,7 @@ export const useCartStore = create<CartState>()(
                     isApplyingDiscount: false
                   });
                 } else {
-                  get().syncShopifyCart(updatedCart);
+                  get().syncShopifyCart(cartObj);
                   set({ isApplyingDiscount: false });
                 }
                 return true;
@@ -342,7 +343,7 @@ export const useCartStore = create<CartState>()(
 
         // Server Action: Create separate temporary Shopify Cart for this single item
         const { createBuyNowCartAction } = await import('@/lib/actions/actions');
-        const cart = await createBuyNowCartAction(formattedVariantId, quantity);
+        const cart: any = await createBuyNowCartAction(formattedVariantId, quantity);
         if (cart) {
           const lines = cart.lines?.edges || [];
           const node = lines[0]?.node;
@@ -640,6 +641,29 @@ export const useCartStore = create<CartState>()(
       setShippingRates: (rates) => set({ availableShippingRates: rates }),
       
       setSelectedShippingRate: (rate) => set({ selectedShippingRate: rate }),
+
+      validateCartStock: async () => {
+        const state = get();
+        const payload = state.items.map((item) => ({
+          id: item.id,
+          product_id: item.id,
+          quantity: item.cartQuantity,
+          price: item.price,
+        }));
+
+        try {
+          const res = await fetch('/api/cart/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: payload }),
+          });
+          const data = await res.json();
+          return data;
+        } catch (err) {
+          console.error('Cart stock validation error:', err);
+          return { is_valid: true, has_stock_alerts: false, items: [] };
+        }
+      },
 
       finalTotalAmount: () => {
         const state = get();

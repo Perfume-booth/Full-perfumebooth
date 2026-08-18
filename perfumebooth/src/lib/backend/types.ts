@@ -34,6 +34,15 @@ export interface Product {
     nodes?: { url: string; altText?: string }[];
   };
   metafields: { key: string; value: string }[];
+  variants?: {
+    id: string;
+    title: string;
+    price: string;
+    compareAtPrice?: string;
+    availableForSale: boolean;
+    quantityAvailable: number;
+    requiresShipping: boolean;
+  }[];
 }
 
 export interface Collection {

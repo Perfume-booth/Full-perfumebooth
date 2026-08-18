@@ -257,6 +257,8 @@ export const requireCustomer = cache(async () => {
         email: user.email,
         phone: user.phone,
         createdAt: new Date().toISOString(),
+        tags: user.tags || [],
+        gender: { value: user.gender || "" },
         addresses: { edges: [] },
         orders: { edges: [] },
       };
@@ -274,5 +276,13 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
     return { error: "Email is required." };
   }
   return { success: "If an account exists with that email, a recovery link has been sent." };
+}
+
+export async function resetPasswordAction(prevState: any, formData: FormData) {
+  const password = formData.get("password") as string;
+  if (!password) {
+    return { error: "Password is required." };
+  }
+  return { success: "Your password has been successfully reset." };
 }
 

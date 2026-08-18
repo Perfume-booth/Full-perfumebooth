@@ -225,7 +225,7 @@ export const useFilterLogic = ({
       const data = await loadMoreCollectionProducts(collectionHandle || 'all', pageInfo.endCursor, filterOptions, sortKey, reverse);
 
       if (data) {
-        let nextProducts = data.products as Product[];
+        let nextProducts = (data as any).products as Product[];
         if (selectedRating !== null) {
           nextProducts = nextProducts.filter(p => getProductRating(p) >= selectedRating);
         }
@@ -241,9 +241,9 @@ export const useFilterLogic = ({
 
           return [...available, ...nextAvailable, ...outOfStock, ...nextOutOfStock];
         });
-        setPageInfo(data.pageInfo);
-        if (data.filters && data.filters.length > 0) {
-          setFilters(data.filters);
+        setPageInfo((data as any).pageInfo);
+        if ((data as any).filters && (data as any).filters.length > 0) {
+          setFilters((data as any).filters);
         }
       }
     } catch (error) {

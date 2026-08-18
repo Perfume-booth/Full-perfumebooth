@@ -33,7 +33,7 @@ export default async function OrdersPage() {
         financialStatus: any;
         fulfillmentStatus: any; name: any; 
 }) => {
-        const adminOrder = adminOrders.find((ao: any) => ao.name === sfOrder.name);
+        const adminOrder: any = adminOrders.find((ao: any) => ao.name === sfOrder.name);
         if (adminOrder) {
           return {
             ...sfOrder,

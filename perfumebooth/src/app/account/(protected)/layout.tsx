@@ -26,10 +26,11 @@ export default async function AccountLayout({ children }: { children: React.Reac
           ordersCount,
           addressesCount,
           gender: (() => {
-            if (customer.tags?.includes("gender_men")) return "men";
-            if (customer.tags?.includes("gender_women")) return "women";
-            if (customer.tags?.includes("gender_others")) return "others";
-            return customer.gender?.value || "";
+            const cust = customer as any;
+            if (cust.tags?.includes("gender_men")) return "men";
+            if (cust.tags?.includes("gender_women")) return "women";
+            if (cust.tags?.includes("gender_others")) return "others";
+            return cust.gender?.value || "";
           })(),
         }} 
       />

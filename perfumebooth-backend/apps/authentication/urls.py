@@ -20,6 +20,11 @@ from .customer_views import (
     CustomerSocialAuthView,
     CustomerMeView
 )
+from .customer_management_views import (
+    MerchantCustomerListView,
+    MerchantCustomerDetailView,
+    MerchantCustomerToggleStatusView
+)
 
 urlpatterns = [
     path('csrf/', GetCSRFTokenView.as_view(), name='auth-csrf'),
@@ -41,6 +46,11 @@ urlpatterns = [
     path('customer/otp/verify/', CustomerVerifyOTPView.as_view(), name='customer-otp-verify'),
     path('customer/social/', CustomerSocialAuthView.as_view(), name='customer-social-auth'),
     path('customer/me/', CustomerMeView.as_view(), name='customer-me'),
+
+    # Merchant Customer Management endpoints
+    path('merchant/customers/', MerchantCustomerListView.as_view(), name='merchant-customer-list'),
+    path('merchant/customers/<uuid:pk>/', MerchantCustomerDetailView.as_view(), name='merchant-customer-detail'),
+    path('merchant/customers/<uuid:pk>/toggle-status/', MerchantCustomerToggleStatusView.as_view(), name='merchant-customer-toggle-status'),
 ]
 
 

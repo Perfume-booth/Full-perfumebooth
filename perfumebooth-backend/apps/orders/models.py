@@ -46,6 +46,15 @@ class Order(models.Model):
     # Shipping address snapshot
     shipping_address = models.JSONField(default=dict)
 
+    # Shiprocket Logistics & Fulfillment Fields
+    shiprocket_order_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    shiprocket_shipment_id = models.CharField(max_length=100, blank=True, null=True)
+    awb_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    courier_name = models.CharField(max_length=150, blank=True, null=True)
+    tracking_url = models.URLField(max_length=500, blank=True, null=True)
+    shipped_at = models.DateTimeField(blank=True, null=True)
+    delivered_at = models.DateTimeField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

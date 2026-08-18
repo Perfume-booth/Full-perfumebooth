@@ -24,7 +24,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderPag
   // 1. If email is provided in query params, attempt guest login bypass
   if (email) {
     const { getGuestOrderAction } = await import("@/lib/actions/actions");
-    const guestResponse = await getGuestOrderAction(id, email);
+    const guestResponse: any = await getGuestOrderAction(id, email);
     if (guestResponse.success && guestResponse.order) {
       order = guestResponse.order;
       customerEmail = email;
@@ -60,7 +60,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderPag
 
     let adminOrder = null;
     if (sfOrder?.id) {
-      const adminResponse = await getAdminOrderByIdAction(sfOrder.id);
+      const adminResponse: any = await getAdminOrderByIdAction(sfOrder.id);
       if (adminResponse.success) {
         adminOrder = adminResponse.order;
       }
@@ -68,7 +68,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderPag
 
     // Fallback to name-based search if sfOrder wasn't found or ID fetch failed
     if (!adminOrder) {
-      const adminResponse = await getAdminOrderAction(orderName.startsWith("#") ? orderName : `#${orderName}`);
+      const adminResponse: any = await getAdminOrderAction(orderName.startsWith("#") ? orderName : `#${orderName}`);
       if (adminResponse.success) {
         adminOrder = adminResponse.order;
       }
@@ -100,7 +100,7 @@ export default async function OrderDetailPage({ params, searchParams }: OrderPag
 
   // Fetch real-time tracking data from Shiprocket
   try {
-    const trackingRes = await trackShiprocketOrder(order.name, customerEmail);
+    const trackingRes: any = await trackShiprocketOrder(order.name, customerEmail);
     if (trackingRes.success) {
       trackingInfo = {
         data: trackingRes.data,

@@ -118,6 +118,9 @@ async function getProduct(slug: string): Promise<Product | null> {
             });
         }
 
+        const priceVal = parseFloat(p.price || "0").toFixed(2);
+        const comparePriceVal = p.compare_at_price ? parseFloat(p.compare_at_price).toFixed(2) : undefined;
+
         return {
             ...p,
             image: cleanImageUrl(p.image) || (images.length > 0 ? images[0].image : null),
@@ -127,7 +130,17 @@ async function getProduct(slug: string): Promise<Product | null> {
             rating: p.rating || 4.5,
             rating_count: p.rating_count || 0,
             reviewsHtml: '',
-            variants: [],
+            variants: [
+                {
+                    id: `gid://shopify/ProductVariant/${p.id}`,
+                    title: "Default Title",
+                    price: priceVal,
+                    compareAtPrice: comparePriceVal,
+                    availableForSale: p.is_online && (p.stock > 0 || p.stock_count > 0),
+                    quantityAvailable: p.stock_count ?? p.stock ?? 50,
+                    requiresShipping: true
+                }
+            ],
             coupons: []
         };
     } catch (err) {

@@ -45,7 +45,7 @@ export default function DashboardLayout({
 
   // Active Role Guard Check
   let hasAccess = false;
-  if (pathname === '/' || pathname.startsWith('/products') || pathname.startsWith('/orders') || pathname.startsWith('/collections')) {
+  if (pathname === '/' || pathname.startsWith('/products') || pathname.startsWith('/csv-editor') || pathname.startsWith('/orders') || pathname.startsWith('/collections')) {
     hasAccess = user.roles.some(r => ['Super Admin', 'Admin', 'E-commerce Executive', 'Content Manager'].includes(r));
   } else if (pathname.startsWith('/cms')) {
     hasAccess = user.roles.some(r => ['Super Admin', 'Admin', 'Content Manager'].includes(r));

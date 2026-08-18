@@ -195,7 +195,7 @@ export default function ProductCard({
     return (
         <Link 
             href={getProductUrl()} 
-            className={`group relative flex flex-col h-full w-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm hover:shadow-md transition-all duration-500 rounded-2xl overflow-hidden ${isSoldOut ? "opacity-80" : ""}`}
+            className={`product-card group relative flex flex-col h-full w-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm hover:shadow-md transition-all duration-500 rounded-2xl overflow-hidden ${isSoldOut ? "opacity-80" : ""}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={() => setIsHovered(false)}
             onTouchStart={handleTouchStart}

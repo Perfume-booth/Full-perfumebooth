@@ -426,7 +426,12 @@ export default function OrderDetailsComponent({ order, trackingInfo, isGuest }: 
                     <div className="flex justify-between items-start gap-4">
                       <div>
                         <div className="flex items-center gap-3 mb-1">
-                          <h3 className="text-lg font-black text-[#1a1410] line-clamp-2 leading-tight">{item.title}</h3>
+                          <Link 
+                            href={`/products/${item.variant?.product?.handle || ""}`}
+                            className="text-lg font-black text-[#1a1410] line-clamp-2 leading-tight hover:underline hover:text-[#c5a059] transition-colors"
+                          >
+                            {item.title}
+                          </Link>
                           {isCancelled && (
                             <span className="px-2 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-wider border border-red-100">
                               Cancelled

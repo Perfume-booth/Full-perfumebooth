@@ -9,7 +9,7 @@ from django.core.cache import cache
 import json
 from decimal import Decimal
 
-from .models import Product, Inventory, ProductImage, Collection, AutoCollection
+from .models import Product, Inventory, ProductImage, Collection, AutoCollection, WishlistItem, ProductReview
 # pyrefly: ignore [missing-import]
 from django.utils.text import slugify
 # pyrefly: ignore [missing-import]
@@ -1659,4 +1659,246 @@ class PageBannerImageDeleteView(APIView):
             return Response({'detail': 'Deleted successfully'})
         except Exception:
             return Response({'detail': 'Not found'}, status=404)
+
+
+class WishlistAPIView(APIView):
+    """
+    Customer Wishlist API (GET, POST).
+    Handles wishlist listing and guest-to-user sync on login.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        items = WishlistItem.objects.filter(user=request.user).select_related('product')
+        products_data = [flatten_product(item.product, request) for item in items if item.product.is_online]
+        return Response({'items': products_data})
+
+    def post(self, request):
+        product_id = request.data.get('product_id') or request.data.get('id')
+        bulk_items = request.data.get('items', [])
+
+        target_product_ids = []
+        if product_id:
+            target_product_ids.append(product_id)
+        if bulk_items and isinstance(bulk_items, list):
+            for bi in bulk_items:
+                pid = bi.get('id') or bi.get('product_id')
+                if pid and pid not in target_product_ids:
+                    target_product_ids.append(pid)
+
+        if not target_product_ids:
+            return Response({'detail': 'No product_id or items list provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        added_count = 0
+        for pid in target_product_ids:
+            try:
+                product = Product.objects.get(id=pid, is_online=True)
+                WishlistItem.objects.get_or_create(user=request.user, product=product)
+                added_count += 1
+            except (Product.DoesNotExist, Exception):
+                continue
+
+        # Return updated wishlist
+        items = WishlistItem.objects.filter(user=request.user).select_related('product')
+        products_data = [flatten_product(item.product, request) for item in items if item.product.is_online]
+        return Response({'detail': f'Synced {added_count} items', 'items': products_data})
+
+
+class WishlistDeleteView(APIView):
+    """
+    DELETE /api/shop/wishlist/<product_id>/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, product_id):
+        deleted, _ = WishlistItem.objects.filter(user=request.user, product_id=product_id).delete()
+        if deleted:
+            return Response({'detail': 'Removed from wishlist'})
+        return Response({'detail': 'Item not found in wishlist'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CartValidationAPIView(APIView):
+    """
+    Cart Validation API
+    Checks availability, stock limits, and price changes before checkout.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        cart_items = request.data.get('items', request.data)
+        if not isinstance(cart_items, list):
+            return Response({'detail': 'Expected array of cart items'}, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_items = []
+        is_all_valid = True
+        has_stock_alerts = False
+
+        for item in cart_items:
+            product_id = item.get('product_id') or item.get('id')
+            req_qty = int(item.get('quantity', 1))
+            req_price = str(item.get('price', ''))
+
+            if not product_id:
+                continue
+
+            try:
+                product = Product.objects.get(id=product_id)
+                stock_val = product.inventory.available_stock if hasattr(product, 'inventory') else 0
+                current_price = str(product.price)
+
+                is_in_stock = stock_val >= req_qty
+                is_online = product.is_online
+                price_changed = req_price and Decimal(req_price) != product.price
+
+                item_status = 'AVAILABLE'
+                if not is_online:
+                    item_status = 'UNAVAILABLE'
+                    is_all_valid = False
+                    has_stock_alerts = True
+                elif stock_val <= 0:
+                    item_status = 'OUT_OF_STOCK'
+                    is_all_valid = False
+                    has_stock_alerts = True
+                elif not is_in_stock:
+                    item_status = 'EXCEEDS_STOCK'
+                    is_all_valid = False
+                    has_stock_alerts = True
+
+                validated_items.append({
+                    'product_id': str(product.id),
+                    'title': product.title,
+                    'slug': product.slug,
+                    'requested_quantity': req_qty,
+                    'available_stock': stock_val,
+                    'is_in_stock': is_in_stock,
+                    'is_online': is_online,
+                    'price_changed': price_changed,
+                    'current_price': current_price,
+                    'status': item_status
+                })
+
+            except Product.DoesNotExist:
+                validated_items.append({
+                    'product_id': str(product_id),
+                    'title': 'Unknown Product',
+                    'requested_quantity': req_qty,
+                    'available_stock': 0,
+                    'is_in_stock': False,
+                    'is_online': False,
+                    'price_changed': False,
+                    'current_price': '0.00',
+                    'status': 'NOT_FOUND'
+                })
+                is_all_valid = False
+                has_stock_alerts = True
+
+        return Response({
+            'is_valid': is_all_valid,
+            'has_stock_alerts': has_stock_alerts,
+            'items': validated_items
+        })
+
+
+class ProductReviewAPIView(APIView):
+    """
+    Product Reviews & Ratings API (GET, POST).
+    """
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
+
+    def get(self, request, product_id):
+        reviews = ProductReview.objects.filter(
+            product_id=product_id,
+            is_approved=True
+        ).select_related('user').order_by('-created_at')
+
+        reviews_list = []
+        total_rating_sum = 0
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+
+        for r in reviews:
+            total_rating_sum += r.rating
+            if r.rating in distribution:
+                distribution[r.rating] += 1
+
+            reviews_list.append({
+                'id': str(r.id),
+                'user_name': r.user.full_name or r.user.email.split('@')[0],
+                'rating': r.rating,
+                'title': r.title,
+                'comment': r.comment,
+                'is_verified_buyer': r.is_verified_buyer,
+                'created_at': r.created_at.isoformat()
+            })
+
+        count = len(reviews_list)
+        avg_rating = round(total_rating_sum / count, 1) if count > 0 else 5.0
+
+        return Response({
+            'product_id': str(product_id),
+            'average_rating': avg_rating,
+            'review_count': count,
+            'rating_distribution': distribution,
+            'reviews': reviews_list
+        })
+
+    def post(self, request, product_id):
+        try:
+            product = Product.objects.get(id=product_id, is_online=True)
+        except Product.DoesNotExist:
+            return Response({'detail': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        rating = int(request.data.get('rating', 5))
+        if rating < 1 or rating > 5:
+            return Response({'detail': 'Rating must be between 1 and 5'}, status=status.HTTP_400_BAD_REQUEST)
+
+        title = request.data.get('title', '')
+        comment = request.data.get('comment', '')
+
+        # Check verified buyer via Orders
+        is_verified = Order.objects.filter(
+            user=request.user,
+            status__in=['COMPLETED', 'DELIVERED', 'PAID'],
+            items__product=product
+        ).exists()
+
+        review, created = ProductReview.objects.update_or_create(
+            product=product,
+            user=request.user,
+            defaults={
+                'rating': rating,
+                'title': title,
+                'comment': comment,
+                'is_verified_buyer': is_verified,
+                'is_approved': True
+            }
+        )
+
+        # Recalculate product rating summary
+        all_reviews = ProductReview.objects.filter(product=product, is_approved=True)
+        rcount = all_reviews.count()
+        rsum = sum([r.rating for r in all_reviews])
+        new_avg = round(rsum / rcount, 1) if rcount > 0 else 5.0
+
+        attrs = product.attributes or {}
+        attrs['rating'] = new_avg
+        attrs['rating_count'] = rcount
+        product.attributes = attrs
+        product.save(update_fields=['attributes'])
+
+        return Response({
+            'detail': 'Review submitted successfully',
+            'review': {
+                'id': str(review.id),
+                'rating': review.rating,
+                'title': review.title,
+                'comment': review.comment,
+                'is_verified_buyer': review.is_verified_buyer
+            },
+            'new_average_rating': new_avg,
+            'new_review_count': rcount
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
 

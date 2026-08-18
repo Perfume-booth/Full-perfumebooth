@@ -1,4 +1,4 @@
-import { Article } from "./types";
+import { Article } from "../backend/types";
 
 
 const MOCK_ARTICLES: Article[] = [

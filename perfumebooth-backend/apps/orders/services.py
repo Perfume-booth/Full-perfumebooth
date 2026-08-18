@@ -51,6 +51,12 @@ def process_payment_webhook(payment_intent_id: str, order_id: str) -> Order:
         order.status = Order.Status.PAID
         order.payment_intent_id = payment_intent_id
         order.save(update_fields=['status', 'payment_intent_id', 'updated_at'])
+
+        # Enqueue background Celery tasks
+        from .tasks import send_order_email_receipt, push_order_to_shiprocket_task
+        send_order_email_receipt.delay(str(order.id))
+        push_order_to_shiprocket_task.delay(str(order.id))
+
     except Order.DoesNotExist:
         cache.delete(lock_key)
         raise ValueError(f'Order {order_id} not found.')
