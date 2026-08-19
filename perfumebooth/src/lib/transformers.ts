@@ -142,8 +142,11 @@ export function cleanImageUrl(url: string | null | undefined): string | undefine
     const cacheBuster = '?v=1';
     
     if (url.startsWith('/media/')) return `${API_URL}${url}${cacheBuster}`;
-    if (url.includes('http://django:8000') || url.includes('http://localhost:8000')) {
-      const newUrl = url.replace('http://django:8000', API_URL).replace('http://localhost:8000', API_URL);
+    if (url.includes('http://django:8000') || url.includes('http://localhost:8000') || url.includes('http://localhost/media/')) {
+      const newUrl = url
+        .replace('http://django:8000', API_URL)
+        .replace('http://localhost:8000', API_URL)
+        .replace('http://localhost/media/', 'http://localhost:8000/media/');
       return newUrl.includes('?') ? newUrl : `${newUrl}${cacheBuster}`;
     }
     return url;

@@ -46,7 +46,18 @@ interface Props {
 
 export default function ProductDetailsClient({ product }: Props) {
   const [quantity, setQuantity] = useState(1);
-  const isSoldOut = product.stock_count === 0 || product.availableForSale === false;
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+
+  useEffect(() => {
+    if (product.variants && product.variants.length > 0) {
+      setSelectedVariant(product.variants[0]);
+    }
+  }, [product.variants]);
+
+  const activePrice = selectedVariant ? selectedVariant.price : product.price;
+  const activeComparePrice = selectedVariant ? (selectedVariant.compare_at_price || product.compare_at_price) : product.compare_at_price;
+  const activeStock = selectedVariant ? selectedVariant.stock : product.stock_count;
+  const isSoldOut = activeStock === 0 || product.availableForSale === false;
 
   const { isInWishlist, addItem, removeItem } = useWishlist();
   const { addToCart, openCart, items, buyNow, clearBuyNow } = useCartStore();
@@ -353,17 +364,44 @@ export default function ProductDetailsClient({ product }: Props) {
       {/* 2. Price & Badges Area (Compact) */}
       <div className="space-y-4">
         <div className="flex items-baseline gap-3">
-          <span className="text-lg md:text-3xl text-[var(--color-text-primary)]">Rs. {product.price}</span>
-          {product.compare_at_price && parseFloat(product.compare_at_price) > parseFloat(product.price) && (
+          <span className="text-lg md:text-3xl text-[var(--color-text-primary)]">Rs. {activePrice}</span>
+          {activeComparePrice && parseFloat(activeComparePrice) > parseFloat(activePrice) && (
             <>
-              <span className="text-sm md:text-lg text-[var(--color-text-muted)] line-through opacity-70">Rs. {product.compare_at_price}</span>
+              <span className="text-sm md:text-lg text-[var(--color-text-muted)] line-through opacity-70">Rs. {activeComparePrice}</span>
               <span className="text-xs md:text-sm font-bold text-[var(--color-maroon)]">
-                {Math.round(((parseFloat(product.compare_at_price) - parseFloat(product.price)) / parseFloat(product.compare_at_price)) * 100)}% off
+                {Math.round(((parseFloat(activeComparePrice) - parseFloat(activePrice)) / parseFloat(activeComparePrice)) * 100)}% off
               </span>
             </>
           )}
           <span className="text-[8px] uppercase tracking-widest text-[var(--color-text-muted)] font-bold ml-auto md:ml-0">Incl. all taxes</span>
         </div>
+
+        {/* Variant Size Selector Pills */}
+        {product.variants && product.variants.length > 0 && (
+          <div className="space-y-2 py-1">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">Select Bottle Size</span>
+            <div className="flex flex-wrap gap-2">
+              {product.variants.map((v: any, idx: number) => {
+                const isSelected = selectedVariant?.id === v.id || (!selectedVariant && idx === 0);
+                return (
+                  <button
+                    key={v.id || idx}
+                    type="button"
+                    onClick={() => setSelectedVariant(v)}
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-[var(--color-gold)] bg-[var(--color-gold)]/10 text-[var(--color-gold)] shadow-sm ring-1 ring-[var(--color-gold)]'
+                        : 'border-[var(--color-border)] bg-[#fbfcfa] text-[var(--color-text-secondary)] hover:border-black'
+                    }`}
+                  >
+                    <span>{v.option1_value || v.title}</span>
+                    <span className="text-[10px] ml-1.5 opacity-80">Rs. {v.price}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {isSoldOut && (

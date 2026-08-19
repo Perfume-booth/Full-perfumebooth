@@ -148,3 +148,38 @@ def _placeholder_embedding(text: str) -> list[float]:
     Replace with a real embedding API call before going to production.
     """
     return [0.0] * 384
+
+
+@shared_task(
+    bind=True,
+    queue='default',
+    name='apps.shop.tasks.check_and_send_low_stock_alerts',
+)
+def check_and_send_low_stock_alerts(self, threshold: int = 5) -> dict:
+    """
+    Scans inventory for products under threshold (default 5 units) and sends warehouse email alert.
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    low_items = Inventory.objects.filter(stock_level__lte=threshold).select_related('product')
+    count = low_items.count()
+
+    if count > 0:
+        item_rows = "\n".join([f"- {inv.product.title} (SKU: {inv.product.sku}): {inv.stock_level} units left" for inv in low_items if inv.product])
+        subject = f"⚠️ Warehouse Alert: {count} Products Low on Stock"
+        message = f"Attention Warehouse Team,\n\nThe following items have fallen below {threshold} units in inventory:\n\n{item_rows}\n\nPlease restock these items soon."
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.DEFAULT_FROM_EMAIL],
+                fail_silently=True
+            )
+        except Exception as exc:
+            pass
+
+    return {'status': 'completed', 'low_stock_count': count}
+

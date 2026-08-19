@@ -7,7 +7,7 @@ export default function CSVEditorIndex() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/csv-editor/import');
+    router.replace('/products');
   }, [router]);
 
   return null;

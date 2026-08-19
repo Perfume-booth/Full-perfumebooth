@@ -1,6 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import ShopifyImportModal from '@/components/products/ShopifyImportModal';
+import ShopifyExportModal from '@/components/products/ShopifyExportModal';
+import BatchImageDropzone from '@/components/products/BatchImageDropzone';
+import VariantManager, { VariantItem } from '@/components/products/VariantManager';
 import { apiFetch } from '@/lib/api';
 import {
   Plus,
@@ -15,7 +20,9 @@ import {
   X,
   FileImage,
   FileUp,
-  FileDown
+  FileDown,
+  FileSpreadsheet,
+  Wand2
 } from 'lucide-react';
 
 interface Product {
@@ -30,12 +37,71 @@ interface Product {
   compare_at_price: string | null;
   image: string | null;
   images: { url: string; altText: string }[];
+  variants?: VariantItem[];
   attributes: Record<string, any>;
   stock: number;
   is_online: boolean;
   created_by_name?: string;
   updated_by_name?: string;
 }
+
+const PRESET_TEMPLATES = [
+  {
+    id: 'ROYAL_OUD',
+    name: '👑 Royal Oud & Golden Amber',
+    topNotes: 'Precious Rose, Saffron, Spiced Nutmeg',
+    middleNotes: 'Patchouli, Amberwood, Cedar',
+    baseNotes: 'Cambodian Oud, White Musk, Vanilla',
+    scentProfile: 'Oud',
+    category: 'Perfume',
+    productType: 'Extrait de Parfum',
+    gender: 'Unisex'
+  },
+  {
+    id: 'FRESH_CITRUS',
+    name: '🍋 Fresh Citrus & Marine Breeze',
+    topNotes: 'Calabrian Bergamot, Sicilian Lemon, Mint',
+    middleNotes: 'Sea Water Accord, Green Tea, Lavender',
+    baseNotes: 'Cedarwood, Oakmoss, White Musk',
+    scentProfile: 'Fresh',
+    category: 'Perfume',
+    productType: 'Eau de Parfum',
+    gender: 'Men'
+  },
+  {
+    id: 'FLORAL_ROSE',
+    name: '🌹 Floral Rose & Cashmere Musk',
+    topNotes: 'Damask Rose, Pink Pepper, Peach',
+    middleNotes: 'Peony, Jasmine Sambac, Violet',
+    baseNotes: 'Cashmere Wood, White Musk, Amber',
+    scentProfile: 'Floral',
+    category: 'Perfume',
+    productType: 'Eau de Parfum',
+    gender: 'Women'
+  },
+  {
+    id: 'SPICY_ORIENTAL',
+    name: '🕌 Spicy Oriental & Warm Cinnamon',
+    topNotes: 'Cardamom, Cinnamon Bark, Bergamot',
+    middleNotes: 'Clove, Nutmeg, Incense',
+    baseNotes: 'Gold Amber, Tonka Bean, Vanilla',
+    scentProfile: 'Spicy',
+    category: 'Attar',
+    productType: 'Attar/CPO',
+    gender: 'Unisex'
+  },
+  {
+    id: 'GOURMAND_VANILLA',
+    name: '🍨 Sweet Gourmand & Vanilla Bean',
+    topNotes: 'Sweet Almond, Roasted Coffee, Citrus',
+    middleNotes: 'Bourbon Vanilla, Cocoa, Heliotrope',
+    baseNotes: 'Sandalwood, Amber, White Musk',
+    scentProfile: 'Fresh',
+    category: 'Body Mist',
+    productType: 'Eau de Toilette',
+    gender: 'Women'
+  }
+];
 
 const NOTE_OPTIONS = [
   'Citrus',
@@ -66,6 +132,8 @@ export default function ProductsPage() {
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Form Fields
@@ -97,12 +165,62 @@ export default function ProductsPage() {
   const [metaDescription, setMetaDescription] = useState('');
   const [imageAltText, setImageAltText] = useState('');
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const [variantsList, setVariantsList] = useState<VariantItem[]>([]);
   const [manualTags, setManualTags] = useState<string[]>([]);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkActionType, setBulkActionType] = useState('price');
   const [bulkActionOption, setBulkActionOption] = useState('percent_discount');
   const [bulkActionValue, setBulkActionValue] = useState(0);
   const [noteOptions, setNoteOptions] = useState<string[]>(NOTE_OPTIONS);
+
+  // In-line cell editing state
+  const [editingCell, setEditingCell] = useState<{ slug: string; field: 'price' | 'stock' } | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
+
+  const handleApplyPresetTemplate = (templateId: string) => {
+    const template = PRESET_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    setTopNotes(template.topNotes);
+    setMiddleNotes(template.middleNotes);
+    setBaseNotes(template.baseNotes);
+    setScentProfile(template.scentProfile);
+    setCategory(template.category);
+    setProductType(template.productType);
+    setGender(template.gender);
+  };
+
+  const handleSaveInlineCell = async (slug: string, field: 'price' | 'stock', value: string) => {
+    try {
+      const payload: any = {};
+      if (field === 'price') {
+        payload.price = value;
+      } else {
+        payload.stock_level = parseInt(value, 10) || 0;
+      }
+
+      const fd = new FormData();
+      Object.entries(payload).forEach(([k, v]) => fd.append(k, String(v)));
+
+      await apiFetch(`/shop/products/${slug}/`, {
+        method: 'PUT',
+        body: fd,
+      });
+
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.slug === slug) {
+            if (field === 'price') return { ...p, price: value };
+            if (field === 'stock') return { ...p, stock: parseInt(value, 10) || 0 };
+          }
+          return p;
+        })
+      );
+    } catch (err) {
+      console.error('Failed to save inline cell edit:', err);
+    } finally {
+      setEditingCell(null);
+    }
+  };
 
   const handleAddCustomNote = (currentNotes: string[], setNotesFn: (val: string) => void) => {
     const val = prompt('Enter a name for the new custom scent note:');
@@ -359,6 +477,7 @@ export default function ProductsPage() {
     setMetaDescription('');
     setImageAltText('');
     setManualTags([]);
+    setVariantsList([]);
     setImageFile(null);
     setGalleryFiles(null);
     setError('');
@@ -367,6 +486,7 @@ export default function ProductsPage() {
 
   const handleOpenEdit = (product: Product) => {
     setEditingProduct(product);
+    setVariantsList(product.variants || []);
     setTitle(product.title);
     setSlug(product.slug);
     setSku(product.sku);
@@ -479,6 +599,10 @@ export default function ProductsPage() {
     };
     formData.append('attributes', JSON.stringify(attributes));
 
+    if (variantsList && variantsList.length > 0) {
+      formData.append('variants', JSON.stringify(variantsList));
+    }
+
     if (imageFile) {
       formData.append('image', imageFile);
     }
@@ -566,6 +690,30 @@ export default function ProductsPage() {
 
         <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            {/* 1-Click Preset Scent Template Selector */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
+              <div className="flex items-center gap-2.5">
+                <Wand2 className="w-5 h-5 text-primary flex-shrink-0" />
+                <div>
+                  <span className="text-xs font-bold text-foreground block">Preset Scent Templates</span>
+                  <span className="text-[11px] text-muted-foreground">Select a fragrance family to auto-fill Top/Heart/Base notes, accords & gender in 1 click</span>
+                </div>
+              </div>
+              <select
+                onChange={(e) => {
+                  if (e.target.value) handleApplyPresetTemplate(e.target.value);
+                }}
+                className="w-full md:w-auto px-3.5 py-2 bg-background border border-primary/40 rounded-xl text-xs font-bold text-foreground focus:outline-none cursor-pointer hover:border-primary transition"
+              >
+                <option value="">-- Apply Preset Fragrance Template --</option>
+                {PRESET_TEMPLATES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Title */}
               <div className="flex flex-col gap-2">
@@ -1044,60 +1192,26 @@ export default function ProductsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Featured File (Image/Video) */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Featured Image/Video</label>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 px-4 py-2.5 bg-secondary border border-border rounded-xl hover:bg-secondary/80 transition duration-200 text-sm cursor-pointer text-foreground">
-                    <FileImage className="w-5 h-5 text-primary" />
-                    <span>Choose File</span>
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                      className="hidden"
-                    />
-                  </label>
-                  <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                    {imageFile ? imageFile.name : 'No file chosen'}
-                  </span>
-                </div>
-              </div>
+            {/* Shopify Product Variant Manager */}
+            <VariantManager
+              baseSku={sku}
+              basePrice={price}
+              baseComparePrice={comparePrice}
+              baseStock={stockLevel}
+              initialVariants={variantsList}
+              onChange={(updated) => setVariantsList(updated)}
+            />
 
-              {/* Image Alt Text */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Image Alt Text</label>
-                <input
-                  type="text"
-                  value={imageAltText}
-                  onChange={(e) => setImageAltText(e.target.value)}
-                  placeholder="e.g. Lomani Code Perfume Bottle"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
-                />
-              </div>
-
-              {/* Additional Gallery (Images/Videos) */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Gallery Files (Images/Videos)</label>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 px-4 py-2.5 bg-secondary border border-border rounded-xl hover:bg-secondary/80 transition duration-200 text-sm cursor-pointer text-foreground">
-                    <ImageIcon className="w-5 h-5 text-primary" />
-                    <span>Choose Files</span>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,video/*"
-                      onChange={(e) => setGalleryFiles(e.target.files)}
-                      className="hidden"
-                    />
-                  </label>
-                  <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                    {galleryFiles ? `${galleryFiles.length} files selected` : 'No files chosen'}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {/* Batch Image Dropzone Component */}
+            <BatchImageDropzone
+              productTitle={title}
+              onFeaturedFileChange={(file) => setImageFile(file)}
+              onGalleryFilesChange={(files) => {
+                const dt = new DataTransfer();
+                files.forEach((f) => dt.items.add(f));
+                setGalleryFiles(dt.files);
+              }}
+            />
 
             {/* Search Engine Listing Preview */}
             <div className="border-t border-border pt-6 flex flex-col gap-6">
@@ -1239,35 +1353,35 @@ export default function ProductsPage() {
       <div className="flex justify-between items-center">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">Catalog</h1>
+            <h1 className="text-3xl font-bold text-foreground">Products</h1>
             <span className="text-xs font-bold text-muted-foreground bg-secondary/80 border border-border px-2.5 py-1 rounded-xl uppercase tracking-wider">
               {products.length} {products.length === 1 ? 'product' : 'products'}
             </span>
           </div>
-          <p className="text-muted-foreground text-sm">Manage store products, stock levels, and R2 images</p>
+          <p className="text-muted-foreground text-sm">Manage store catalog, pricing, inventory, and media assets</p>
         </div>
         <div className='flex justify-center items-center gap-3'>
           {selectedSlugs.length > 0 && (
             <>
               <button
                 onClick={() => handleBulkStatusChange(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-emerald-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
               >
-                <Check className="w-5 h-5" />
+                <Check className="w-4 h-4" />
                 <span>Publish ({selectedSlugs.length})</span>
               </button>
               <button
                 onClick={() => handleBulkStatusChange(false)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-zinc-600 hover:bg-zinc-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-zinc-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-zinc-600 hover:bg-zinc-700 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
                 <span>Unpublish ({selectedSlugs.length})</span>
               </button>
               <button
                 onClick={handleBulkDelete}
-                className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="w-4 h-4" />
                 <span>Delete ({selectedSlugs.length})</span>
               </button>
               <button
@@ -1278,32 +1392,32 @@ export default function ProductsPage() {
                   setBulkActionValue(10);
                   setBulkEditOpen(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
               >
-                <span>Bulk Edit ({selectedSlugs.length})</span>
+                <span>Bulk Adjust ({selectedSlugs.length})</span>
               </button>
             </>
           )}
           <button
-            onClick={handleImportExcel}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-semibold rounded-xl transition duration-200 cursor-pointer text-sm"
           >
-            <FileDown className="w-5 h-5" />
-            <span>Import Excel</span>
+            <FileDown className="w-4 h-4 text-muted-foreground" />
+            <span>Import</span>
           </button>
           <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-semibold rounded-xl transition duration-200 cursor-pointer text-sm"
           >
-            <FileUp className="w-5 h-5" />
-            <span>Export Excel</span>
+            <FileUp className="w-4 h-4 text-muted-foreground" />
+            <span>Export</span>
           </button>
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
           >
-            <Plus className="w-5 h-5" />
-            <span>Add Product</span>
+            <Plus className="w-4 h-4" />
+            <span>Add product</span>
           </button>
         </div>
       </div>
@@ -1465,33 +1579,97 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="p-5">
-                        <div className="font-semibold text-foreground">{product.title}</div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(product)}
+                          className="font-semibold text-foreground hover:text-primary transition text-left cursor-pointer hover:underline block"
+                        >
+                          {product.title}
+                        </button>
                         <div className="text-xs text-muted-foreground mt-0.5">{product.sku}</div>
                       </td>
                       <td className="p-5">
                         <div className="font-semibold text-foreground">{product.brand}</div>
                       </td>
+                      {/* Price Cell (In-Line Editable) */}
                       <td className="p-5">
-                        <div className="text-foreground font-medium">₹{parseFloat(product.price).toLocaleString('en-IN')}</div>
-                        {product.compare_at_price && (
-                          <div className="text-xs text-muted-foreground line-through mt-0.5">
-                            ₹{parseFloat(product.compare_at_price).toLocaleString('en-IN')}
+                        {editingCell?.slug === product.slug && editingCell?.field === 'price' ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground">₹</span>
+                            <input
+                              type="number"
+                              autoFocus
+                              value={editingValue}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveInlineCell(product.slug, 'price', editingValue);
+                                if (e.key === 'Escape') setEditingCell(null);
+                              }}
+                              onBlur={() => handleSaveInlineCell(product.slug, 'price', editingValue)}
+                              className="w-24 px-2 py-1 bg-background border border-primary rounded text-xs font-bold text-foreground focus:outline-none"
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => {
+                              setEditingCell({ slug: product.slug, field: 'price' });
+                              setEditingValue(product.price);
+                            }}
+                            title="Click to quick-edit price"
+                            className="cursor-pointer group flex flex-col"
+                          >
+                            <div className="text-foreground font-medium flex items-center gap-1 group-hover:text-primary transition">
+                              <span>₹{parseFloat(product.price).toLocaleString('en-IN')}</span>
+                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition text-muted-foreground" />
+                            </div>
+                            {product.compare_at_price && (
+                              <div className="text-xs text-muted-foreground line-through mt-0.5">
+                                ₹{parseFloat(product.compare_at_price).toLocaleString('en-IN')}
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>
+
+                      {/* Stock Cell (In-Line Editable) */}
                       <td className="p-5">
-                        {product.stock === 0 ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1  text-[11px] font-semibold bg-red-500/10 text-red-400 ">
-                            Out of Stock
-                          </span>
-                        ) : product.stock <= 10 ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1  text-[11px] font-semibold bg-amber-500/10 text-amber-400 ">
-                            Low Stock: {product.stock} units
-                          </span>
+                        {editingCell?.slug === product.slug && editingCell?.field === 'stock' ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveInlineCell(product.slug, 'stock', editingValue);
+                              if (e.key === 'Escape') setEditingCell(null);
+                            }}
+                            onBlur={() => handleSaveInlineCell(product.slug, 'stock', editingValue)}
+                            className="w-20 px-2 py-1 bg-background border border-primary rounded text-xs font-bold text-foreground focus:outline-none"
+                          />
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1  text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 ">
-                            {product.stock} in stock
-                          </span>
+                          <div
+                            onClick={() => {
+                              setEditingCell({ slug: product.slug, field: 'stock' });
+                              setEditingValue(String(product.stock));
+                            }}
+                            title="Click to quick-edit stock level"
+                            className="cursor-pointer group inline-flex items-center gap-1"
+                          >
+                            {product.stock === 0 ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-red-500/10 text-red-400 rounded-lg group-hover:border group-hover:border-red-500/30">
+                                Out of Stock
+                              </span>
+                            ) : product.stock <= 10 ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-amber-500/10 text-amber-400 rounded-lg group-hover:border group-hover:border-amber-500/30">
+                                Low Stock: {product.stock} units
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 rounded-lg group-hover:border group-hover:border-emerald-500/30">
+                                {product.stock} in stock
+                              </span>
+                            )}
+                            <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition text-muted-foreground ml-0.5" />
+                          </div>
                         )}
                       </td>
                       <td className="p-5">
@@ -1520,13 +1698,6 @@ export default function ProductsPage() {
                             className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card transition cursor-pointer"
                           >
                             <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(product)}
-                            title="Edit Product"
-                            className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card transition cursor-pointer"
-                          >
-                            <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(product.slug)}
@@ -1638,6 +1809,23 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Shopify Native Import & Export Modals */}
+      <ShopifyImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          fetchProducts();
+          fetchBrands();
+        }}
+      />
+
+      <ShopifyExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        products={products}
+        selectedSlugs={selectedSlugs}
+      />
     </div>
   );
 }

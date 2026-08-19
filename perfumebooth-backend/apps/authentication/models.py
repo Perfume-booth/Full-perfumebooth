@@ -185,3 +185,31 @@ class SocialAccount(models.Model):
         return f'{self.user} — {self.provider} ({self.uid})'
 
 
+class CustomerAddress(models.Model):
+    """
+    Saved shipping/billing addresses for customers.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='addresses')
+    first_name = models.CharField(max_length=150, blank=True)
+    last_name = models.CharField(max_length=150, blank=True)
+    address1 = models.CharField(max_length=255)
+    address2 = models.CharField(max_length=255, blank=True, default='')
+    city = models.CharField(max_length=100)
+    province = models.CharField(max_length=100, blank=True, default='')
+    country = models.CharField(max_length=100, default='India')
+    zip = models.CharField(max_length=20)
+    phone = models.CharField(max_length=20, blank=True, default='')
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'auth_customer_address'
+        ordering = ['-is_default', '-created_at']
+        verbose_name = 'Customer Address'
+        verbose_name_plural = 'Customer Addresses'
+
+    def __str__(self) -> str:
+        return f'{self.user.email} — {self.address1}, {self.city}'
+

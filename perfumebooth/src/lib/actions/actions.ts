@@ -4,6 +4,14 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 
+import { 
+  updateCustomer, 
+  createCustomerAddress, 
+  updateCustomerAddress, 
+  deleteCustomerAddress, 
+  updateDefaultAddress 
+} from "../backend/customer";
+
 /* ── Account Actions ── */
 
 // Update Personal Info
@@ -19,10 +27,11 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     const firstName = formData.get("firstName") as string;
     const lastName = formData.get("lastName") as string;
     const phone = formData.get("phone") as string;
-    const gender = formData.get("gender") as string;
 
-    // TODO: Replace with your own backend API call
-    console.log("updateProfileAction: Shopify removed. Data:", { firstName, lastName, phone, gender });
+    const res = await updateCustomer(tokenCookie.value, { firstName, lastName, phone });
+    if (res.customerUserErrors && res.customerUserErrors.length > 0) {
+      return { message: res.customerUserErrors[0].message, success: false };
+    }
 
     revalidatePath("/account");
     return { message: "Profile updated successfully", success: true };
@@ -54,8 +63,10 @@ export async function addAddressAction(prevState: any, formData: FormData) {
       phone: formData.get("phone") as string,
     };
 
-    // TODO: Replace with your own backend API call
-    console.log("addAddressAction: Shopify removed. Address:", address);
+    const res = await createCustomerAddress(tokenCookie.value, address);
+    if (res.customerUserErrors && res.customerUserErrors.length > 0) {
+      return { message: res.customerUserErrors[0].message, success: false };
+    }
 
     revalidatePath("/account");
     return { message: "Address added successfully", success: true };
@@ -90,8 +101,10 @@ export async function updateAddressAction(prevState: any, formData: FormData) {
       phone: formData.get("phone") as string,
     };
 
-    // TODO: Replace with your own backend API call
-    console.log("updateAddressAction: Shopify removed. ID:", id, "Address:", address);
+    const res = await updateCustomerAddress(tokenCookie.value, id, address);
+    if (res.customerUserErrors && res.customerUserErrors.length > 0) {
+      return { message: res.customerUserErrors[0].message, success: false };
+    }
 
     revalidatePath("/account");
     return { message: "Address updated successfully", success: true };
@@ -111,8 +124,10 @@ export async function deleteAddressAction(id: string) {
       return { message: "You are not logged in", success: false };
     }
 
-    // TODO: Replace with your own backend API call
-    console.log("deleteAddressAction: Shopify removed. ID:", id);
+    const res = await deleteCustomerAddress(tokenCookie.value, id);
+    if (res.customerUserErrors && res.customerUserErrors.length > 0) {
+      return { message: res.customerUserErrors[0].message, success: false };
+    }
 
     revalidatePath("/account");
     return { message: "Address deleted successfully", success: true };
@@ -132,8 +147,10 @@ export async function setDefaultAddressAction(id: string) {
       return { message: "You are not logged in", success: false };
     }
 
-    // TODO: Replace with your own backend API call
-    console.log("setDefaultAddressAction: Shopify removed. ID:", id);
+    const res = await updateDefaultAddress(tokenCookie.value, id);
+    if (res.customerUserErrors && res.customerUserErrors.length > 0) {
+      return { message: res.customerUserErrors[0].message, success: false };
+    }
 
     revalidatePath("/account");
     return { message: "Default address updated", success: true };

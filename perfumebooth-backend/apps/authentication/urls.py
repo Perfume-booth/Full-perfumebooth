@@ -18,7 +18,10 @@ from .customer_views import (
     CustomerSendOTPView,
     CustomerVerifyOTPView,
     CustomerSocialAuthView,
-    CustomerMeView
+    CustomerMeView,
+    CustomerAddressListView,
+    CustomerAddressDetailView,
+    CustomerAddressSetDefaultView
 )
 from .customer_management_views import (
     MerchantCustomerListView,
@@ -39,13 +42,16 @@ urlpatterns = [
     path('change-password-self/', ChangePasswordSelfView.as_view(), name='change-password-self'),
     path('reset-staff-password/', ResetStaffPasswordView.as_view(), name='reset-staff-password'),
 
-    # Customer auth endpoints
+    # Customer auth & address endpoints
     path('customer/register/', CustomerRegisterView.as_view(), name='customer-register'),
     path('customer/login/', CustomerLoginView.as_view(), name='customer-login'),
     path('customer/otp/send/', CustomerSendOTPView.as_view(), name='customer-otp-send'),
     path('customer/otp/verify/', CustomerVerifyOTPView.as_view(), name='customer-otp-verify'),
     path('customer/social/', CustomerSocialAuthView.as_view(), name='customer-social-auth'),
     path('customer/me/', CustomerMeView.as_view(), name='customer-me'),
+    path('customer/addresses/', CustomerAddressListView.as_view(), name='customer-address-list'),
+    path('customer/addresses/<uuid:pk>/', CustomerAddressDetailView.as_view(), name='customer-address-detail'),
+    path('customer/addresses/<uuid:pk>/set-default/', CustomerAddressSetDefaultView.as_view(), name='customer-address-set-default'),
 
     # Merchant Customer Management endpoints
     path('merchant/customers/', MerchantCustomerListView.as_view(), name='merchant-customer-list'),

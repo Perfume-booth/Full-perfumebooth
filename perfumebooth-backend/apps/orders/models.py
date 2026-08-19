@@ -97,3 +97,30 @@ class OrderItem(models.Model):
     def __str__(self) -> str:
         product_name = self.product.title if self.product else 'Deleted Product'
         return f'{product_name} × {self.quantity}'
+
+
+class AbandonedCart(models.Model):
+    """Tracks abandoned carts for recovery workflows."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='abandoned_carts'
+    )
+    email = models.EmailField(db_index=True)
+    cart_data = models.JSONField(default=dict)
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    recovered = models.BooleanField(default=False)
+    reminder_sent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'orders_abandoned_cart'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"AbandonedCart ({self.email}) - {'Recovered' if self.recovered else 'Pending'}"
+

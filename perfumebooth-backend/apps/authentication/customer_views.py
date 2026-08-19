@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import requests
 import jwt
 
-from .models import CustomUser, OTPVerification, SocialAccount
+from .models import CustomUser, OTPVerification, SocialAccount, CustomerAddress
 from core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
 
 logger = logging.getLogger(__name__)
@@ -327,16 +327,175 @@ class CustomerSocialAuthView(APIView):
 class CustomerMeView(APIView):
     """
     GET /api/auth/customer/me/
-    Retrieve authenticated customer's profile info.
+    Retrieve authenticated customer's profile info & addresses.
+    PUT /api/auth/customer/me/
+    Update authenticated customer's profile info.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = request.user
+        addresses = list(user.addresses.values(
+            'id', 'first_name', 'last_name', 'address1', 'address2',
+            'city', 'province', 'country', 'zip', 'phone', 'is_default'
+        ))
+        for addr in addresses:
+            addr['id'] = str(addr['id'])
+
         return Response({
             'id': str(user.id),
             'email': user.email,
             'phone': user.phone,
             'first_name': user.first_name,
             'last_name': user.last_name,
+            'addresses': addresses,
         })
+
+    def put(self, request):
+        user = request.user
+        first_name = request.data.get('first_name', request.data.get('firstName'))
+        last_name = request.data.get('last_name', request.data.get('lastName'))
+        phone = request.data.get('phone')
+
+        if first_name is not None:
+            user.first_name = first_name
+        if last_name is not None:
+            user.last_name = last_name
+        if phone is not None:
+            user.phone = phone
+        user.save()
+
+        return Response({
+            'detail': 'Profile updated successfully.',
+            'user': {
+                'id': str(user.id),
+                'email': user.email,
+                'phone': user.phone,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+            }
+        })
+
+
+class CustomerAddressListView(APIView):
+    """
+    GET /api/auth/customer/addresses/
+    POST /api/auth/customer/addresses/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        addresses = list(request.user.addresses.values(
+            'id', 'first_name', 'last_name', 'address1', 'address2',
+            'city', 'province', 'country', 'zip', 'phone', 'is_default'
+        ))
+        for addr in addresses:
+            addr['id'] = str(addr['id'])
+        return Response(addresses)
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+
+        # If this is the first address, make it default
+        is_first = not user.addresses.exists()
+        is_default = data.get('is_default', is_first)
+
+        if is_default:
+            user.addresses.update(is_default=False)
+
+        addr = CustomerAddress.objects.create(
+            user=user,
+            first_name=data.get('first_name', data.get('firstName', '')),
+            last_name=data.get('last_name', data.get('lastName', '')),
+            address1=data.get('address1', ''),
+            address2=data.get('address2', ''),
+            city=data.get('city', ''),
+            province=data.get('province', data.get('state', '')),
+            country=data.get('country', 'India'),
+            zip=data.get('zip', data.get('pincode', '')),
+            phone=data.get('phone', ''),
+            is_default=is_default
+        )
+
+        return Response({
+            'id': str(addr.id),
+            'first_name': addr.first_name,
+            'last_name': addr.last_name,
+            'address1': addr.address1,
+            'address2': addr.address2,
+            'city': addr.city,
+            'province': addr.province,
+            'country': addr.country,
+            'zip': addr.zip,
+            'phone': addr.phone,
+            'is_default': addr.is_default,
+        }, status=status.HTTP_201_CREATED)
+
+
+class CustomerAddressDetailView(APIView):
+    """
+    PUT /api/auth/customer/addresses/<uuid:pk>/
+    DELETE /api/auth/customer/addresses/<uuid:pk>/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def put(self, request, pk):
+        try:
+            addr = CustomerAddress.objects.get(id=pk, user=request.user)
+        except CustomerAddress.DoesNotExist:
+            return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        addr.first_name = data.get('first_name', data.get('firstName', addr.first_name))
+        addr.last_name = data.get('last_name', data.get('lastName', addr.last_name))
+        addr.address1 = data.get('address1', addr.address1)
+        addr.address2 = data.get('address2', addr.address2)
+        addr.city = data.get('city', addr.city)
+        addr.province = data.get('province', data.get('state', addr.province))
+        addr.country = data.get('country', addr.country)
+        addr.zip = data.get('zip', data.get('pincode', addr.zip))
+        addr.phone = data.get('phone', addr.phone)
+        addr.save()
+
+        return Response({
+            'id': str(addr.id),
+            'first_name': addr.first_name,
+            'last_name': addr.last_name,
+            'address1': addr.address1,
+            'address2': addr.address2,
+            'city': addr.city,
+            'province': addr.province,
+            'country': addr.country,
+            'zip': addr.zip,
+            'phone': addr.phone,
+            'is_default': addr.is_default,
+        })
+
+    def delete(self, request, pk):
+        try:
+            addr = CustomerAddress.objects.get(id=pk, user=request.user)
+        except CustomerAddress.DoesNotExist:
+            return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        addr.delete()
+        return Response({'detail': 'Address deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class CustomerAddressSetDefaultView(APIView):
+    """
+    POST /api/auth/customer/addresses/<uuid:pk>/set-default/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            addr = CustomerAddress.objects.get(id=pk, user=request.user)
+        except CustomerAddress.DoesNotExist:
+            return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        request.user.addresses.update(is_default=False)
+        addr.is_default = True
+        addr.save()
+
+        return Response({'detail': 'Default address updated successfully.'})

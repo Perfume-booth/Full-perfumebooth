@@ -1,5 +1,8 @@
 from django.urls import path
-from .views import OrderListView, OrderDetailView, RazorpayWebhookView, ShippingRatesAPIView, ShiprocketWebhookView
+from .views import (
+    OrderListView, OrderDetailView, RazorpayWebhookView, ShippingRatesAPIView, 
+    ShiprocketWebhookView, AbandonedCartAPIView, AbandonedCartRecoverView
+)
 
 urlpatterns = [
     path('', OrderListView.as_view(), name='order-list'),
@@ -7,4 +10,7 @@ urlpatterns = [
     path('shipping-rates/', ShippingRatesAPIView.as_view(), name='shipping-rates'),
     path('shiprocket/webhook/', ShiprocketWebhookView.as_view(), name='shiprocket-webhook'),
     path('webhooks/razorpay/', RazorpayWebhookView.as_view(), name='razorpay-webhook'),
+    path('abandoned-cart/', AbandonedCartAPIView.as_view(), name='abandoned-cart'),
+    path('abandoned-cart/recover/<str:token>/', AbandonedCartRecoverView.as_view(), name='abandoned-cart-recover'),
 ]
+

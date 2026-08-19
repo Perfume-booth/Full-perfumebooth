@@ -67,6 +67,39 @@ class Product(models.Model):
         return self.title
 
 
+class ProductVariant(models.Model):
+    """
+    Specific SKU / Option variant (e.g. 50ml, 100ml, 200ml) for a parent Product.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='variants', db_index=True
+    )
+    title = models.CharField(max_length=255, default='Default Title')
+    option1_name = models.CharField(max_length=100, default='Size')
+    option1_value = models.CharField(max_length=100, default='100ml')
+    option2_name = models.CharField(max_length=100, blank=True, default='')
+    option2_value = models.CharField(max_length=100, blank=True, default='')
+    sku = models.CharField(max_length=200, db_index=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    compare_at_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    stock_level = models.PositiveIntegerField(default=0)
+    image = models.FileField(upload_to='variants/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'shop_product_variant'
+        ordering = ['created_at']
+        verbose_name = 'Product Variant'
+        verbose_name_plural = 'Product Variants'
+
+    def __str__(self) -> str:
+        return f"{self.product.title} — {self.option1_value} ({self.sku})"
+
+
 class Inventory(models.Model):
     """
     Stock levels for a product.

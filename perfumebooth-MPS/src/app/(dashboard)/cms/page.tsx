@@ -253,7 +253,7 @@ export default function CMSBuilderPage() {
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
           >
             {saveLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 " />
             ) : (
               <Save className="w-4 h-4" />
             )}
@@ -264,7 +264,7 @@ export default function CMSBuilderPage() {
 
       {pageLoading ? (
         <div className="flex-1 flex items-center justify-center text-primary">
-          <Loader2 className="w-8 h-8 animate-spin" />
+          <Loader2 className="w-8 h-8 " />
         </div>
       ) : (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0">
@@ -395,7 +395,7 @@ export default function CMSBuilderPage() {
           {/* Right panel: Live Editor (Customize fields) */}
           <div className="glass-card p-6 rounded-2xl lg:col-span-2 flex flex-col gap-6 overflow-y-auto">
             <h3 className="font-bold text-foreground border-b border-border/50 pb-3 flex items-center gap-2">
-              <Settings className="w-5 h-5 text-primary animate-spin" style={{ animationDuration: '6s' }} /> Section Customizer
+              <Settings className="w-5 h-5 text-primary" style={{ animationDuration: '6s' }} /> Section Customizer
             </h3>
 
             {selectedSectionIdx === null ? (

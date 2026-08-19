@@ -122,7 +122,7 @@ export default function CheckoutClient({ customer }: Props) {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderedItems, setOrderedItems] = useState<any[]>([]);
   const [successTotal, setSuccessTotal] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
+  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("cod");
   const [billingSame, setBillingSame] = useState(true);
   const [activeStep, setActiveStep] = useState<'address' | 'summary' | 'payment'>('address');
 

@@ -4,6 +4,7 @@ Orders Views — Checkout & Webhook Endpoints
 import json
 import datetime
 import random
+import uuid
 from django.db import transaction
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 
 from .services import verify_razorpay_signature, process_payment_webhook
 from .tasks import send_order_email_receipt
-from .models import Order, OrderItem
+from .models import Order, OrderItem, AbandonedCart
 from apps.shop.models import Product, Inventory
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
@@ -383,5 +384,60 @@ class ShiprocketWebhookView(APIView):
             order.save()
 
         return Response({'detail': 'Webhook processed.'}, status=status.HTTP_200_OK)
+
+
+class AbandonedCartAPIView(APIView):
+    """
+    POST /api/orders/abandoned-cart/
+    Captures checkout cart state for automated recovery.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        cart_data = request.data.get('cart_data')
+
+        if not email or not cart_data:
+            return Response({'detail': 'Email and cart_data are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        token = uuid.uuid4().hex
+        user_inst = request.user if request.user.is_authenticated else None
+
+        cart, _ = AbandonedCart.objects.update_or_create(
+            email=email,
+            recovered=False,
+            defaults={
+                'user': user_inst,
+                'cart_data': cart_data,
+                'token': token,
+            }
+        )
+
+        return Response({
+            'detail': 'Cart saved for recovery.',
+            'token': cart.token,
+            'id': str(cart.id)
+        }, status=status.HTTP_200_OK)
+
+
+class AbandonedCartRecoverView(APIView):
+    """
+    GET /api/orders/abandoned-cart/recover/<token>/
+    Restores abandoned cart by token and marks it recovered.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, token):
+        try:
+            cart = AbandonedCart.objects.get(token=token, recovered=False)
+            cart.recovered = True
+            cart.save()
+            return Response({
+                'detail': 'Cart recovered successfully.',
+                'cart_data': cart.cart_data
+            })
+        except AbandonedCart.DoesNotExist:
+            return Response({'detail': 'Invalid or expired cart recovery token.'}, status=status.HTTP_404_NOT_FOUND)
+
 
 
