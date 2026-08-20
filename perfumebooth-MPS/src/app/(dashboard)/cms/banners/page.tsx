@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { 
   Loader2, 
@@ -8,9 +9,8 @@ import {
   PlusCircle,
   Save,
   ImageIcon,
-  Image as ImageIconSolid,
-  ChevronDown,
-  ChevronUp
+  Layout,
+  Edit
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -33,9 +33,9 @@ interface PageBanner {
 }
 
 export default function BannersPage() {
+  const router = useRouter();
   const [banners, setBanners] = useState<PageBanner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedBannerId, setExpandedBannerId] = useState<string | null>(null);
 
   // New Banner Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,6 +43,9 @@ export default function BannersPage() {
   const [title, setTitle] = useState('');
   const [isActive, setIsActive] = useState(true);
   interface SlideInput {
+    id?: string;
+    existingImageUrl?: string | null;
+    existingMobileUrl?: string | null;
     imageFile: File | null;
     mobileImageFile: File | null;
     linkUrl: string;
@@ -94,7 +97,7 @@ export default function BannersPage() {
       setSaving(true);
       
       for (const slide of slides) {
-        if (!slide.imageFile && !slide.mobileImageFile && !slide.linkUrl && slides.length > 1) {
+        if (!slide.imageFile && !slide.mobileImageFile && !slide.linkUrl && !slide.existingImageUrl && slides.length > 1) {
             continue; // Skip empty slides
         }
 
@@ -103,6 +106,7 @@ export default function BannersPage() {
         formData.append('title', title);
         formData.append('is_active', isActive ? 'true' : 'false');
         
+        if (slide.id) formData.append('slide_id', slide.id);
         if (slide.imageFile) formData.append('image', slide.imageFile);
         if (slide.mobileImageFile) formData.append('mobile_image', slide.mobileImageFile);
         if (slide.linkUrl) formData.append('link_url', slide.linkUrl);
@@ -133,12 +137,49 @@ export default function BannersPage() {
     setIsModalOpen(true);
   };
 
+  const openEditModal = (banner: PageBanner) => {
+    setPageSlug(banner.page_slug);
+    setTitle(banner.title || '');
+    setIsActive(banner.is_active);
+    if (banner.images && banner.images.length > 0) {
+      setSlides(banner.images.map(img => ({
+        id: img.id,
+        existingImageUrl: img.image_url,
+        existingMobileUrl: img.mobile_image_url,
+        imageFile: null,
+        mobileImageFile: null,
+        linkUrl: img.link_url || ''
+      })));
+    } else {
+      setSlides([{ imageFile: null, mobileImageFile: null, linkUrl: '' }]);
+    }
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="p-6">
+      {/* Top Navigation Sub-Tabs */}
+      <div className="flex border-b border-white/10 mb-6 gap-2">
+        <button
+          onClick={() => router.push('/cms/banners')}
+          className="px-5 py-2.5 font-semibold text-sm border-b-2 border-[var(--color-gold)] text-[var(--color-gold)] flex items-center gap-2 bg-white/5 rounded-t-lg"
+        >
+          <ImageIcon size={16} />
+          <span>Header Banners & Slideshows</span>
+        </button>
+        <button
+          onClick={() => router.push('/cms')}
+          className="px-5 py-2.5 font-semibold text-sm text-gray-400 hover:text-white flex items-center gap-2 rounded-t-lg transition-colors"
+        >
+          <Layout size={16} />
+          <span>Page Content & Layout Builder</span>
+        </button>
+      </div>
+
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Page Banners</h1>
-          <p className="text-gray-400 text-sm">Manage header banners and slideshows for specific page slugs</p>
+          <h1 className="text-2xl font-bold text-white">Header Banners & Slideshows</h1>
+          <p className="text-gray-400 text-sm">Upload and manage hero slideshow graphics for homepage and product categories</p>
         </div>
         <button 
           onClick={() => {
@@ -147,7 +188,7 @@ export default function BannersPage() {
             setIsActive(true);
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded font-semibold hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded font-semibold hover:opacity-90 transition-opacity cursor-pointer text-sm"
         >
           <PlusCircle size={18} />
           Create Banner
@@ -163,7 +204,6 @@ export default function BannersPage() {
           <table className="w-full text-left text-sm text-gray-300">
             <thead className="bg-white/5 text-gray-400">
               <tr>
-                <th className="px-6 py-4 font-medium w-10"></th>
                 <th className="px-6 py-4 font-medium">Primary Image</th>
                 <th className="px-6 py-4 font-medium">Page Slug</th>
                 <th className="px-6 py-4 font-medium">Title</th>
@@ -174,109 +214,59 @@ export default function BannersPage() {
             <tbody className="divide-y divide-white/10">
               {banners.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                     No banners found. Create one to get started.
                   </td>
                 </tr>
               ) : (
                 banners.map((banner) => (
-                  <React.Fragment key={banner.id}>
-                    <tr className="hover:bg-white/5">
-                      <td className="px-6 py-4">
-                        <button 
-                          onClick={() => setExpandedBannerId(expandedBannerId === banner.id ? null : banner.id)}
-                          className="text-gray-400 hover:text-white"
-                        >
-                          {expandedBannerId === banner.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        {banner.primary_image ? (
-                          <div className="relative w-24 h-12 bg-white/10 rounded overflow-hidden">
-                            <Image 
-                              src={banner.primary_image} 
-                              alt={banner.title || 'Banner'} 
-                              fill 
-                              sizes="96px"
-                              className="object-cover" 
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-24 h-12 bg-white/10 rounded flex items-center justify-center text-gray-500">
-                            <ImageIcon size={20} />
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 font-mono text-[var(--color-gold)]">/{banner.page_slug}</td>
-                      <td className="px-6 py-4">
-                        {banner.title || '-'}
-                        <div className="text-xs text-gray-500 mt-1">{banner.image_count} image(s)</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${banner.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {banner.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => openAddImageModal(banner)}
-                          className="text-primary hover:text-primary/80 p-2 mr-2"
-                          title="Add Image to Banner"
-                        >
-                          <ImageIconSolid size={18} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(banner.id)}
-                          className="text-red-400 hover:text-red-300 p-2"
-                          title="Delete Banner"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                    {expandedBannerId === banner.id && (
-                      <tr className="bg-white/5 border-t-0">
-                        <td colSpan={6} className="px-12 py-6">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {banner.images?.map((img, index) => (
-                              <div key={img.id} className="relative group rounded-lg overflow-hidden border border-white/10 bg-[#1a1a1a]">
-                                <div className="aspect-[21/9] relative">
-                                  <Image 
-                                    src={img.image_url} 
-                                    alt={`Banner ${index + 1}`} 
-                                    fill 
-                                    sizes="(max-width: 768px) 50vw, 25vw"
-                                    className="object-cover"
-                                  />
-                                </div>
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <button 
-                                    onClick={() => handleDeleteImage(banner.id, img.id)}
-                                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
-                                    title="Delete Image"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                                {img.link_url && (
-                                  <div className="p-2 text-xs text-gray-400 truncate">
-                                    Link: {img.link_url}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            <div 
-                              onClick={() => openAddImageModal(banner)}
-                              className="aspect-[21/9] rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-gray-500 hover:text-primary hover:border-primary hover:bg-primary/5 transition-all cursor-pointer"
-                            >
-                              <PlusCircle size={24} className="mb-2" />
-                              <span className="text-sm">Add Image</span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+                  <tr key={banner.id} className="hover:bg-white/5">
+                    <td className="px-6 py-4">
+                      {banner.primary_image ? (
+                        <div className="relative w-24 h-12 bg-white/10 rounded overflow-hidden">
+                          <Image 
+                            src={banner.primary_image} 
+                            alt={banner.title || 'Banner'} 
+                            fill 
+                            sizes="96px"
+                            className="object-cover" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-24 h-12 bg-white/10 rounded flex items-center justify-center text-gray-500">
+                          <ImageIcon size={20} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 font-mono text-[var(--color-gold)]">/{banner.page_slug}</td>
+                    <td className="px-6 py-4">
+                      {banner.title || '-'}
+                      <div className="text-xs text-gray-500 mt-1">{banner.image_count} image(s)</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${banner.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {banner.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => openEditModal(banner)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer mr-2"
+                        title="Edit Banner Settings"
+                      >
+                        <Edit size={14} />
+                        <span>Edit</span>
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(banner.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
+                        title="Delete Banner"
+                      >
+                        <Trash2 size={14} />
+                        <span>Delete</span>
+                      </button>
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>
@@ -288,7 +278,9 @@ export default function BannersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#1a1a1a] border border-white/10 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-              <h2 className="text-xl font-bold text-white">Create Page Banner & Add Image</h2>
+              <h2 className="text-xl font-bold text-white">
+                {pageSlug ? `Edit Banner (/${pageSlug})` : 'Create Page Banner'}
+              </h2>
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
@@ -345,7 +337,20 @@ export default function BannersPage() {
                     <h4 className="text-sm font-medium text-gray-300">Slide {index + 1}</h4>
                     
                     <div>
-                      <label className="block text-sm text-gray-400 mb-1">Desktop Media (Image/Video) (Optional)</label>
+                      <label className="block text-sm text-gray-400 mb-1">
+                        {slide.existingImageUrl ? 'Desktop Media (Select to replace)' : 'Desktop Media (Image/Video)'}
+                      </label>
+                      {slide.existingImageUrl && (
+                        <div className="mb-2 p-2 bg-black/40 rounded border border-white/10 flex items-center gap-3">
+                          <div className="relative w-24 h-12 rounded overflow-hidden shrink-0 border border-white/10">
+                            <Image src={slide.existingImageUrl} alt="Current Desktop" fill className="object-cover" />
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-semibold text-[var(--color-gold)] block">Active Desktop Image</span>
+                            <span className="text-[10px] text-gray-400 truncate block max-w-[220px]">{slide.existingImageUrl}</span>
+                          </div>
+                        </div>
+                      )}
                       <input
                         type="file"
                         accept="image/*,video/mp4,video/webm"
@@ -354,12 +359,25 @@ export default function BannersPage() {
                           newSlides[index].imageFile = e.target.files?.[0] || null;
                           setSlides(newSlides);
                         }}
-                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white outline-none"
+                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white text-xs outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm text-gray-400 mb-1">Mobile Media (Image/Video) (Optional)</label>
+                      <label className="block text-sm text-gray-400 mb-1">
+                        {slide.existingMobileUrl ? 'Mobile Media (Select to replace)' : 'Mobile Media (Image/Video)'}
+                      </label>
+                      {slide.existingMobileUrl && (
+                        <div className="mb-2 p-2 bg-black/40 rounded border border-white/10 flex items-center gap-3">
+                          <div className="relative w-16 h-12 rounded overflow-hidden shrink-0 border border-white/10">
+                            <Image src={slide.existingMobileUrl} alt="Current Mobile" fill className="object-cover" />
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-semibold text-primary block">Active Mobile Image</span>
+                            <span className="text-[10px] text-gray-400 truncate block max-w-[220px]">{slide.existingMobileUrl}</span>
+                          </div>
+                        </div>
+                      )}
                       <input
                         type="file"
                         accept="image/*,video/mp4,video/webm"
@@ -368,7 +386,7 @@ export default function BannersPage() {
                           newSlides[index].mobileImageFile = e.target.files?.[0] || null;
                           setSlides(newSlides);
                         }}
-                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white outline-none"
+                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white text-xs outline-none"
                       />
                     </div>
 

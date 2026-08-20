@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.r2.dev',
+      },
+      {
+        protocol: 'https',
         hostname: 'randomuser.me',
       },
       {

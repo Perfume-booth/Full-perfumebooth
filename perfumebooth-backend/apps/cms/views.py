@@ -7,9 +7,11 @@ from rest_framework.views import APIView
 from django.core.cache import cache
 import json
 
-from .models import CMSPage, CMSSection
+from .models import CMSPage, CMSSection, BlogPost
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
+from django.shortcuts import get_object_or_404
+from django.utils.text import slugify
 
 
 class CMSPageView(APIView):
@@ -150,6 +152,61 @@ class CMSPageListView(APIView):
             for role in request.user.roles.values_list('role__name', flat=True)
         )
         
+        # Auto-seed standard info/policy pages with exact user requested routes
+        DEFAULT_PAGES = [
+            ('home', 'Homepage', [
+                ('HeroBanner', {'title': 'Architectural Fragrances', 'subtitle': 'Explore luxury perfumes from world-class houses.', 'buttonText': 'Shop All', 'buttonLink': '/products'}),
+                ('ProductGrid', {'title': 'Trending Scents', 'limit': 4, 'categoryTag': 'Citrus'})
+            ]),
+            ('men', 'Men\'s Fragrances', [
+                ('HeroBanner', {'title': 'Bold & Masculine Fragrances', 'subtitle': 'Discover woody, spicy, and oriental perfumes designed for impact.', 'buttonText': 'Explore Collection', 'buttonLink': '/products'})
+            ]),
+            ('women', 'Women\'s Fragrances', [
+                ('HeroBanner', {'title': 'Elegant & Floral Fragrances', 'subtitle': 'Immerse yourself in opulent floral and sweet gourmet accords.', 'buttonText': 'Explore Collection', 'buttonLink': '/products'})
+            ]),
+            ('blog', 'Blog', [
+                ('HeroBanner', {'title': 'The PerfumeBooth Journal', 'subtitle': 'Insiders guide to notes, longevity, and niche perfumery.'}),
+                ('RichText', {'title': 'Guide to Fragrance Concentration: EDP vs Extrait', 'body': 'Understanding fragrance concentration is key to choosing your signature scent.\n\nExtrait de Parfum features a 20-40% oil concentration providing 12+ hours of sillage, making it the most opulent choice for fragrance lovers.'})
+            ]),
+            ('info/about-us', 'About Us', [
+                ('HeroBanner', {'title': 'Our Scent Heritage', 'subtitle': 'Crafting unforgettable olfactory experiences since 2018.'}),
+                ('RichText', {'title': 'The PerfumeBooth Story', 'body': 'PerfumeBooth was founded on a singular vision: to bring authentic, high-concentration luxury fragrances directly to connoisseurs.\n\nWe collaborate exclusively with master perfumers across Dubai, Paris, and Grasse to curate fragrances that make an unforgettable impression.'})
+            ]),
+            ('info/contact-us', 'Contact Us', [
+                ('HeroBanner', {'title': "We're Here For You", 'subtitle': 'Elevate your senses. Our bespoke service team awaits.'}),
+                ('ContactCard', {'email': 'admin@perfumebooth.com', 'phone': '+91 9266030909 / 011-46604937', 'hours': 'Mon to Sat, 10am to 6pm', 'address': '70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015'}),
+                ('RichText', {'title': 'Send Us A Message', 'body': 'Fill out your inquiries and one of our dedicated fragrance specialists will be in touch shortly.'})
+            ]),
+            ('info/disclaimers', 'Disclaimers', [
+                ('RichText', {'title': 'Product & Legal Disclaimers', 'body': '1. Authenticity: All products sold on PerfumeBooth are 100% genuine and sourced directly from verified brand manufacturers.\n\n2. Product Imagery: Bottle designs and packaging colors may slightly vary due to manufacturer batch updates.\n\n3. Sensitivity Test: We recommend performing a patch test prior to applying perfume directly to skin.'})
+            ]),
+            ('info/policies/privacy', 'Privacy Policy', [
+                ('RichText', {'title': 'Privacy Policy & Data Protection', 'body': 'Your privacy is paramount at PerfumeBooth.\n\n1. Information Collection: We collect essential shipping and contact details solely to fulfill your orders and provide real-time tracking updates.\n\n2. Security: All transaction credentials are processed using SSL 256-bit encryption compliant with PCI-DSS standards. We never store raw credit card numbers.\n\n3. Third Parties: We do not sell or rent customer data to any third-party advertisers.'})
+            ]),
+            ('info/policies/shipping', 'Shipping Policy', [
+                ('RichText', {'title': 'Express Shipping & Delivery', 'body': 'We dispatch all orders within 24 business hours using premium air express logistics partners.\n\n- Standard Delivery: 3-5 business days across India.\n- Dispatch Notification: You will receive SMS and email tracking links upon dispatch.\n- Tamper-Evident Packaging: All perfumes are shipped in shock-resistant protective casing.'})
+            ]),
+            ('info/policies/refund', 'Refund and Return Policy', [
+                ('RichText', {'title': 'Return & Replacement Guarantee', 'body': 'We offer a 7-day hassle-free replacement guarantee for damaged or defective shipments.\n\nDue to hygiene standards for personal fragrance products, opened bottles cannot be returned unless verified damaged during transit.'})
+            ]),
+            ('info/policies/terms', 'Terms and Conditions', [
+                ('RichText', {'title': 'Terms of Service', 'body': 'Welcome to PerfumeBooth. By accessing or purchasing from our platform, you agree to these terms.\n\nAll brand names, bottle designs, and fragrance formulas displayed are the intellectual property of their respective manufacturer houses.\n\nOrders are subject to availability and verification.'})
+            ]),
+            ('info/faq', 'FAQ', [
+                ('FaqList', {'title': 'Frequently Asked Questions', 'faqs': [
+                    {'q': 'Are all perfumes 100% authentic?', 'a': 'Yes, all products are directly imported from authorized brand distributors and guaranteed 100% genuine.'},
+                    {'q': 'How can I track my order?', 'a': 'Once your order is shipped, you will receive an SMS and email with live tracking details.'},
+                    {'q': 'What payment methods do you accept?', 'a': 'We accept UPI, Credit/Debit cards, Net Banking, Wallet payments, and Cash on Delivery (COD).'}
+                ]})
+            ])
+        ]
+        for item in DEFAULT_PAGES:
+            slug, title = item[0], item[1]
+            page, created = CMSPage.objects.get_or_create(slug=slug, defaults={'title': title, 'meta_title': title, 'is_published': True})
+            if created and len(item) > 2:
+                for idx, (sec_type, payload) in enumerate(item[2]):
+                    CMSSection.objects.create(page=page, type=sec_type, sort_order=idx, content_payload=payload, is_visible=True)
+
         pages_query = CMSPage.objects.all()
         if not is_merchant:
             pages_query = pages_query.filter(is_published=True)
@@ -182,4 +239,110 @@ class CMSPageListView(APIView):
             'slug': page.slug,
             'detail': 'CMS Page created successfully.'
         }, status=status.HTTP_201_CREATED)
+
+
+class BlogPostListView(APIView):
+    """
+    GET  /api/cms/blogs/       -> List blog articles
+    POST /api/cms/blogs/       -> Create blog article
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        is_merchant = request.query_params.get('merchant', 'false').lower() == 'true'
+        queryset = BlogPost.objects.all()
+        if not is_merchant:
+            queryset = queryset.filter(is_published=True)
+            
+        posts = list(queryset.values(
+            'id', 'title', 'slug', 'author', 'cover_image',
+            'excerpt', 'content_html', 'tags', 'read_time',
+            'is_published', 'published_at', 'updated_at'
+        ))
+        return Response(posts)
+
+    def post(self, request):
+        data = request.data
+        title = data.get('title', 'Untitled Scent Journal')
+        slug = data.get('slug')
+        if not slug and title:
+            slug = slugify(title)
+
+        if BlogPost.objects.filter(slug=slug).exists():
+            return Response({'detail': 'A blog post with this slug already exists.'}, status=400)
+
+        post = BlogPost.objects.create(
+            title=title,
+            slug=slug,
+            author=data.get('author', 'PerfumeBooth Editorial'),
+            cover_image=data.get('cover_image', ''),
+            excerpt=data.get('excerpt', ''),
+            content_html=data.get('content_html', ''),
+            tags=data.get('tags', []),
+            read_time=data.get('read_time', '5 min read'),
+            is_published=data.get('is_published', True)
+        )
+        cache.clear()
+        return Response({
+            'id': str(post.id),
+            'slug': post.slug,
+            'detail': 'Blog article created successfully.'
+        }, status=status.HTTP_201_CREATED)
+
+
+class BlogPostDetailView(APIView):
+    """
+    GET    /api/cms/blogs/<slug_or_id>/ -> Retrieve post detail
+    PUT    /api/cms/blogs/<slug_or_id>/ -> Update post
+    DELETE /api/cms/blogs/<slug_or_id>/ -> Delete post
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def _get_post(self, slug_or_id):
+        try:
+            return BlogPost.objects.get(id=slug_or_id)
+        except Exception:
+            return get_object_or_404(BlogPost, slug=slug_or_id)
+
+    def get(self, request, slug_or_id):
+        post = self._get_post(slug_or_id)
+        return Response({
+            'id': str(post.id),
+            'title': post.title,
+            'slug': post.slug,
+            'author': post.author,
+            'cover_image': post.cover_image,
+            'excerpt': post.excerpt,
+            'content_html': post.content_html,
+            'tags': post.tags,
+            'read_time': post.read_time,
+            'is_published': post.is_published,
+            'published_at': post.published_at,
+            'updated_at': post.updated_at
+        })
+
+    def put(self, request, slug_or_id):
+        post = self._get_post(slug_or_id)
+        data = request.data
+        post.title = data.get('title', post.title)
+        if 'slug' in data and data['slug']:
+            post.slug = data['slug']
+        post.author = data.get('author', post.author)
+        post.cover_image = data.get('cover_image', post.cover_image)
+        post.excerpt = data.get('excerpt', post.excerpt)
+        post.content_html = data.get('content_html', post.content_html)
+        post.tags = data.get('tags', post.tags)
+        post.read_time = data.get('read_time', post.read_time)
+        if 'is_published' in data:
+            post.is_published = data['is_published']
+        post.save()
+        cache.clear()
+        return Response({'detail': 'Blog article updated successfully.'})
+
+    def delete(self, request, slug_or_id):
+        post = self._get_post(slug_or_id)
+        post.delete()
+        cache.clear()
+        return Response({'detail': 'Blog article deleted successfully.'})
+
 

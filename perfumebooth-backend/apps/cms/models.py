@@ -72,3 +72,32 @@ class CMSSection(models.Model):
         verbose_name_plural = 'CMS Sections'
     def __str__(self) -> str:
         return f'{self.page.slug} → [{self.sort_order}] {self.type}'
+
+
+class BlogPost(models.Model):
+    """
+    Dedicated Blog Article Model for CMS Journal
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=300)
+    slug = models.SlugField(max_length=300, unique=True, db_index=True)
+    author = models.CharField(max_length=150, default='PerfumeBooth Editorial')
+    cover_image = models.CharField(max_length=500, blank=True)
+    excerpt = models.TextField(blank=True)
+    content_html = models.TextField(blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    read_time = models.CharField(max_length=50, default='5 min read')
+    is_published = models.BooleanField(default=True, db_index=True)
+    published_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'cms_blog_post'
+        ordering = ['-published_at']
+        verbose_name = 'Blog Post'
+        verbose_name_plural = 'Blog Posts'
+
+    def __str__(self) -> str:
+        status = '✓' if self.is_published else '✗'
+        return f'[{status}] {self.title} (/blog/{self.slug})'
+

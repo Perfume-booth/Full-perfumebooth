@@ -351,7 +351,7 @@ export async function getBanner(slug: string): Promise<any | null> {
 
   try {
     const res = await fetch(`${API_URL}/api/shop/banners/${slug}/`, {
-      next: { revalidate: 3600 }
+      cache: 'no-store'
     });
     if (res.ok) {
       const data = await res.json();
@@ -367,6 +367,24 @@ export async function getBanner(slug: string): Promise<any | null> {
     }
   } catch (err) {
     console.error(`Error fetching banner for slug ${slug}:`, err);
+  }
+  return null;
+}
+
+export async function getCmsPage(slug: string): Promise<any | null> {
+  const isServer = typeof window === 'undefined';
+  const isDocker = process.env.WATCHPACK_POLLING === "true";
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
+
+  try {
+    const res = await fetch(`${API_URL}/api/cms/pages/${slug}/`, {
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error(`Error fetching CMS page for slug ${slug}:`, err);
   }
   return null;
 }

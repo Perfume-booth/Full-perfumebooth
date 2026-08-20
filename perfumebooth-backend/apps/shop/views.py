@@ -1592,6 +1592,23 @@ class ProductExcelImportView(APIView):
 
 from .models import PageBanner
 
+def format_media_url(url, request=None):
+    if not url:
+        return None
+    if url.startswith('http://') or url.startswith('https://'):
+        if 'localhost/media/' in url and 'localhost:8000' not in url:
+            return url.replace('localhost/media/', 'localhost:8000/media/')
+        return url
+    if url.startswith('/media/'):
+        return f"http://localhost:8000{url}"
+    if request:
+        abs_url = request.build_absolute_uri(url)
+        if 'localhost/media/' in abs_url and 'localhost:8000' not in abs_url:
+            return abs_url.replace('localhost/media/', 'localhost:8000/media/')
+        return abs_url
+    return f"http://localhost:8000/media/{url.lstrip('/')}"
+
+
 class PageBannerDetailView(APIView):
     """
     Public API to fetch active banners by page slug.
@@ -1607,22 +1624,10 @@ class PageBannerDetailView(APIView):
         images = banner.images.all()
         image_data = []
         for img in images:
-            img_url = img.image.url if img.image else None
-            if img_url and img_url.startswith('/media/'):
-                img_url = f"http://localhost:8000{img_url}"
-            elif img_url and 'localhost/media/' in img_url:
-                img_url = img_url.replace('localhost/media/', 'localhost:8000/media/')
-
-            mob_url = img.mobile_image.url if img.mobile_image else None
-            if mob_url and mob_url.startswith('/media/'):
-                mob_url = f"http://localhost:8000{mob_url}"
-            elif mob_url and 'localhost/media/' in mob_url:
-                mob_url = mob_url.replace('localhost/media/', 'localhost:8000/media/')
-
             image_data.append({
                 'id': str(img.id),
-                'image_url': img_url,
-                'mobile_image_url': mob_url,
+                'image_url': format_media_url(img.image.url if img.image else None, request),
+                'mobile_image_url': format_media_url(img.mobile_image.url if img.mobile_image else None, request),
                 'sort_order': img.sort_order,
                 'link_url': img.link_url
             })
@@ -1649,8 +1654,8 @@ class PageBannerListCreateView(APIView):
             for img in images:
                 image_list.append({
                     'id': str(img.id),
-                    'image_url': request.build_absolute_uri(img.image.url) if img.image else None,
-                    'mobile_image_url': request.build_absolute_uri(img.mobile_image.url) if img.mobile_image else None,
+                    'image_url': format_media_url(img.image.url if img.image else None, request),
+                    'mobile_image_url': format_media_url(img.mobile_image.url if img.mobile_image else None, request),
                     'sort_order': img.sort_order,
                     'link_url': img.link_url
                 })
@@ -1689,22 +1694,45 @@ class PageBannerListCreateView(APIView):
             banner.save()
 
         
-        # Handle image upload if provided
-        if 'image' in request.FILES:
-            from .models import PageBannerImage
+        # Handle image upload or update if provided
+        from .models import PageBannerImage
+        slide_id = request.data.get('slide_id')
+        link_url = request.data.get('link_url', '')
+
+        if slide_id:
+            try:
+                banner_img = PageBannerImage.objects.get(id=slide_id, banner=banner)
+                banner_img.link_url = link_url
+                if 'image' in request.FILES:
+                    banner_img.image = request.FILES['image']
+                if 'mobile_image' in request.FILES:
+                    banner_img.mobile_image = request.FILES['mobile_image']
+                banner_img.save()
+            except PageBannerImage.DoesNotExist:
+                pass
+        elif 'image' in request.FILES or 'mobile_image' in request.FILES:
             images = request.FILES.getlist('image')
             mobile_images = request.FILES.getlist('mobile_image')
             base_sort_order = int(request.data.get('sort_order', 0))
             
-            for i, img in enumerate(images):
+            max_count = max(len(images), len(mobile_images))
+            for i in range(max_count):
+                img = images[i] if i < len(images) else None
                 mobile_img = mobile_images[i] if i < len(mobile_images) else None
-                PageBannerImage.objects.create(
-                    banner=banner,
-                    image=img,
-                    mobile_image=mobile_img,
-                    link_url=request.data.get('link_url', ''),
-                    sort_order=base_sort_order + i
-                )
+                if img or mobile_img:
+                    PageBannerImage.objects.create(
+                        banner=banner,
+                        image=img,
+                        mobile_image=mobile_img,
+                        link_url=link_url,
+                        sort_order=base_sort_order + i
+                    )
+        elif link_url and banner.images.exists():
+            # If no files uploaded but link_url passed for single-image banner, update primary image link
+            first_img = banner.images.first()
+            if first_img:
+                first_img.link_url = link_url
+                first_img.save()
 
         log_action(request.user, f"Created/Updated banner for {page_slug}", request)
         return Response({'detail': 'Banner saved successfully', 'id': str(banner.id)})
@@ -1719,6 +1747,12 @@ class PageBannerDeleteView(APIView):
         try:
             banner = PageBanner.objects.get(id=id)
             slug = banner.page_slug
+            # Clean up image files from storage
+            for img in banner.images.all():
+                if img.image:
+                    img.image.delete(save=False)
+                if img.mobile_image:
+                    img.mobile_image.delete(save=False)
             banner.delete()
             log_action(request.user, f"Deleted banner for {slug}", request)
             return Response({'detail': 'Deleted successfully'})
@@ -1736,6 +1770,10 @@ class PageBannerImageDeleteView(APIView):
             from .models import PageBannerImage
             image = PageBannerImage.objects.get(id=id)
             slug = image.banner.page_slug
+            if image.image:
+                image.image.delete(save=False)
+            if image.mobile_image:
+                image.mobile_image.delete(save=False)
             image.delete()
             log_action(request.user, f"Deleted image from banner {slug}", request)
             return Response({'detail': 'Deleted successfully'})

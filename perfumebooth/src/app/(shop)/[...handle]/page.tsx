@@ -1,5 +1,7 @@
 import { Metadata } from "next";
 import CollectionTemplate from "@/components/product/CollectionTemplate";
+import CMSPageRenderer from "@/components/cms/CMSPageRenderer";
+import { getCmsPage } from "@/lib/backend/collections";
 
 interface CollectionPageProps {
   params: Promise<{ handle: string | string[] }>;
@@ -9,6 +11,18 @@ interface CollectionPageProps {
 export async function generateMetadata({ params }: { params: Promise<{ handle: string | string[] }> }): Promise<Metadata> {
   const resolvedParams = await params;
   const handleString = Array.isArray(resolvedParams.handle) ? resolvedParams.handle.join('/') : resolvedParams.handle;
+  const cmsPage = await getCmsPage(handleString);
+
+  if (cmsPage && cmsPage.is_published) {
+    return {
+      title: cmsPage.meta_title || `${cmsPage.title} | Perfume Booth`,
+      description: cmsPage.meta_description || undefined,
+      alternates: {
+        canonical: `https://www.perfumebooth.com/${handleString}`
+      }
+    };
+  }
+
   return {
     alternates: {
       canonical: `https://www.perfumebooth.com/${handleString}`
@@ -20,6 +34,12 @@ export default async function GenericCollectionPage({ params, searchParams }: Co
   const resolvedParams = await params;
   const handleString = Array.isArray(resolvedParams.handle) ? resolvedParams.handle.join('/') : resolvedParams.handle;
   const sParams = await searchParams;
+
+  // Check if a custom CMS page exists in Django backend
+  const cmsPage = await getCmsPage(handleString);
+  if (cmsPage && cmsPage.is_published && cmsPage.sections && cmsPage.sections.length > 0) {
+    return <CMSPageRenderer page={cmsPage} />;
+  }
 
   const breadcrumbLd = {
     "@context": "https://schema.org",

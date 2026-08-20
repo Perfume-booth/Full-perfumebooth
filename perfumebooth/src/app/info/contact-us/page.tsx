@@ -1,19 +1,28 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import InfoHero from '@/components/layout/InfoHero';
+import { getContactUs } from '@/lib/shopify';
 
 export const metadata: Metadata = {
   title: 'Contact Us | PerfumeBooth',
   description: 'Connect with PerfumeBooth. For product inquiries, collaborations, and customer service.',
 };
 
-export default function ContactUsPage() {
+export default async function ContactUsPage() {
+  const page = await getContactUs();
+  const info = page?.contactInfo || {
+    email: 'admin@perfumebooth.com',
+    phone: '+91 9266030909 / 011-46604937',
+    hours: 'Mon to Sat, 10am to 6pm',
+    address: '70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015'
+  };
+
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]">
       
       {/* ── Editorial Hero Section ── */}
       <InfoHero 
-        title="We're Here For You" 
+        title={page?.title || "We're Here For You"} 
         desktopSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/contact_139b629a-4e56-42a7-9441-4750a1995629.png?v=1779253483" 
         mobileSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/contact_139b629a-4e56-42a7-9441-4750a1995629.png?v=1779253483" 
         pillText="Get In Touch" 
@@ -33,26 +42,23 @@ export default function ContactUsPage() {
             </span>
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-text-primary)] mb-2">Email Us</h3>
             <p className="text-[var(--color-text-muted)] text-sm mb-4">For general inquiries</p>
-            <a href="mailto:admin@perfumebooth.com" className="text-sm font-serif text-[var(--color-text-primary)] hover:text-[var(--color-gold)] transition-colors pb-0.5 border-b border-[var(--color-gold)]">
-              admin@perfumebooth.com
+            <a href={`mailto:${info.email}`} className="text-sm font-serif text-[var(--color-text-primary)] hover:text-[var(--color-gold)] transition-colors pb-0.5 border-b border-[var(--color-gold)]">
+              {info.email || 'admin@perfumebooth.com'}
             </a>
           </div>
 
           {/* Phone Card */}
-          <div className="bg-[var(--color-bg-subtle)] p-10 flex flex-col items-center text-center shadow-lg  border border-[var(--color-border)]">
-            <span className="w-12 h-12 rounded-full bg-[var(--color-gold)]  flex items-center justify-center mb-6">
+          <div className="bg-[var(--color-bg-subtle)] p-10 flex flex-col items-center text-center shadow-lg border border-[var(--color-border)]">
+            <span className="w-12 h-12 rounded-full bg-[var(--color-gold)] flex items-center justify-center mb-6">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
             </span>
-            <h3 className="text-[11px] font-bold uppercase tracking-widest  mb-2">Call Us</h3>
-            <p className="/60 text-sm mb-4">Mon to Sat, 10am to 6pm</p>
+            <h3 className="text-[11px] font-bold uppercase tracking-widest mb-2">Call Us</h3>
+            <p className="text-[var(--color-text-muted)] text-sm mb-4">{info.hours || 'Mon to Sat, 10am to 6pm'}</p>
             <div className="flex flex-col gap-2">
-              <a href="tel:+918287791303" className="text-sm font-serif hover:text-[var(--color-gold)] transition-colors ">
-              +91 9266030909
-              </a>
-              <a href="tel:01146604937" className="text-sm font-serif hover:text-[var(--color-gold)] transition-colors ">
-                011-46604937
+              <a href={`tel:${info.phone}`} className="text-sm font-serif hover:text-[var(--color-gold)] transition-colors">
+                {info.phone || '+91 9266030909'}
               </a>
             </div>
           </div>
@@ -67,8 +73,8 @@ export default function ContactUsPage() {
             </span>
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-text-primary)] mb-2">Visit Us</h3>
             <p className="text-[var(--color-text-muted)] text-sm mb-4">Head Office</p>
-            <p className="text-sm font-serif text-[var(--color-text-primary)] leading-relaxed max-w-[200px]">
-              70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015
+            <p className="text-sm font-serif text-[var(--color-text-primary)] leading-relaxed max-w-[220px]">
+              {info.address || '70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015'}
             </p>
           </div>
         </div>
