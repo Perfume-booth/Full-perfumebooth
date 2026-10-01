@@ -19,7 +19,11 @@ import {
   CheckCircle2,
   AlertCircle,
   ShoppingCart,
-  Clock
+  Clock,
+  Printer,
+  Mail,
+  Phone,
+  Tag
 } from 'lucide-react';
 
 interface OrderItem {
@@ -272,15 +276,24 @@ export default function OrderDetailPage() {
             </span>
           </div>
 
-          <p className="text-sm text-muted-foreground">
-            Created on {new Date(orderDetail.created_at).toLocaleString('en-IN', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </p>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground text-xs font-semibold rounded-xl border border-border transition cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Order</span>
+            </button>
+            <p className="text-sm text-muted-foreground">
+              Created on {new Date(orderDetail.created_at).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -328,11 +341,21 @@ export default function OrderDetailPage() {
 
             <div className="flex flex-col divide-y divide-border/50">
               {orderDetail.items.map((item) => {
-                const productUrl = `/products?search=${encodeURIComponent(item.product_title)}`;
+                const storefrontUrl = item.product_slug 
+                  ? `http://localhost:3000/products/${item.product_slug}` 
+                  : `http://localhost:3000/all`;
+                const mpsCatalogUrl = `/products?search=${encodeURIComponent(item.product_title)}`;
+                
                 return (
                   <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex items-center gap-4">
-                    {/* Thumbnail Image */}
-                    <Link href={productUrl} className="relative w-16 h-16 bg-muted/20 border border-border rounded-xl flex items-center justify-center overflow-hidden shrink-0 group">
+                    {/* Clickable Thumbnail Image */}
+                    <a 
+                      href={storefrontUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      title="View product in Storefront"
+                      className="relative w-16 h-16 bg-muted/20 border border-border rounded-xl flex items-center justify-center overflow-hidden shrink-0 group cursor-pointer"
+                    >
                       {item.product_image ? (
                         <Image
                           src={item.product_image}
@@ -343,23 +366,34 @@ export default function OrderDetailPage() {
                       ) : (
                         <Package className="w-8 h-8 text-muted-foreground/50" />
                       )}
-                    </Link>
+                    </a>
 
-                    {/* Title & SKU */}
-                    <div className="flex-1 min-w-0">
-                      <Link 
-                        href={productUrl}
-                        className="font-semibold text-foreground hover:text-primary transition duration-150 flex items-center gap-1.5 group text-sm"
+                    {/* Title, SKU & Clickable links */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <a 
+                        href={storefrontUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-foreground hover:text-primary transition duration-150 flex items-center gap-1.5 group text-sm w-fit"
                       >
                         <span className="truncate">{item.product_title}</span>
-                        <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition duration-150 shrink-0 text-primary" />
-                      </Link>
-                      <div className="text-xs text-muted-foreground mt-1">SKU: {item.sku || 'N/A'}</div>
+                        <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition duration-150 shrink-0 text-primary" />
+                      </a>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>SKU: <span className="font-mono text-foreground font-medium">{item.sku || 'N/A'}</span></span>
+                        <span>•</span>
+                        <Link 
+                          href={mpsCatalogUrl}
+                          className="text-primary hover:underline text-[11px] font-medium"
+                        >
+                          Manage in MPS Catalog →
+                        </Link>
+                      </div>
                     </div>
 
                     {/* Quantity & Pricing */}
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-semibold text-foreground">
+                      <div className="text-sm font-bold text-foreground">
                         ₹{parseFloat(item.line_total).toLocaleString('en-IN')}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
@@ -457,7 +491,13 @@ export default function OrderDetailPage() {
 
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{orderDetail.customer_name}</span>
-              <span>{orderDetail.customer_email}</span>
+              <a 
+                href={`mailto:${orderDetail.customer_email}`} 
+                className="flex items-center gap-2 text-primary hover:underline text-xs"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>{orderDetail.customer_email}</span>
+              </a>
             </div>
           </div>
 
@@ -476,7 +516,15 @@ export default function OrderDetailPage() {
                 {shippingAddr.postal_code || shippingAddr.zip ? ` - ${shippingAddr.postal_code || shippingAddr.zip}` : ''}
               </span>
               {shippingAddr.country && <span>{shippingAddr.country}</span>}
-              {shippingAddr.phone && <span className="pt-2 font-medium text-foreground">Phone: {shippingAddr.phone}</span>}
+              {shippingAddr.phone && (
+                <a 
+                  href={`tel:${shippingAddr.phone}`} 
+                  className="flex items-center gap-2 pt-2 text-primary hover:underline font-medium text-xs"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Phone: {shippingAddr.phone}</span>
+                </a>
+              )}
             </div>
           </div>
 
@@ -488,16 +536,28 @@ export default function OrderDetailPage() {
 
             <div className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
+                <span>Payment Method</span>
+                <span className="font-semibold uppercase text-xs px-2 py-0.5 bg-muted rounded text-foreground">
+                  {shippingAddr.payment_method || 'COD'}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Delivery Method</span>
+                <span className="text-foreground text-xs font-medium">
+                  {shippingAddr.shipping_carrier || 'Standard Shipping'}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground border-t border-border/50 pt-2">
                 <span>Subtotal</span>
                 <span className="text-foreground">₹{parseFloat(orderDetail.subtotal || '0').toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Tax</span>
+                <span>Tax / GST</span>
                 <span className="text-foreground">₹{parseFloat(orderDetail.tax || '0').toLocaleString('en-IN')}</span>
               </div>
               
               <div className="flex justify-between font-bold text-base border-t border-border pt-3 text-foreground">
-                <span>Total</span>
+                <span>Total Amount</span>
                 <span className="text-primary">₹{parseFloat(orderDetail.total || '0').toLocaleString('en-IN')}</span>
               </div>
             </div>
