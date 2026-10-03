@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import CSVEditorNav from '@/components/csv/CSVEditorNav';
 import { useCSVEditorStore } from '@/lib/csv/changeSetStore';
-import { FIELD_TO_SHOPIFY_HEADER } from '@/lib/csv/minimalCsvGenerator';
+import { FIELD_TO_CSV_HEADER } from '@/lib/csv/minimalCsvGenerator';
 import { GitCompare, Download, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react';
 
 export default function ChangeReviewPage() {
@@ -49,7 +49,7 @@ export default function ChangeReviewPage() {
               <tr>
                 <th className="p-3.5 min-w-[150px]">Product Handle</th>
                 <th className="p-3.5 min-w-[120px]">SKU</th>
-                <th className="p-3.5 min-w-[140px]">Shopify Column</th>
+                <th className="p-3.5 min-w-[140px]">CSV Column</th>
                 <th className="p-3.5 min-w-[180px]">OLD VALUE</th>
                 <th className="p-3.5 min-w-[180px]">NEW VALUE</th>
                 <th className="p-3.5 min-w-[110px]">Status State</th>
@@ -65,7 +65,7 @@ export default function ChangeReviewPage() {
                 </tr>
               ) : (
                 changes.map((change) => {
-                  const shopifyHeader = FIELD_TO_SHOPIFY_HEADER[String(change.field)] || String(change.field);
+                  const csvHeader = FIELD_TO_CSV_HEADER[String(change.field)] || String(change.field);
                   const isWarning = change.state === 'CLEARED' || change.field === 'handle' || change.field === 'sku';
 
                   return (
@@ -77,7 +77,7 @@ export default function ChangeReviewPage() {
                         {change.variantSku || 'ALL'}
                       </td>
                       <td className="p-3.5 font-semibold text-primary">
-                        {shopifyHeader}
+                        {csvHeader}
                       </td>
                       <td className="p-3.5 bg-rose-500/10 text-rose-800 dark:text-rose-300 font-mono break-all">
                         {change.oldValue || '(Blank)'}

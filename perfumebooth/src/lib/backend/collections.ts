@@ -89,7 +89,7 @@ export async function getCollection(
     });
     if (res.ok) {
       const data = await res.json();
-      const shopifyProducts = data.products.map(mapDjangoProductToProduct);
+      const catalogProducts = data.products.map(mapDjangoProductToProduct);
       return {
         id: data.id,
         handle: data.slug,
@@ -97,9 +97,9 @@ export async function getCollection(
         description: data.description,
         image: data.image ? { url: cleanImageUrl(data.image) || '' } : undefined,
         products: {
-          edges: shopifyProducts.slice(0, first).map((p: any) => ({ node: p })),
+          edges: catalogProducts.slice(0, first).map((p: any) => ({ node: p })),
           pageInfo: {
-            hasNextPage: shopifyProducts.length > first,
+            hasNextPage: catalogProducts.length > first,
             endCursor: null
           }
         }
@@ -160,6 +160,10 @@ export async function getCollection(
       return false;
     });
   }
+
+  const offset = Math.max(0, Number(after || 0));
+  const pageProducts = products.slice(offset, offset + first);
+  const nextOffset = offset + pageProducts.length;
 
   return {
     id: handle,
@@ -328,15 +332,19 @@ export async function getCollectionProducts(
     }
   }
 
+  const offset = Math.max(0, Number(after || 0));
+  const pageProducts = products.slice(offset, offset + first);
+  const nextOffset = offset + pageProducts.length;
+
   return {
     title: collection.title,
     description: collection.description,
     bannerImage: (collection as any).image?.url || null,
-    products: products.slice(0, first),
+    products: pageProducts,
     totalCount: products.length,
     pageInfo: {
-      hasNextPage: products.length > first,
-      endCursor: null
+      hasNextPage: nextOffset < products.length,
+      endCursor: nextOffset < products.length ? String(nextOffset) : null
     },
     filters
   };

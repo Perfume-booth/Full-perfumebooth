@@ -1,5 +1,5 @@
 import { Product } from "@/types/product";
-import { METAFIELD_MAPPINGS } from "./metafields.config";
+import { METAFIELD_MAPPINGS } from "./product-fields.config";
 
 export function cleanMetafieldValue(val: any): string {
     if (val === undefined || val === null) return "";
@@ -153,7 +153,7 @@ export function cleanImageUrl(url: string | null | undefined): string | undefine
 }
 
 /**
- * Normalizes product data from various sources (Shopify API, internal DB, etc.)
+ * Normalizes product data returned by the catalog API.
  * into a consistent format for the UI.
  */
 export function normalizeProduct(product: any, passedDeliveryDate?: string): NormalizedProduct {
@@ -202,7 +202,7 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
     };
 
     if (product.priceRange) {
-        // Raw Shopify data structure
+        // Legacy edge-based data structure
         sellingPrice = parsePrice(product.priceRange.minVariantPrice?.amount);
         const cap = product.compareAtPriceRange?.minVariantPrice?.amount;
         comparePrice = cap ? parsePrice(cap) : Math.round(sellingPrice * 1.25);

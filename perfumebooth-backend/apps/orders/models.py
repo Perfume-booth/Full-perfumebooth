@@ -8,7 +8,7 @@ import uuid
 from django.db import models
 from django.conf import settings
 
-from apps.shop.models import Product
+from apps.shop.models import Product, ProductVariant
 
 
 class Order(models.Model):
@@ -82,6 +82,16 @@ class OrderItem(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.SET_NULL, null=True, related_name='order_items'
     )
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='order_items',
+    )
+    product_title = models.CharField(max_length=500, blank=True, default='')
+    variant_title = models.CharField(max_length=255, blank=True, default='')
+    sku = models.CharField(max_length=200, blank=True, default='')
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
 
@@ -91,11 +101,16 @@ class OrderItem(models.Model):
         verbose_name_plural = 'Order Items'
 
     @property
+    def price(self):
+        """Alias for unit_price to support item.price access safely."""
+        return self.unit_price
+
+    @property
     def line_total(self) -> float:
         return float(self.unit_price) * self.quantity
 
     def __str__(self) -> str:
-        product_name = self.product.title if self.product else 'Deleted Product'
+        product_name = self.product_title or (self.product.title if self.product else 'Deleted Product')
         return f'{product_name} × {self.quantity}'
 
 

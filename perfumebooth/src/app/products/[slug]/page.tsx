@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getProductRecommendations } from '@/lib/shopify';
+import { getProductRecommendations } from '@/lib/catalog';
 import { stripHtml } from '@/lib/utils';
-import { METAFIELD_MAPPINGS } from '@/lib/metafields.config';
+import { METAFIELD_MAPPINGS } from '@/lib/product-fields.config';
 import { parseRating, getBrandFromTags, cleanMetafieldValue } from '@/lib/transformers';
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductDetailsClient from "@/components/product/ProductDetailsClient";
@@ -20,7 +20,7 @@ import './pdp.css';
 // Cache PDP on server for 15 minutes via ISR
 export const revalidate = 900;
 
-// Preserving API_URL for mocked recommendation array bindings
+// Public API URL used for server-side product requests.
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export interface ProductImage {
@@ -130,17 +130,19 @@ async function getProduct(slug: string): Promise<Product | null> {
             rating: p.rating || 4.5,
             rating_count: p.rating_count || 0,
             reviewsHtml: '',
-            variants: [
-                {
-                    id: `gid://shopify/ProductVariant/${p.id}`,
-                    title: "Default Title",
-                    price: priceVal,
-                    compareAtPrice: comparePriceVal,
-                    availableForSale: p.is_online && (p.stock > 0 || p.stock_count > 0),
-                    quantityAvailable: p.stock_count ?? p.stock ?? 50,
-                    requiresShipping: true
-                }
-            ],
+            variants: p.variants?.length ? p.variants.map((variant: any) => ({
+                id: String(variant.id),
+                title: variant.title || variant.option1_value || "Default Title",
+                price: String(variant.price),
+                compareAtPrice: variant.compare_at_price ? String(variant.compare_at_price) : undefined,
+                availableForSale: Number(variant.stock_level) > 0,
+                quantityAvailable: Number(variant.stock_level || 0),
+                requiresShipping: true
+            })) : [{
+                id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
+                availableForSale: p.is_online && (p.stock > 0 || p.stock_count > 0),
+                quantityAvailable: p.stock_count ?? p.stock ?? 0, requiresShipping: true
+            }],
             coupons: []
         };
     } catch (err) {

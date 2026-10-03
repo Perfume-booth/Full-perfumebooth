@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatedArrowLeft as ArrowLeft } from "@/components/ui/icons/AnimatedArrowLeft";
 import { AnimatedArrowRight as ArrowRight } from "@/components/ui/icons/AnimatedArrowRight";
-import type { Article } from "@/lib/shopify";
+import type { Article } from "@/lib/catalog";
 import BlogCard from "@/components/blog/BlogCard";
 
 export default function RelatedArticlesCarousel({ articles }: { articles: Article[] }) {

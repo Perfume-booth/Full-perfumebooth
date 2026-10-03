@@ -42,8 +42,8 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
   const [displayCount, setDisplayCount] = useState(3);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [shopifyRating, setShopifyRating] = useState<number>(0);
-  const [shopifyRatingCount, setShopifyRatingCount] = useState<number>(0);
+  const [productRating, setProductRating] = useState<number>(0);
+  const [productRatingCount, setProductRatingCount] = useState<number>(0);
 
   // Form State
   const [formRating, setFormRating] = useState(5);
@@ -64,8 +64,8 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
         
         const data = await res.json();
         setReviews(data.reviews || []);
-        setShopifyRating(data.rating || 0);
-        setShopifyRatingCount(data.ratingCount || (data.reviews || []).length);
+        setProductRating(data.rating || 0);
+        setProductRatingCount(data.ratingCount || (data.reviews || []).length);
       } catch (error) {
         console.error("Error fetching reviews:", error);
       } finally {
@@ -139,8 +139,8 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
     }
   };
 
-  const avgRating = shopifyRating > 0 ? shopifyRating.toFixed(1) : "0.0";
-  const totalCount = shopifyRatingCount > 0 ? shopifyRatingCount : reviews.length;
+  const avgRating = productRating > 0 ? productRating.toFixed(1) : "0.0";
+  const totalCount = productRatingCount > 0 ? productRatingCount : reviews.length;
 
   // Mock distribution based on the total count
   const distribution = [

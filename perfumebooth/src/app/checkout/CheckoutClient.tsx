@@ -38,13 +38,11 @@ export default function CheckoutClient({ customer }: Props) {
     discountAmount: storeDiscountAmount,
     discountErrorMessage,
     isApplyingDiscount,
-    shopifyCartId: cartShopifyCartId,
     selectedShippingRate,
     finalTotalAmount,
     updateQuantity,
     removeFromCart,
     buyNowItem,
-    buyNowShopifyCartId,
     buyNowDiscountAmount,
     buyNowCouponCode,
     buyNowCouponDiscount,
@@ -54,7 +52,6 @@ export default function CheckoutClient({ customer }: Props) {
 
   const isBuyNow = !!buyNowItem;
   const items = isBuyNow ? [buyNowItem] : cartItems;
-  const shopifyCartId = isBuyNow ? buyNowShopifyCartId : cartShopifyCartId;
   const couponCode = isBuyNow ? buyNowCouponCode : cartCouponCode;
   
   const subtotal = isBuyNow 
@@ -299,7 +296,7 @@ export default function CheckoutClient({ customer }: Props) {
     }
   };
 
-  const createShopifyOrder = async (financialStatus = "PENDING", gatewayRef = "") => {
+  const createOrder = async (financialStatus = "PENDING", gatewayRef = "") => {
     // If we're already processing an order and this is a COD flow, bypass the return block.
     // Razorpay uses a separate verify endpoint, so this function is mainly for COD.
     isProcessingRef.current = true;
@@ -383,7 +380,6 @@ export default function CheckoutClient({ customer }: Props) {
             items,
             form,
             finalTotal,
-            shopifyCartId,
             couponCode,
             discountAmount,
             shippingRate: selectedShippingRate
@@ -482,7 +478,7 @@ export default function CheckoutClient({ customer }: Props) {
 
       } else {
         // Cash on Delivery (COD) flow
-        await createShopifyOrder("PENDING", "Cash on Delivery");
+        await createOrder("PENDING", "Cash on Delivery");
       }
     } catch (error) {
       console.error("Payment orchestrator failure:", error);
@@ -675,7 +671,7 @@ export default function CheckoutClient({ customer }: Props) {
 
                           {/* Calculated Shipping Methods */}
                           <div className="border-t border-gray-150 pt-6">
-                            <ShippingMethods form={form} cartId={shopifyCartId} />
+                            <ShippingMethods form={form} />
                           </div>
 
                           {/* Transition Button */}

@@ -22,7 +22,10 @@ urlpatterns = [
     # Health check (no auth required)
     path('api/health/', health_check, name='health-check'),
 
-    # Domain API routes
+    # Versioned API (v1)
+    path('api/v1/', include('core.v1_urls')),
+
+    # Legacy domain API routes (preserved for backwards compatibility)
     path('api/auth/', include('apps.authentication.urls')),
     path('api/shop/', include('apps.shop.urls')),
     path('api/orders/', include('apps.orders.urls')),

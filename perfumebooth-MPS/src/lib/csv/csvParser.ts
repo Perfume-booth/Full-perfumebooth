@@ -1,8 +1,8 @@
 import Papa from 'papaparse';
-import { ShopifyProduct, ShopifyVariant } from './types';
+import { CatalogProduct, CatalogVariant } from './types';
 
 /**
- * Shopify Standard CSV Header keys map
+ * Product CSV header aliases
  */
 const GET_FIELD = (row: Record<string, any>, keys: string[]): string => {
   for (const k of keys) {
@@ -21,12 +21,12 @@ const GET_FIELD = (row: Record<string, any>, keys: string[]): string => {
 };
 
 export interface ParseResult {
-  products: ShopifyProduct[];
+  products: CatalogProduct[];
   rawHeaders: string[];
   totalRowsParsed: number;
 }
 
-export function parseShopifyCsv(csvContent: string): ParseResult {
+export function parseCatalogCsv(csvContent: string): ParseResult {
   const parseRes = Papa.parse<Record<string, string>>(csvContent, {
     header: true,
     skipEmptyLines: true,
@@ -35,7 +35,7 @@ export function parseShopifyCsv(csvContent: string): ParseResult {
   const rawHeaders = parseRes.meta.fields || [];
   const rows = parseRes.data;
 
-  const productMap = new Map<string, ShopifyProduct>();
+  const productMap = new Map<string, CatalogProduct>();
 
   let idCounter = 1;
 
@@ -80,7 +80,7 @@ export function parseShopifyCsv(csvContent: string): ParseResult {
     const option1Name = GET_FIELD(row, ['Option1 Name', 'option1_name']);
     const option1Value = GET_FIELD(row, ['Option1 Value', 'option1_value']);
 
-    const variant: ShopifyVariant = {
+    const variant: CatalogVariant = {
       internalId: `var_${idCounter++}`,
       productHandle: handle,
       sku: sku,

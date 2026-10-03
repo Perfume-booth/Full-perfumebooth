@@ -246,10 +246,18 @@ class BlogPostListView(APIView):
     GET  /api/cms/blogs/       -> List blog articles
     POST /api/cms/blogs/       -> Create blog article
     """
-    permission_classes = [permissions.AllowAny]
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager']
 
     def get(self, request):
-        is_merchant = request.query_params.get('merchant', 'false').lower() == 'true'
+        is_merchant = request.user and request.user.is_authenticated and any(
+            role in ['Super Admin', 'Admin', 'Content Manager'] 
+            for role in request.user.roles.values_list('role__name', flat=True)
+        )
         queryset = BlogPost.objects.all()
         if not is_merchant:
             queryset = queryset.filter(is_published=True)
@@ -283,6 +291,7 @@ class BlogPostListView(APIView):
             is_published=data.get('is_published', True)
         )
         cache.clear()
+        log_action(request.user, f"Created Blog Article: '{post.title}'", request)
         return Response({
             'id': str(post.id),
             'slug': post.slug,
@@ -296,7 +305,12 @@ class BlogPostDetailView(APIView):
     PUT    /api/cms/blogs/<slug_or_id>/ -> Update post
     DELETE /api/cms/blogs/<slug_or_id>/ -> Delete post
     """
-    permission_classes = [permissions.AllowAny]
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager']
 
     def _get_post(self, slug_or_id):
         try:
@@ -306,6 +320,13 @@ class BlogPostDetailView(APIView):
 
     def get(self, request, slug_or_id):
         post = self._get_post(slug_or_id)
+        is_merchant = request.user and request.user.is_authenticated and any(
+            role in ['Super Admin', 'Admin', 'Content Manager'] 
+            for role in request.user.roles.values_list('role__name', flat=True)
+        )
+        if not is_merchant and not post.is_published:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         return Response({
             'id': str(post.id),
             'title': post.title,
@@ -337,12 +358,15 @@ class BlogPostDetailView(APIView):
             post.is_published = data['is_published']
         post.save()
         cache.clear()
+        log_action(request.user, f"Updated Blog Article: '{post.title}'", request)
         return Response({'detail': 'Blog article updated successfully.'})
 
     def delete(self, request, slug_or_id):
         post = self._get_post(slug_or_id)
+        title = post.title
         post.delete()
         cache.clear()
+        log_action(request.user, f"Deleted Blog Article: '{title}'", request)
         return Response({'detail': 'Blog article deleted successfully.'})
 
 

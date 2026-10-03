@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import CSVEditorNav from '@/components/csv/CSVEditorNav';
 import { useCSVEditorStore } from '@/lib/csv/changeSetStore';
-import { ShopifyProduct, ShopifyVariant } from '@/lib/csv/types';
+import { CatalogProduct, CatalogVariant } from '@/lib/csv/types';
 import { Table as TableIcon, Search, Undo2, Redo2, RotateCcw, AlertCircle } from 'lucide-react';
 
 export default function SpreadsheetEditorPage() {

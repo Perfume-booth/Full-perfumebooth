@@ -30,7 +30,7 @@ export default function CollectionBanner({
     // 1. Prioritize new CMS Page Banners if available
     if (cmsBannerImages && cmsBannerImages.length > 0) return cmsBannerImages;
 
-    // 2. Fallback to Shopify Backend collection image if available
+    // 2. Fall back to the catalog collection image if available
     if (backendBannerImage) return [backendBannerImage];
 
     // 3. Fall back to custom overrides / slideshows

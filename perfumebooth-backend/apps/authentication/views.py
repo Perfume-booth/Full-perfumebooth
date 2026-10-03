@@ -16,6 +16,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from .models import CustomUser, Role, UserRole, AuditLog
+from core.throttling import AuthRateThrottle
 
 
 class HasRolePermission(permissions.BasePermission):
@@ -51,6 +52,7 @@ class LoginView(APIView):
     POST /api/auth/login/ — Authenticate credentials and initiate Django session.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         email = request.data.get('email')

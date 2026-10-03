@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import CSVEditorNav from '@/components/csv/CSVEditorNav';
 import { useCSVEditorStore } from '@/lib/csv/changeSetStore';
-import { FIELD_TO_SHOPIFY_HEADER } from '@/lib/csv/minimalCsvGenerator';
+import { FIELD_TO_CSV_HEADER } from '@/lib/csv/minimalCsvGenerator';
 import { Sliders, ArrowRight, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export default function SingleFieldUpdatePage() {
@@ -43,7 +43,7 @@ export default function SingleFieldUpdatePage() {
     setPreviewActive(true);
   };
 
-  const shopifyHeaderName = FIELD_TO_SHOPIFY_HEADER[selectedField] || selectedField;
+  const csvHeaderName = FIELD_TO_CSV_HEADER[selectedField] || selectedField;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -190,7 +190,7 @@ export default function SingleFieldUpdatePage() {
                 <div className="p-2.5 bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[11px] rounded-lg border border-rose-500/20 flex gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    Warning: Exporting a CLEARED field will send an empty string to Shopify, clearing the value in your store.
+                    Warning: Exporting a cleared field sends an empty value and clears it in the catalog.
                   </span>
                 </div>
               )}
@@ -216,8 +216,8 @@ export default function SingleFieldUpdatePage() {
                     <div className="p-3 bg-card rounded-lg border border-border text-xs">
                       <span className="text-muted-foreground block text-[11px]">Product:</span>
                       <strong className="text-foreground font-semibold">{currentProduct?.title || selectedHandle}</strong>
-                      <span className="text-muted-foreground block text-[11px] mt-1">Shopify Column:</span>
-                      <strong className="text-primary font-mono text-[11px]">{shopifyHeaderName}</strong>
+                      <span className="text-muted-foreground block text-[11px] mt-1">CSV Column:</span>
+                      <strong className="text-primary font-mono text-[11px]">{csvHeaderName}</strong>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -235,7 +235,7 @@ export default function SingleFieldUpdatePage() {
 
                     <div className="p-3 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-lg text-xs border border-emerald-500/20 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span>All other 40+ Shopify fields remain <strong>UNCHANGED</strong> & safe!</span>
+                      <span>All other catalog fields remain <strong>UNCHANGED</strong> and safe.</span>
                     </div>
                   </div>
                 ) : (

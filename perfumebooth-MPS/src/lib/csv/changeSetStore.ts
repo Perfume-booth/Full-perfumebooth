@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
-  ShopifyProduct,
-  ShopifyVariant,
+  CatalogProduct,
+  CatalogVariant,
   FieldChange,
   FieldState,
   ValidationIssue,
@@ -10,8 +10,8 @@ import {
 
 interface CSVEditorState {
   rawHeaders: string[];
-  products: ShopifyProduct[];
-  originalProducts: ShopifyProduct[];
+  products: CatalogProduct[];
+  originalProducts: CatalogProduct[];
   changeSet: Map<string, FieldChange>; // Key: "handle:sku:field"
   history: Map<string, FieldChange>[];
   historyIndex: number;
@@ -22,7 +22,7 @@ interface CSVEditorState {
   activeMode: 'SAFE_UPDATE' | 'FULL_CATALOG';
 
   // Actions
-  setImportedData: (products: ShopifyProduct[], rawHeaders: string[]) => void;
+  setImportedData: (products: CatalogProduct[], rawHeaders: string[]) => void;
   updateField: (
     productHandle: string,
     variantSku: string | undefined,

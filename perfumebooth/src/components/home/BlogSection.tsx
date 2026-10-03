@@ -4,7 +4,7 @@ import React from "react";
 import BlogCard from "@/components/blog/BlogCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 import Carousel from "@/components/ui/Carousel";
-import type { Article } from "@/lib/shopify";
+import type { Article } from "@/lib/catalog";
 
 interface BlogSectionProps {
   articles: Article[];

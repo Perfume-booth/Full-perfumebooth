@@ -26,25 +26,6 @@ export function slugify(text: string): string {
         .replace(/ +/g, "-");
 }
 
-export function buildShopifyQuery(collection: string, brands: string[], types: string[], minPrice: number, maxPrice: number): string {
-  const queryParts = [`collection:${collection}`];
-  
-  if (brands.length > 0) {
-    const brandQuery = brands.map(b => `vendor:"${b}"`).join(" OR ");
-    queryParts.push(`(${brandQuery})`);
-  }
-  
-  if (types.length > 0) {
-    const typeQuery = types.map(t => `product_type:"${t}"`).join(" OR ");
-    queryParts.push(`(${typeQuery})`);
-  }
-  
-  queryParts.push(`variants.price:>=${minPrice}`);
-  queryParts.push(`variants.price:<=${maxPrice}`);
-  
-  return queryParts.join(" AND ");
-}
-
 export function stripHtml(html: string): string {
     if (!html) return "";
     return html

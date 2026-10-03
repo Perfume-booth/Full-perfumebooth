@@ -79,6 +79,7 @@ export interface Article {
   authorV2?: {
     name: string;
   };
+  tags?: string[];
 }
 
 export interface BlogData {

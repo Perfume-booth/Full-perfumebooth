@@ -1,4 +1,4 @@
-import { getCollectionProducts, getBanner } from "@/lib/shopify";
+import { getCollectionProducts, getBanner } from "@/lib/catalog";
 import SideFilter from "@/components/product/SideFilter";
 import CollectionProductGrid from "@/components/product/CollectionProductGrid";
 import CollectionBanner from "@/components/ui/CollectionBanner";
@@ -35,7 +35,7 @@ export default async function BrandPage({ params, searchParams }: BrandPageProps
   const availability = sParams.availability as string;
   const gender = sParams.gender as string;
 
-  // Build filter options for Shopify API
+  // Build filter options for the catalog API
   const filterOptions: any[] = [];
   if (brand) {
     brand.split(",").forEach(b => filterOptions.push({ productVendor: b }));

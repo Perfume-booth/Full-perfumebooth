@@ -1,4 +1,4 @@
-import { getBrands } from "@/lib/shopify";
+import { getBrands } from "@/lib/catalog";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import Breadcrumb from "@/components/layout/Breadcrumb";

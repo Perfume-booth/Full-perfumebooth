@@ -47,37 +47,37 @@ export const TOP_CATEGORIES = [
   {
     label: "Perfumes",
     title: " Exclusive Perfumes",
-    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/perfume.png?v=1778139272",
+    image: "/images/fallback-luxury.svg",
     href: "/perfumes",
   },
   {
     label: "Attars",
     title: "Pure Attars",
-    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/attar.png?v=1778139272",
+    image: "/images/fallback-luxury.svg",
     href: "/attars",
   },
   {
     label: "Deodorants",
     title: "Fresh Deodorants",
-    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/deo_888a2919-741e-4acc-a2d1-692e69d8e819.png?v=1778139272",
+    image: "/images/fallback-luxury.svg",
     href: "/deodorants",
   },
   {
     label: "Gift Sets",
     title: "Perfect Gift Sets",
-    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/gift-sets.png?v=1778139271",
+    image: "/images/fallback-luxury.svg",
     href: "/gift-sets",
   },
   {
     label: "Scent Shots",
     title: "Try More Fragrances ",
-    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/scent.png?v=1778139274",
+    image: "/images/fallback-luxury.svg",
     href: "/scent-shot",
   },
   {
     label: "Body Mists",
     title: "Refreshing Mists",
-    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mist.png?v=1778139272",
+    image: "/images/fallback-luxury.svg",
     href: "/mist",
   },
 ];
@@ -129,15 +129,15 @@ export const GENDER_FILTERS = ["Men", "Women", "Unisex"];
 export const BRAND_MEDIA: Record<string, { type: "image" | "video", desktopSrc: string, mobileSrc: string }> = {
 
   // --- SCENT NOTES BANNERS ---
-  "oud": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/OUD_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/OUD_jpg.jpg?v=1778239125" },
-  "floral": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/FLORAL_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/FLORAL_jpg.jpg?v=1778239125" },
-  "citrus": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/CITRUS_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/CITRUS_jpg.jpg?v=1778239125" },
-  "woody": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/WOODY_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/WOODY_jpg.jpg?v=1778239125" },
-  "aquatic": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/AQUA_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/AQUA_jpg.jpg?v=1778239125" },
-  "spicy": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/SPICY_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/SPICY_jpg.jpg?v=1778239125" },
-  "oriental": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ORIENTAL_jpg.jpg?v=1778239125", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ORIENTAL_jpg.jpg?v=1778239125" },
-  "fresh": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh.jpg?v=1778136299", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh.jpg?v=1778136299" },
-  "unisex": { type: "image", desktopSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/unisex.png?v=1780126452", mobileSrc: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/unisex.png?v=1780126452" },
+  "oud": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "floral": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "citrus": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "woody": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "aquatic": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "spicy": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "oriental": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "fresh": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
+  "unisex": { type: "image", desktopSrc: "/images/fallback-luxury.svg", mobileSrc: "/images/fallback-luxury.svg" },
 
 
   // --- DEFAULT FALLBACK ---
@@ -145,19 +145,19 @@ export const BRAND_MEDIA: Record<string, { type: "image" | "video", desktopSrc: 
 };
 
 export const SORT_OPTIONS = [
-  { label: "Featured", value: "featured", shopifySortKey: "COLLECTION_DEFAULT", reverse: false },
-  { label: "Newest", value: "newest", shopifySortKey: "CREATED", reverse: true },
-  { label: "Price: Low to High", value: "price-asc", shopifySortKey: "PRICE", reverse: false },
-  { label: "Price: High to Low", value: "price-desc", shopifySortKey: "PRICE", reverse: true },
-  { label: "Trending", value: "trending", shopifySortKey: "BEST_SELLING", reverse: false },
+  { label: "Featured", value: "featured", sortKey: "COLLECTION_DEFAULT", reverse: false },
+  { label: "Newest", value: "newest", sortKey: "CREATED", reverse: true },
+  { label: "Price: Low to High", value: "price-asc", sortKey: "PRICE", reverse: false },
+  { label: "Price: High to Low", value: "price-desc", sortKey: "PRICE", reverse: true },
+  { label: "Trending", value: "trending", sortKey: "BEST_SELLING", reverse: false },
 ];
 
 export const INSTAGRAM_POSTS = [
-  { id: "ig-1", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/1_937d780d-e810-458e-959a-db88b913959b.webp?v=1778479565", alt: "Exclusive woody fragrance notes" },
-  { id: "ig-3", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/16.webp?v=1778479565", alt: "Bright citrus perfume vibes" },
-  { id: "ig-4", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/15.webp?v=1778479566", alt: "Grounded earthy woody notes" },
-  { id: "ig-5", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/2_24d003cb-398d-4149-bfaa-626d30dc7dfc.webp?v=1778479565", alt: "Cool aquatic fragrance lifestyle" },
-  { id: "ig-6", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/17.webp?v=1778479565", alt: "Bold and intriguing spicy scents" },
-  { id: "ig-7", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/New_NB_Red_A_Premium_Quality_Perfume_WithFragrance-_Lemon_Rose_Orange_Blossom_Amber_Wood.webp?v=1782801488", alt: "Bold and intriguing spicy scents" },
+  { id: "ig-1", image: "/images/fallback-luxury.svg", alt: "Exclusive woody fragrance notes" },
+  { id: "ig-3", image: "/images/fallback-luxury.svg", alt: "Bright citrus perfume vibes" },
+  { id: "ig-4", image: "/images/fallback-luxury.svg", alt: "Grounded earthy woody notes" },
+  { id: "ig-5", image: "/images/fallback-luxury.svg", alt: "Cool aquatic fragrance lifestyle" },
+  { id: "ig-6", image: "/images/fallback-luxury.svg", alt: "Bold and intriguing spicy scents" },
+  { id: "ig-7", image: "/images/fallback-luxury.svg", alt: "Bold and intriguing spicy scents" },
 
-];  
+];

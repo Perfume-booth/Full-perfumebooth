@@ -1,4 +1,4 @@
-import { getBlog } from "@/lib/shopify";
+import { getBlog } from "@/lib/catalog";
 
 export const metadata = {
   title: "The Journal | Exclusive Perfume Booth",

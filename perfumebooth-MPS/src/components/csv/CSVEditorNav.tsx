@@ -41,13 +41,13 @@ export default function CSVEditorNav() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-              Shopify Safe Partial CSV Editor
+              Safe Partial CSV Editor
               <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-600 font-semibold rounded-full border border-emerald-500/20">
                 Safe Partial Updates Active
               </span>
             </h1>
             <p className="text-xs text-muted-foreground">
-              Guarantees untouched Shopify fields are never modified or cleared during updates.
+              Guarantees untouched catalog fields are never modified or cleared during updates.
             </p>
           </div>
         </div>

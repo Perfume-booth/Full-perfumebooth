@@ -3,6 +3,7 @@ Django Settings — PerfumeBooth Backend
 All secrets are read from environment variables (via python-decouple).
 Docker populates these from .env.docker; local dev uses a .env file.
 """
+import sys
 from datetime import timedelta
 from pathlib import Path
 # pyrefly: ignore [missing-import]
@@ -16,8 +17,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ─────────────────────────────────────────────────────────────────────────────
 # Security
 # ─────────────────────────────────────────────────────────────────────────────
-SECRET_KEY = config('DJANGO_SECRET_KEY')
-DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
+IS_TESTING = 'test' in sys.argv
+DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
+if DEBUG or IS_TESTING:
+    SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-local-development-only')
+else:
+    # A production deployment must never start with a known signing key.
+    SECRET_KEY = config('DJANGO_SECRET_KEY')
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,django,127.0.0.1', cast=Csv())
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -47,6 +53,8 @@ LOCAL_APPS = [
     'apps.shop',
     'apps.orders',
     'apps.cms',
+    'apps.checkout',
+    'apps.catalog',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -56,6 +64,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ─────────────────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'core.middleware.RequestIDMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'corsheaders.middleware.CorsMiddleware',      # Must be before CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -93,40 +102,57 @@ WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Database — PostgreSQL with pgvector
+# Database — PostgreSQL with pgvector (SQLite in-memory for testing)
 # ─────────────────────────────────────────────────────────────────────────────
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRES_DB', default='perfumebooth'),
-        'USER': config('POSTGRES_USER', default='perfume_user'),
-        'PASSWORD': config('POSTGRES_PASSWORD'),
-        'HOST': config('POSTGRES_HOST', default='postgres'),
-        'PORT': config('POSTGRES_PORT', default='5432'),
-        'CONN_MAX_AGE': 60,           # Persistent connections (seconds)
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
     }
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Cache — Redis DB 0
-# ─────────────────────────────────────────────────────────────────────────────
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config('REDIS_URL', default='redis://redis:6379/0'),
-        'KEY_PREFIX': 'perfumebooth',
-        'TIMEOUT': 3600,              # Default TTL: 1 hour
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
     }
-}
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='perfumebooth'),
+            'USER': config('POSTGRES_USER', default='perfume_user'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default=''),
+            'HOST': config('POSTGRES_HOST', default='postgres'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+            'CONN_MAX_AGE': 60,           # Persistent connections (seconds)
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+        }
+    }
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': config('REDIS_URL', default='redis://redis:6379/0'),
+            'KEY_PREFIX': 'perfumebooth',
+            'TIMEOUT': 3600,              # Default TTL: 1 hour
+        }
+    }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Celery — Redis DB 1 (broker) + DB 2 (results)
 # ─────────────────────────────────────────────────────────────────────────────
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/1')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://redis:6379/2')
+if 'test' in sys.argv:
+    CELERY_BROKER_URL = 'memory://'
+    CELERY_RESULT_BACKEND = 'cache+locmem://'
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+else:
+    CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/1')
+    CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://redis:6379/2')
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']
@@ -154,17 +180,22 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
+        'core.responses.StandardJSONRenderer',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
+    'COERCE_DECIMAL_TO_STRING': True,
+    'EXCEPTION_HANDLER': 'core.exceptions.sanitized_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '2000/minute',
-        'user': '10000/minute',
+        'anon': config('THROTTLE_ANON_RATE', default='120/minute'),
+        'user': config('THROTTLE_USER_RATE', default='600/minute'),
+        'auth': config('THROTTLE_AUTH_RATE', default='10/minute'),
+        'otp': config('THROTTLE_OTP_RATE', default='5/minute'),
+        'checkout': config('THROTTLE_CHECKOUT_RATE', default='10/minute'),
     },
 }
 
@@ -172,41 +203,20 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
 }
 
 
-# Session & CSRF Cookie Settings for Local Cross-Origin Dev
-SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment-Specific Security & Cookies (Dev vs Prod Separation)
+# ─────────────────────────────────────────────────────────────────────────────
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = False  # Allows frontend to read csrf cookie
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Survived browser window close
+CSRF_COOKIE_HTTPONLY = False  # Allows frontend to read csrf cookie for state mutations
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_COOKIE_AGE = 1209600  # Persistent session lasts for 14 days
-
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-]
-
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CORS — django-cors-headers
-# ─────────────────────────────────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:3001,http://nextjs:3000,http://nextjs:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
-    cast=Csv(),
-)
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=DEBUG, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -216,6 +226,53 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+if not DEBUG:
+    # ── Production Security Settings ─────────────────────────────────────────
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax')
+    CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Lax')
+
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool) if 'test' not in sys.argv else False
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # Strict CORS & CSRF — NEVER allow all origins in production
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = config(
+        'CORS_ALLOWED_ORIGINS',
+        default='https://perfumebooth.com,https://admin.perfumebooth.com',
+        cast=Csv(),
+    )
+    CSRF_TRUSTED_ORIGINS = config(
+        'CSRF_TRUSTED_ORIGINS',
+        default='https://perfumebooth.com,https://admin.perfumebooth.com',
+        cast=Csv(),
+    )
+else:
+    # ── Local Development Security Settings ──────────────────────────────────
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+    CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+    CORS_ALLOWED_ORIGINS = config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://localhost:3000,http://localhost:3001,http://nextjs:3000,http://nextjs:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
+        cast=Csv(),
+    )
+    CSRF_TRUSTED_ORIGINS = config(
+        'CSRF_TRUSTED_ORIGINS',
+        default='http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
+        cast=Csv(),
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Static & Media Files

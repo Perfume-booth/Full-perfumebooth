@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { AnimatedArrowRight } from "@/components/ui/icons/AnimatedArrowRight";
-import type { Article } from "@/lib/shopify";
+import type { Article } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 
 interface BlogCardProps {

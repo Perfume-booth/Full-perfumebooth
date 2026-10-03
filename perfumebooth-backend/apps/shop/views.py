@@ -7,7 +7,12 @@ from rest_framework.views import APIView
 # pyrefly: ignore [missing-import]
 from django.core.cache import cache
 import json
+import logging
 from decimal import Decimal
+from rest_framework.exceptions import ValidationError
+from core.validators import validate_image_upload, validate_spreadsheet_upload
+
+logger = logging.getLogger(__name__)
 
 from .models import Product, Inventory, ProductImage, Collection, AutoCollection, WishlistItem, ProductReview
 # pyrefly: ignore [missing-import]
@@ -26,777 +31,28 @@ import random
 # pyrefly: ignore [missing-import]
 from apps.orders.models import Order
 
-def flatten_product(product, request):
-    """
-    Extracts nested data from the attributes JSONB field and flattens it
-    so the API response matches the storefront's expected TypeScript interface.
-    """
-    images_data = []
-    for img in product.images.all():
-        images_data.append({
-            'url': request.build_absolute_uri(img.image.url) if img.image else None,
-            'altText': img.alt_text,
-            'width': img.width,
-            'height': img.height
-        })
 
-    variants_data = []
-    for var in product.variants.all():
-        variants_data.append({
-            'id': str(var.id),
-            'title': var.title,
-            'option1_name': var.option1_name,
-            'option1_value': var.option1_value,
-            'option2_name': var.option2_name,
-            'option2_value': var.option2_value,
-            'sku': var.sku,
-            'price': str(var.price),
-            'compare_at_price': str(var.compare_at_price) if var.compare_at_price else None,
-            'stock': var.stock_level,
-            'image': request.build_absolute_uri(var.image.url) if var.image else None,
-        })
-
-    stock_val = product.inventory.stock_level if hasattr(product, 'inventory') else 0
-
-    result = {
-        'id': str(product.id),
-        'title': product.title,
-        'slug': product.slug,
-        'sku': product.sku,
-        'price': str(product.price),
-        'compare_at_price': str(product.compare_at_price) if product.compare_at_price else None,
-        'image': request.build_absolute_uri(product.image.url) if product.image else None,
-        'images': images_data,
-        'variants': variants_data,
-        'stock': stock_val,
-        'stock_count': stock_val,
-        'is_online': product.is_online,
-        'created_at': product.created_at.isoformat(),
-        'updated_at': product.updated_at.isoformat(),
-        'description': product.description,
-        'created_by_name': (f"{product.created_by.full_name or product.created_by.email}" + (f" ({', '.join([ur.role.name for ur in product.created_by.roles.all()])})" if product.created_by.roles.exists() else "")) if product.created_by else "",
-        'updated_by_name': (f"{product.updated_by.full_name or product.updated_by.email}" + (f" ({', '.join([ur.role.name for ur in product.updated_by.roles.all()])})" if product.updated_by.roles.exists() else "")) if product.updated_by else "",
-    }
-
-    attrs = product.attributes or {}
-    
-    # Storefront metafields defaults
-    result['brand'] = attrs.get('brand', '')
-    result['tagline'] = attrs.get('tagline', '')
-    result['category'] = attrs.get('category')
-    result['productType'] = attrs.get('productType')
-    result['tags'] = attrs.get('tags', [])
-    result['vendor'] = attrs.get('vendor', '')
-    result['top_notes'] = attrs.get('top_notes', '')
-    result['middle_notes'] = attrs.get('middle_notes', '')
-    result['base_notes'] = attrs.get('base_notes', '')
-    result['longevity'] = attrs.get('longevity', '')
-    result['sillage'] = attrs.get('sillage', '')
-    result['size_ml'] = attrs.get('size_ml', 100)
-    result['is_scent_shot'] = attrs.get('is_scent_shot', False)
-    result['whats_inside'] = attrs.get('whats_inside', [])
-    result['ingredients'] = attrs.get('ingredients', '')
-    
-    # Optional fields
-    result['image_alt_text'] = attrs.get('image_alt_text', '')
-    result['ideal_for'] = attrs.get('ideal_for', '')
-    result['fragrance_type'] = attrs.get('fragrance_type', '')
-    result['origin_country'] = attrs.get('origin_country', '')
-    result['concentration'] = attrs.get('concentration', '')
-    result['gender'] = attrs.get('gender', '')
-    result['season'] = attrs.get('season', '')
-    result['occasion'] = attrs.get('occasion', '')
-    result['rating'] = attrs.get('rating', 4.5)
-    result['rating_count'] = attrs.get('rating_count', 0)
-    result['discount_price'] = attrs.get('discount_price', None)
-    result['has_discount'] = attrs.get('has_discount', False)
-    
-    # Preserve raw attributes for backward compatibility
-    result['attributes'] = attrs
-
-    return result
-
-
-def auto_generate_tags(attributes):
-    """
-    Build tags array from product attribute fields for collection matching and search.
-    Called automatically on product create/update.
-    """
-    tags = list(attributes.get('tags', []))
-    
-    # Gender tags (for /men, /women collection matching)
-    gender = attributes.get('gender', '')
-    if gender:
-        gl = gender.lower()
-        if 'men' in gl and 'women' not in gl:
-            for t in ['Perfume for Men', 'men']:
-                if t.lower() not in [x.lower() for x in tags]:
-                    tags.append(t)
-        if 'women' in gl or 'female' in gl:
-            for t in ['Perfume for Women', 'women']:
-                if t.lower() not in [x.lower() for x in tags]:
-                    tags.append(t)
-        if 'unisex' in gl:
-            for t in ['Unisex Perfume', 'unisex']:
-                if t.lower() not in [x.lower() for x in tags]:
-                    tags.append(t)
-    
-    # Category as tag (for /woody, /floral collection matching)
-    category = attributes.get('category', '')
-    if category and category.lower() not in [t.lower() for t in tags]:
-        tags.append(category.lower())
-    
-    # Brand as tag (for /brands/[slug] collection matching)
-    brand = attributes.get('brand', '')
-    if brand and brand.lower() not in [t.lower() for t in tags]:
-        tags.append(brand.lower())
-    
-    # Product type as tag
-    product_type = attributes.get('productType', '')
-    if product_type and product_type.lower() not in [t.lower() for t in tags]:
-        tags.append(product_type.lower())
-    
-    # Occasion as tag
-    occasion = attributes.get('occasion', '')
-    if occasion and occasion.lower() not in [t.lower() for t in tags]:
-        tags.append(occasion.lower())
-    
-    # Season as tag
-    season = attributes.get('season', '')
-    if season and season.lower() not in [t.lower() for t in tags]:
-        tags.append(season.lower())
-    
-    # Scent notes as tags (top, middle, base)
-    for note_field in ['top_notes', 'middle_notes', 'base_notes']:
-        notes = attributes.get(note_field, '')
-        if notes:
-            for note in notes.split(','):
-                note = note.strip().lower()
-                if note and note not in [t.lower() for t in tags]:
-                    tags.append(note)
-    
-    # Deduplicate (case-insensitive, preserve first occurrence)
-    seen = set()
-    unique = []
-    for t in tags:
-        key = t.lower().strip()
-        if key and key not in seen:
-            seen.add(key)
-            unique.append(t)
-    
-    return unique
-
-
-import os
-# pyrefly: ignore [missing-import]
-from django.conf import settings
-
-BRANDS_FILE_PATH = os.path.join(settings.BASE_DIR, 'brands.json')
-CONSTANTS_PATH = '/app/constants.ts'
-
-import re
-
-def load_brands():
-    # 1. Try to read from constants.ts first
-    if os.path.exists(CONSTANTS_PATH):
-        try:
-            with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
-                content = f.read()
-            match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)\]', content, re.DOTALL)
-            if match:
-                brands_block = match.group(1)
-                brands = re.findall(r'["\'](.*?)["\']', brands_block)
-                return [b.strip() for b in brands if b.strip()]
-        except Exception as e:
-            print("Error loading brands from constants.ts:", e)
-
-    # 2. Fallback to brands.json
-    if not os.path.exists(BRANDS_FILE_PATH):
-        default_brands = [
-            "Al Haramain", "Arabiyat Prestige", "Lomani", "Louis Cardin",
-            "MPF", "New NB", "Otoori", "Lattafa", "Swiss Arabian",
-            "PerfumeBooth", "Armaf", "Creed", "Chanel"
-        ]
-        with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
-            json.dump(default_brands, f, indent=2)
-        return default_brands
-    try:
-        with open(BRANDS_FILE_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def save_brand(brand_name):
-    if not brand_name:
-        return
-    brand_name = brand_name.strip()
-    if not brand_name:
-        return
-    
-    # 1. If constants.ts exists, update constants.ts
-    if os.path.exists(CONSTANTS_PATH):
-        try:
-            with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)(,\s*)?\]', content, re.DOTALL)
-            if match:
-                brands_block = match.group(1)
-                existing_brands = re.findall(r'["\'](.*?)["\']', brands_block)
-                # Case insensitive check
-                if not any(b.lower() == brand_name.lower() for b in existing_brands):
-                    # Strip any trailing comma/space
-                    clean_block = brands_block.rstrip()
-                    if clean_block and not clean_block.endswith(','):
-                        new_block = clean_block + f',\n  "{brand_name}"'
-                    else:
-                        new_block = clean_block + f'\n  "{brand_name}"'
-                    
-                    new_content = content.replace(brands_block, new_block)
-                    with open(CONSTANTS_PATH, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
-                    return
-        except Exception as e:
-            print("Error saving brand to constants.ts:", e)
-
-    # 2. Fallback to brands.json
-    brands = load_brands()
-    if not any(b.lower() == brand_name.lower() for b in brands):
-        brands.append(brand_name)
-        with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
-            json.dump(brands, f, indent=2)
-
-class BrandListView(APIView):
-    permission_classes = [permissions.AllowAny]
-    
-    def get(self, request):
-        cache_key = 'catalog:brands'
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-        brands = load_brands()
-        cache.set(cache_key, brands, timeout=86400)  # Cache 24 hours
-        return Response(brands)
-
-    def post(self, request):
-        brand_name = request.data.get('brand')
-        if brand_name:
-            save_brand(brand_name)
-            cache.delete('catalog:brands')
-            cache.clear()  # Clear related product/facet caches
-            return Response({'status': 'success', 'brands': load_brands()})
-        return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request):
-        brand_name = request.data.get('brand') or request.query_params.get('brand')
-        if not brand_name:
-            return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        brand_name = brand_name.strip()
-        
-        # 1. Update constants.ts if it exists
-        if os.path.exists(CONSTANTS_PATH):
-            try:
-                with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)(,\s*)?\]', content, re.DOTALL)
-                if match:
-                    brands_block = match.group(1)
-                    existing_brands = re.findall(r'["\'](.*?)["\']', brands_block)
-                    
-                    # Filter out the deleted brand (case-insensitive)
-                    new_brands = [b for b in existing_brands if b.lower() != brand_name.lower()]
-                    
-                    # Rebuild the TOP_BRANDS block
-                    new_block = "\n  " + ",\n  ".join([f'"{b}"' for b in new_brands]) + ",\n"
-                    new_content = content.replace(brands_block, new_block)
-                    with open(CONSTANTS_PATH, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
-            except Exception as e:
-                print("Error deleting brand from constants.ts:", e)
-        
-        # 2. Fallback / Sync brands.json
-        if os.path.exists(BRANDS_FILE_PATH):
-            try:
-                with open(BRANDS_FILE_PATH, 'r', encoding='utf-8') as f:
-                    brands = json.load(f)
-                brands = [b for b in brands if b.lower() != brand_name.lower()]
-                with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(brands, f, indent=2)
-            except Exception:
-                pass
-                
-        cache.delete('catalog:brands')
-        cache.clear()  # Clear related product/facet caches
-        return Response({'status': 'success', 'brands': load_brands()})
-
-
-class ProductFacetsView(APIView):
-    """
-    GET /api/shop/facets/ — Returns aggregated filter facets from all online products.
-    Used by the storefront sidebar to dynamically populate filter options.
-    """
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request):
-        cache_key = 'catalog:facets'
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
-        products = Product.objects.filter(is_online=True)
-
-        # Counters for each facet
-        genders = {}
-        brands = {}
-        categories = {}
-        product_types = {}
-        occasions = {}
-        seasons = {}
-        all_tags = set()
-
-        for product in products:
-            attrs = product.attributes or {}
-
-            # Gender
-            gender = attrs.get('gender', '').strip()
-            if gender:
-                genders[gender] = genders.get(gender, 0) + 1
-
-            # Brand
-            brand = attrs.get('brand', '').strip()
-            if brand:
-                brands[brand] = brands.get(brand, 0) + 1
-
-            # Category
-            category = attrs.get('category', '').strip()
-            if category:
-                categories[category] = categories.get(category, 0) + 1
-
-            # Product Type
-            pt = attrs.get('productType', '').strip()
-            if pt:
-                product_types[pt] = product_types.get(pt, 0) + 1
-
-            # Occasion
-            occasion = attrs.get('occasion', '').strip()
-            if occasion:
-                occasions[occasion] = occasions.get(occasion, 0) + 1
-
-            # Season
-            season = attrs.get('season', '').strip()
-            if season:
-                seasons[season] = seasons.get(season, 0) + 1
-
-            # Tags
-            tags = attrs.get('tags', [])
-            if isinstance(tags, list):
-                all_tags.update(tags)
-
-        def to_facet_list(counter):
-            return sorted(
-                [{'value': k, 'count': v} for k, v in counter.items()],
-                key=lambda x: x['count'],
-                reverse=True
-            )
-
-        data = {
-            'genders': to_facet_list(genders),
-            'brands': to_facet_list(brands),
-            'categories': to_facet_list(categories),
-            'productTypes': to_facet_list(product_types),
-            'occasions': to_facet_list(occasions),
-            'seasons': to_facet_list(seasons),
-            'tags': sorted(list(all_tags)),
-        }
-
-        cache.set(cache_key, data, timeout=300)  # Cache 5 minutes
-        return Response(data)
-
-
-class ProductListView(APIView):
-    """GET /api/shop/products/ — Paginated product catalog."""
-    
-    def get_permissions(self):
-        if self.request.method == 'GET':
-            return [permissions.AllowAny()]
-        return [permissions.IsAuthenticated(), HasRolePermission()]
-
-    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
-
-    def get(self, request):
-        # Retrieve filters from query parameters
-        search_query = request.query_params.get('search', '')
-        stock_status = request.query_params.get('stock_status', '')  # 'all', 'low', 'out'
-        brand = request.query_params.get('brand', '')
-        status_filter = request.query_params.get('status', '')  # 'online', 'offline'
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get('page_size', 50))  # Default 50 per page
-        paginate = request.query_params.get('paginate', 'false').lower() == 'true'
-
-        # Cache key: catalog:products:<params>
-        cache_key = f'catalog:products:page:{page}:size:{page_size}:search:{search_query}:stock:{stock_status}:brand:{brand}:status:{status_filter}:paginated:{paginate}'
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
-        # Include items that are offline if requested by an authenticated merchant
-        is_merchant = request.user and request.user.is_authenticated and any(
-            role in ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive'] 
-            for role in request.user.roles.values_list('role__name', flat=True)
-        )
-        
-        products = Product.objects.select_related('created_by', 'updated_by').prefetch_related(
-            'images',
-            'created_by__roles__role',
-            'updated_by__roles__role'
-        ).order_by('title')
-
-        if not is_merchant:
-            products = products.filter(is_online=True)
-        else:
-            if status_filter == 'online':
-                products = products.filter(is_online=True)
-            elif status_filter == 'offline':
-                products = products.filter(is_online=False)
-
-        # Apply search filter
-        if search_query:
-            products = products.filter(
-                Q(title__icontains=search_query) | 
-                Q(sku__icontains=search_query) |
-                Q(attributes__brand__icontains=search_query)
-            )
-
-        # Apply stock filter
-        if stock_status == 'low':
-            products = products.filter(inventory__stock_level__gt=0, inventory__stock_level__lte=10)
-        elif stock_status == 'out':
-            products = products.filter(inventory__stock_level=0)
-
-        # Apply brand filter
-        if brand:
-            products = products.filter(attributes__brand=brand)
-
-        if not paginate:
-            # Return full list as an array for backward compatibility
-            data = []
-            for product in products:
-                data.append(flatten_product(product, request))
-            cache.set(cache_key, data, timeout=7200)
-            return Response(data)
-
-        # Pagination calculations
-        total_count = products.count()
-        start = (page - 1) * page_size
-        end = start + page_size
-        paginated_products = products[start:end]
-
-        results = []
-        for product in paginated_products:
-            results.append(flatten_product(product, request))
-
-        response_data = {
-            'results': results,
-            'total_count': total_count,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': (total_count + page_size - 1) // page_size
-        }
-
-        cache.set(cache_key, response_data, timeout=30)  # cache 30 seconds for quick pagination changes
-        return Response(response_data)
-
-    def delete(self, request):
-        slugs = request.data.get('slugs', [])
-        if not slugs:
-            return Response({'detail': 'No products selected.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        count, _ = Product.objects.filter(slug__in=slugs).delete()
-        
-        # Clean up any collections left with 0 products
-        AutoCollection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
-        Collection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
-        
-        cache.clear()
-        
-        log_action(request.user, f"Bulk deleted {count} products", request)
-        return Response({'detail': f'Successfully deleted {count} products.'})
-
-    def patch(self, request):
-        slugs = request.data.get('slugs', [])
-        if not slugs:
-            return Response({'detail': 'No products selected.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        is_online = request.data.get('is_online')
-        price_adjustment = request.data.get('price_adjustment')
-        stock_adjustment = request.data.get('stock_adjustment')
-
-        if is_online is not None:
-            is_online_bool = str(is_online).lower() == 'true'
-            count = Product.objects.filter(slug__in=slugs).update(is_online=is_online_bool)
-            cache.clear()
-            action_word = "published" if is_online_bool else "unpublished"
-            log_action(request.user, f"Bulk {action_word} {count} products", request)
-            return Response({'detail': f'Successfully {action_word} {count} products.'})
-
-        if price_adjustment:
-            action = price_adjustment.get('action') # 'percent_discount', 'fixed_discount', 'set_compare'
-            val = float(price_adjustment.get('value', 0))
-            products = Product.objects.filter(slug__in=slugs)
-            count = 0
-            for p in products:
-                if action == 'percent_discount':
-                    p.compare_at_price = p.price
-                    p.price = p.price * Decimal(1 - val / 100)
-                elif action == 'fixed_discount':
-                    p.compare_at_price = p.price
-                    p.price = max(p.price - Decimal(val), Decimal(0))
-                elif action == 'set_compare':
-                    p.compare_at_price = Decimal(val)
-                p.save()
-                count += 1
-            cache.clear()
-            log_action(request.user, f"Bulk adjusted price for {count} products", request)
-            return Response({'detail': f'Successfully adjusted price for {count} products.'})
-
-        if stock_adjustment:
-            action = stock_adjustment.get('action') # 'set', 'add'
-            val = int(stock_adjustment.get('value', 0))
-            products = Product.objects.filter(slug__in=slugs)
-            count = 0
-            for p in products:
-                inventory = getattr(p, 'inventory', None)
-                if inventory:
-                    if action == 'set':
-                        inventory.stock_level = max(val, 0)
-                    elif action == 'add':
-                        inventory.stock_level = max(inventory.stock_level + val, 0)
-                    inventory.save()
-                    count += 1
-            cache.clear()
-            log_action(request.user, f"Bulk adjusted stock level for {count} products", request)
-            return Response({'detail': f'Successfully adjusted stock level for {count} products.'})
-
-        return Response({'detail': 'No valid action provided.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    def post(self, request):
-        title = request.data.get('title')
-        slug = request.data.get('slug')
-        sku = request.data.get('sku')
-        price = request.data.get('price')
-        compare_at_price = request.data.get('compare_at_price')
-        description = request.data.get('description', '')
-        is_online = str(request.data.get('is_online', 'true')).lower() == 'true'
-        
-        attributes = request.data.get('attributes', '{}')
-        if isinstance(attributes, str):
-            try:
-                attributes = json.loads(attributes)
-            except json.JSONDecodeError:
-                attributes = {}
-
-        # Auto-generate tags from product fields for collection matching
-        attributes['tags'] = auto_generate_tags(attributes)
-
-        user = request.user if request.user and request.user.is_authenticated else None
-
-        product = Product.objects.create(
-            title=title,
-            slug=slug,
-            sku=sku,
-            price=price,
-            compare_at_price=compare_at_price if compare_at_price else None,
-            description=description,
-            is_online=is_online,
-            attributes=attributes,
-            image=request.FILES.get('image'),
-            created_by=user,
-            updated_by=user
-        )
-        
-        # Auto-save brand to brands.json
-        brand_name = attributes.get('brand') or attributes.get('vendor')
-        if brand_name:
-            save_brand(brand_name)
-        
-        stock_level = int(request.data.get('stock_level', 0))
-        Inventory.objects.create(product=product, stock_level=stock_level)
-        
-        gallery_images = request.FILES.getlist('gallery')
-        for img in gallery_images:
-            ProductImage.objects.create(product=product, image=img)
-
-        # Save Variants if provided
-        variants_json = request.data.get('variants')
-        if variants_json:
-            if isinstance(variants_json, str):
-                try:
-                    variants_list = json.loads(variants_json)
-                except Exception:
-                    variants_list = []
-            elif isinstance(variants_json, list):
-                variants_list = variants_json
-            else:
-                variants_list = []
-
-            for v_data in variants_list:
-                ProductVariant.objects.create(
-                    product=product,
-                    title=v_data.get('title', 'Default Title'),
-                    option1_name=v_data.get('option1_name', 'Size'),
-                    option1_value=v_data.get('option1_value', '100ml'),
-                    option2_name=v_data.get('option2_name', ''),
-                    option2_value=v_data.get('option2_value', ''),
-                    sku=v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}",
-                    price=Decimal(str(v_data.get('price') or product.price)),
-                    compare_at_price=Decimal(str(v_data.get('compare_at_price'))) if v_data.get('compare_at_price') else None,
-                    stock_level=int(v_data.get('stock') or 0),
-                )
-
-        # Auto sync collections
-        synced = CollectionSyncService.syncProductCollections(product)
-        
-        cache.clear()
-        log_action(request.user, f"Created product '{product.title}' (SKU: {product.sku})", request)
-        return Response({
-            "success": True,
-            "message": "Product saved successfully.",
-            "collections_synced": synced,
-            "id": str(product.id),
-            "slug": product.slug
-        }, status=status.HTTP_201_CREATED)
-
-
-class ProductDetailView(APIView):
-    """GET /api/shop/products/<slug>/ — Single product by slug."""
-    
-    def get_permissions(self):
-        if self.request.method == 'GET':
-            return [permissions.AllowAny()]
-        return [permissions.IsAuthenticated(), HasRolePermission()]
-
-    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
-
-    def get(self, request, slug: str):
-        cache_key = f'catalog:product:{slug}'
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
-        try:
-            product = Product.objects.prefetch_related('images').get(slug=slug)
-        except Product.DoesNotExist:
-            return Response({'detail': 'Not found.'}, status=404)
-
-        data = flatten_product(product, request)
-        cache.set(cache_key, data, timeout=7200)
-        return Response(data)
-
-    def put(self, request, slug: str):
-        try:
-            product = Product.objects.get(slug=slug)
-        except Product.DoesNotExist:
-            return Response({'detail': 'Not found.'}, status=404)
-            
-        product.title = request.data.get('title', product.title)
-        product.sku = request.data.get('sku', product.sku)
-        product.price = request.data.get('price', product.price)
-        product.compare_at_price = request.data.get('compare_at_price', product.compare_at_price)
-        product.description = request.data.get('description', product.description)
-        product.is_online = str(request.data.get('is_online', product.is_online)).lower() == 'true'
-        
-        if 'image' in request.FILES:
-            product.image = request.FILES['image']
-            
-        attributes = request.data.get('attributes')
-        if attributes:
-            if isinstance(attributes, str):
-                try:
-                    attributes = json.loads(attributes)
-                except json.JSONDecodeError:
-                    attributes = None
-            if isinstance(attributes, dict):
-                # Auto-generate tags from product fields for collection matching
-                attributes['tags'] = auto_generate_tags(attributes)
-                product.attributes = attributes
-                
-        if request.user and request.user.is_authenticated:
-            product.updated_by = request.user
-        product.save()
-        
-        # Auto-save brand to brands.json
-        if product.attributes:
-            brand_name = product.attributes.get('brand') or product.attributes.get('vendor')
-            if brand_name:
-                save_brand(brand_name)
-        
-        if 'stock_level' in request.data:
-            stock = int(request.data['stock_level'])
-            Inventory.objects.update_or_create(product=product, defaults={'stock_level': stock})
-        gallery_images = request.FILES.getlist('gallery')
-        for img in gallery_images:
-            ProductImage.objects.create(product=product, image=img)
-
-        # Update Variants if provided
-        variants_json = request.data.get('variants')
-        if variants_json:
-            if isinstance(variants_json, str):
-                try:
-                    variants_list = json.loads(variants_json)
-                except Exception:
-                    variants_list = []
-            elif isinstance(variants_json, list):
-                variants_list = variants_json
-            else:
-                variants_list = []
-
-            if variants_list:
-                product.variants.all().delete()
-                for v_data in variants_list:
-                    ProductVariant.objects.create(
-                        product=product,
-                        title=v_data.get('title', 'Default Title'),
-                        option1_name=v_data.get('option1_name', 'Size'),
-                        option1_value=v_data.get('option1_value', '100ml'),
-                        option2_name=v_data.get('option2_name', ''),
-                        option2_value=v_data.get('option2_value', ''),
-                        sku=v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}",
-                        price=Decimal(str(v_data.get('price') or product.price)),
-                        compare_at_price=Decimal(str(v_data.get('compare_at_price'))) if v_data.get('compare_at_price') else None,
-                        stock_level=int(v_data.get('stock') or 0),
-                    )
-
-        # Auto sync collections
-        synced = CollectionSyncService.syncProductCollections(product)
-
-        cache.clear()
-        log_action(request.user, f"Updated product '{product.title}' (SKU: {product.sku})", request)
-        return Response({
-            "success": True,
-            "message": "Product saved successfully.",
-            "collections_synced": synced
-        })
-
-    def delete(self, request, slug: str):
-        try:
-            product = Product.objects.get(slug=slug)
-        except Product.DoesNotExist:
-            return Response({'detail': 'Not found.'}, status=404)
-            
-        product_title = product.title
-        product_sku = product.sku
-        product.delete()
-        
-        # Clean up any collections left with 0 products
-        AutoCollection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
-        Collection.objects.annotate(num_products=Count('products')).filter(num_products=0).delete()
-        
-        cache.clear()
-        log_action(request.user, f"Deleted product '{product_title}' (SKU: {product_sku})", request)
-        return Response({'detail': 'Product deleted successfully.'})
-
+# Catalog domain components extracted to apps.catalog
+from apps.catalog.services import (
+    CatalogService,
+    FacetService,
+    BrandService,
+    RecommendationService,
+)
+from apps.catalog.services.catalog_service import auto_generate_tags
+from apps.catalog.services.brand_service import BRANDS_FILE_PATH, CONSTANTS_PATH
+from apps.catalog.views import (
+    BrandListView,
+    ProductFacetsView,
+    ProductListView,
+    ProductDetailView,
+    ProductRecommendationVectorView,
+)
+
+# Backwards compatibility aliases
+flatten_product = CatalogService.serialize_product
+load_brands = BrandService.load_brands
+save_brand = BrandService.save_brand
 
 class DashboardAnalyticsView(APIView):
     """
@@ -946,6 +202,11 @@ class CollectionListCreateView(APIView):
         is_active = str(request.data.get('is_active', 'true')).lower() == 'true'
         status_val = 'active' if is_active else 'inactive'
         image = request.FILES.get('image')
+        if image:
+            try:
+                validate_image_upload(image)
+            except ValidationError as ve:
+                return Response({'detail': ve.detail if isinstance(ve.detail, str) else ve.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
 
         collection = AutoCollection.objects.create(
             name=title,
@@ -1063,7 +324,13 @@ class CollectionDetailView(APIView):
             is_active = str(request.data.get('is_active')).lower() == 'true'
             col.status = 'active' if is_active else 'inactive'
         if 'image' in request.FILES:
-            col.image = request.FILES.get('image')
+            img_file = request.FILES.get('image')
+            if img_file:
+                try:
+                    validate_image_upload(img_file)
+                except ValidationError as ve:
+                    return Response({'detail': ve.detail if isinstance(ve.detail, str) else ve.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
+            col.image = img_file
         elif request.data.get('image') == 'null' or request.data.get('image') == '':
             col.image = None
 
@@ -1143,453 +410,6 @@ class CollectionDetailView(APIView):
         return Response({'detail': 'Collection deleted successfully.'})
 
 
-# pyrefly: ignore [missing-import]
-from django.http import HttpResponse
-from io import BytesIO
-# pyrefly: ignore [missing-import]
-from django.utils.text import slugify
-
-class ProductExcelExportView(APIView):
-    permission_classes = [permissions.AllowAny]
-    
-    def get(self, request):
-        import openpyxl
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Products"
-
-        headers = [
-            "Title", "Slug", "SKU", "Price", "Compare At Price", 
-            "Description", "Stock Level", "Is Online", "Brand", 
-            "Category", "Gender", "Product Type", "Top Notes", 
-            "Middle Notes", "Base Notes", "Occasion", "Season"
-        ]
-        ws.append(headers)
-
-        products = Product.objects.all().prefetch_related('inventory')
-        for p in products:
-            attrs = p.attributes or {}
-            stock = p.inventory.stock_level if hasattr(p, 'inventory') else 0
-            row = [
-                p.title,
-                p.slug,
-                p.sku,
-                float(p.price) if p.price else 0.0,
-                float(p.compare_at_price) if p.compare_at_price else None,
-                p.description,
-                stock,
-                p.is_online,
-                attrs.get('brand') or attrs.get('vendor', ''),
-                attrs.get('category', ''),
-                attrs.get('gender', ''),
-                attrs.get('productType', ''),
-                attrs.get('top_notes', ''),
-                attrs.get('middle_notes', ''),
-                attrs.get('base_notes', ''),
-                attrs.get('occasion', ''),
-                attrs.get('season', '')
-            ]
-            ws.append(row)
-
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        response = HttpResponse(
-            output.read(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        response['Content-Disposition'] = 'attachment; filename="perfumebooth_products.xlsx"'
-        return response
-
-
-class ProductExcelImportView(APIView):
-    permission_classes = [permissions.AllowAny]
-    
-    def post(self, request):
-        import openpyxl
-        file_obj = request.FILES.get('file')
-        if not file_obj:
-            return Response({'detail': 'No file uploaded.'}, status=400)
-
-        try:
-            import csv
-            is_csv = file_obj.name.lower().endswith('.csv')
-            if is_csv:
-                decoded_file = file_obj.read().decode('utf-8-sig').splitlines()
-                reader = csv.reader(decoded_file)
-                rows = list(reader)
-            else:
-                wb = openpyxl.load_workbook(file_obj, read_only=True)
-                ws = wb.active
-                rows = list(ws.iter_rows(values_only=True))
-
-            if not rows:
-                return Response({'detail': 'Uploaded sheet/file is empty.'}, status=400)
-
-            headers = [str(h).strip().lower() for h in rows[0] if h is not None]
-            header_map = {h: i for i, h in enumerate(headers)}
-
-            def get_val(row, aliases, default=''):
-                if isinstance(aliases, str):
-                    aliases = [aliases]
-                for alias in aliases:
-                    idx = header_map.get(alias.lower())
-                    if idx is not None and idx < len(row):
-                        val = row[idx]
-                        if val is not None:
-                            if isinstance(val, str):
-                                val = val.strip()
-                                if val.startswith("'"):
-                                    val = val[1:]
-                            return val
-                return default
-
-            def safe_int(val, default=0):
-                try:
-                    return int(float(str(val).strip()))
-                except:
-                    return default
-
-            def safe_float(val, default=None):
-                try:
-                    return float(str(val).strip())
-                except:
-                    return default
-
-            products_imported = 0
-            for row in rows[1:]:
-                if not any(row):
-                    continue
-
-                sku = get_val(row, 'sku')
-                title = get_val(row, ['title', 'product title', 'name', 'product name'])
-                
-                # Skip if both Title and SKU are completely missing
-                if not sku and not title:
-                    continue
-                
-                # Generate fallback Title if SKU exists but Title is missing
-                if not title:
-                    title = f"Product {sku}"
-                
-                # Generate fallback SKU if Title exists but SKU is missing
-                if not sku:
-                    import random
-                    title_slug = slugify(title)
-                    sku = f"PB-AUTO-{title_slug[:20].upper()}-{random.randint(1000, 9999)}"
-
-                price = safe_float(get_val(row, ['price', 'price (₹)', 'selling price']), 0.0)
-                compare_price = safe_float(get_val(row, ['compare at price', 'compare at price (₹)', 'mrp']))
-                description = get_val(row, ['description', 'product description', 'body'], '')
-                is_online = str(get_val(row, ['is online', 'status', 'is_online'], 'true')).lower() == 'true'
-                stock_level = safe_int(get_val(row, ['stock level', 'stock quantity', 'stock', 'quantity']), 0)
-                slug = get_val(row, ['slug', 'handle'])
-                if not slug:
-                    slug = slugify(title)
-
-                attributes = {
-                    'brand': get_val(row, ['brand', 'brand name']),
-                    'vendor': get_val(row, ['vendor'], 'PerfumeBooth') or 'PerfumeBooth',
-                    'category': get_val(row, ['category', 'product category']),
-                    'gender': get_val(row, ['gender', 'target gender']),
-                    'productType': get_val(row, ['product type', 'concentration', 'productType']),
-                    'top_notes': get_val(row, ['top notes', 'top_notes']),
-                    'middle_notes': get_val(row, ['middle notes', 'middle_notes', 'heart notes', 'heart_notes']),
-                    'base_notes': get_val(row, ['base notes', 'base_notes']),
-                    'occasion': get_val(row, ['occasion']),
-                    'season': get_val(row, ['season']),
-                    'image_alt_text': get_val(row, ['image alt text', 'image alt', 'alt text', 'alt_text'])
-                }
-
-                attributes = {k: (v if v is not None else '') for k, v in attributes.items()}
-                attributes['tags'] = auto_generate_tags(attributes)
-
-                user = request.user if request.user and request.user.is_authenticated else None
-                defaults = {
-                    'title': title,
-                    'slug': slug,
-                    'price': price,
-                    'compare_at_price': compare_price if compare_price else None,
-                    'description': description,
-                    'is_online': is_online,
-                    'attributes': attributes,
-                    'updated_by': user
-                }
-                if not Product.objects.filter(sku=sku).exists():
-                    defaults['created_by'] = user
-
-                product, created = Product.objects.update_or_create(
-                    sku=sku,
-                    defaults=defaults
-                )
-
-                # Download and save image if an image URL is provided in the Excel/CSV sheet
-                image_url = get_val(row, ['image src', 'image', 'image url', 'image_url'])
-                if image_url and (image_url.startswith('http://') or image_url.startswith('https://')):
-                    try:
-                        import requests
-                        import re
-                        # pyrefly: ignore [missing-import]
-                        from django.core.files.base import ContentFile
-                        from urllib.parse import urlparse
-                        import os
-
-                        # Transform Google Drive link to direct download link if needed
-                        if 'drive.google.com' in image_url:
-                            file_id_match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', image_url)
-                            if not file_id_match:
-                                file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', image_url)
-                            if file_id_match:
-                                file_id = file_id_match.group(1)
-                                image_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-                        
-                        img_res = requests.get(image_url, timeout=15)
-                        if img_res.status_code == 200:
-                            parsed_url = urlparse(image_url)
-                            file_name = os.path.basename(parsed_url.path)
-                            # If it's a drive.google.com link, parsed path basename might be 'uc', so check or fallback
-                            if not file_name or file_name == 'uc':
-                                file_name = f"{sku}.jpg"
-                            product.image.save(file_name, ContentFile(img_res.content), save=True)
-                    except Exception as img_err:
-                        print(f"Error downloading image {image_url} for SKU {sku}: {img_err}")
-
-                # Auto-save brand to brands list
-                brand_name = attributes.get('brand')
-                if brand_name:
-                    save_brand(brand_name)
-
-                Inventory.objects.update_or_create(
-                    product=product,
-                    defaults={'stock_level': stock_level}
-                )
-
-                CollectionSyncService.syncProductCollections(product)
-                products_imported += 1
-
-            cache.clear()
-            return Response({
-                'success': True,
-                'detail': f'Successfully imported {products_imported} products.'
-            })
-        except Exception as e:
-            return Response({'detail': f'Error reading Excel: {str(e)}'}, status=500)
-
-
-from .models import PageBanner
-
-class PageBannerDetailView(APIView):
-    """
-    Public API to fetch active banners by page slug.
-    Used by the storefront (Next.js) to display dynamic CMS banners.
-    """
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request, slug):
-        cache_key = f'catalog:banner:{slug}'
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
-        banner = PageBanner.objects.filter(page_slug=slug, is_active=True).first()
-        if not banner:
-            return Response({'detail': 'Banner not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        images = banner.images.all()
-        image_data = []
-        for img in images:
-            image_data.append({
-                'id': str(img.id),
-                'image_url': request.build_absolute_uri(img.image.url) if img.image else None,
-                'mobile_image_url': request.build_absolute_uri(img.mobile_image.url) if img.mobile_image else None,
-                'sort_order': img.sort_order,
-                'link_url': img.link_url
-            })
-            
-        data = {
-            'id': str(banner.id),
-            'page_slug': banner.page_slug,
-            'title': banner.title,
-            'is_active': banner.is_active,
-            'images': image_data
-        }
-        cache.set(cache_key, data, timeout=7200)  # Cache 2 hours
-        return Response(data)
-class ProductExcelImportView(APIView):
-    permission_classes = [permissions.AllowAny]
-    
-    def post(self, request):
-        import openpyxl
-        file_obj = request.FILES.get('file')
-        if not file_obj:
-            return Response({'detail': 'No file uploaded.'}, status=400)
-
-        try:
-            import csv
-            is_csv = file_obj.name.lower().endswith('.csv')
-            if is_csv:
-                decoded_file = file_obj.read().decode('utf-8-sig').splitlines()
-                reader = csv.reader(decoded_file)
-                rows = list(reader)
-            else:
-                wb = openpyxl.load_workbook(file_obj, read_only=True)
-                ws = wb.active
-                rows = list(ws.iter_rows(values_only=True))
-
-            if not rows:
-                return Response({'detail': 'Uploaded sheet/file is empty.'}, status=400)
-
-            headers = [str(h).strip().lower() for h in rows[0] if h is not None]
-            header_map = {h: i for i, h in enumerate(headers)}
-
-            def get_val(row, aliases, default=''):
-                if isinstance(aliases, str):
-                    aliases = [aliases]
-                for alias in aliases:
-                    idx = header_map.get(alias.lower())
-                    if idx is not None and idx < len(row):
-                        val = row[idx]
-                        if val is not None:
-                            if isinstance(val, str):
-                                val = val.strip()
-                                if val.startswith("'"):
-                                    val = val[1:]
-                            return val
-                return default
-
-            def safe_int(val, default=0):
-                try:
-                    return int(float(str(val).strip()))
-                except:
-                    return default
-
-            def safe_float(val, default=None):
-                try:
-                    return float(str(val).strip())
-                except:
-                    return default
-
-            products_imported = 0
-            for row in rows[1:]:
-                if not any(row):
-                    continue
-
-                sku = get_val(row, 'sku')
-                title = get_val(row, ['title', 'product title', 'name', 'product name'])
-                
-                # Skip if both Title and SKU are completely missing
-                if not sku and not title:
-                    continue
-                
-                # Generate fallback Title if SKU exists but Title is missing
-                if not title:
-                    title = f"Product {sku}"
-                
-                # Generate fallback SKU if Title exists but SKU is missing
-                if not sku:
-                    import random
-                    title_slug = slugify(title)
-                    sku = f"PB-AUTO-{title_slug[:20].upper()}-{random.randint(1000, 9999)}"
-
-                price = safe_float(get_val(row, ['price', 'price (₹)', 'selling price']), 0.0)
-                compare_price = safe_float(get_val(row, ['compare at price', 'compare at price (₹)', 'mrp']))
-                description = get_val(row, ['description', 'product description', 'body'], '')
-                is_online = str(get_val(row, ['is online', 'status', 'is_online'], 'true')).lower() == 'true'
-                stock_level = safe_int(get_val(row, ['stock level', 'stock quantity', 'stock', 'quantity']), 0)
-                slug = get_val(row, ['slug', 'handle'])
-                if not slug:
-                    slug = slugify(title)
-
-                attributes = {
-                    'brand': get_val(row, ['brand', 'brand name']),
-                    'vendor': get_val(row, ['vendor'], 'PerfumeBooth') or 'PerfumeBooth',
-                    'category': get_val(row, ['category', 'product category']),
-                    'gender': get_val(row, ['gender', 'target gender']),
-                    'productType': get_val(row, ['product type', 'concentration', 'productType']),
-                    'top_notes': get_val(row, ['top notes', 'top_notes']),
-                    'middle_notes': get_val(row, ['middle notes', 'middle_notes', 'heart notes', 'heart_notes']),
-                    'base_notes': get_val(row, ['base notes', 'base_notes']),
-                    'occasion': get_val(row, ['occasion']),
-                    'season': get_val(row, ['season']),
-                    'image_alt_text': get_val(row, ['image alt text', 'image alt', 'alt text', 'alt_text'])
-                }
-
-                attributes = {k: (v if v is not None else '') for k, v in attributes.items()}
-                attributes['tags'] = auto_generate_tags(attributes)
-
-                user = request.user if request.user and request.user.is_authenticated else None
-                defaults = {
-                    'title': title,
-                    'slug': slug,
-                    'price': price,
-                    'compare_at_price': compare_price if compare_price else None,
-                    'description': description,
-                    'is_online': is_online,
-                    'attributes': attributes,
-                    'updated_by': user
-                }
-                if not Product.objects.filter(sku=sku).exists():
-                    defaults['created_by'] = user
-
-                product, created = Product.objects.update_or_create(
-                    sku=sku,
-                    defaults=defaults
-                )
-
-                # Download and save image if an image URL is provided in the Excel/CSV sheet
-                image_url = get_val(row, ['image src', 'image', 'image url', 'image_url'])
-                if image_url and (image_url.startswith('http://') or image_url.startswith('https://')):
-                    try:
-                        import requests
-                        import re
-                        # pyrefly: ignore [missing-import]
-                        from django.core.files.base import ContentFile
-                        from urllib.parse import urlparse
-                        import os
-
-                        # Transform Google Drive link to direct download link if needed
-                        if 'drive.google.com' in image_url:
-                            file_id_match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', image_url)
-                            if not file_id_match:
-                                file_id_match = re.search(r'id=([a-zA-Z0-9_-]+)', image_url)
-                            if file_id_match:
-                                file_id = file_id_match.group(1)
-                                image_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-                        
-                        img_res = requests.get(image_url, timeout=15)
-                        if img_res.status_code == 200:
-                            parsed_url = urlparse(image_url)
-                            file_name = os.path.basename(parsed_url.path)
-                            # If it's a drive.google.com link, parsed path basename might be 'uc', so check or fallback
-                            if not file_name or file_name == 'uc':
-                                file_name = f"{sku}.jpg"
-                            product.image.save(file_name, ContentFile(img_res.content), save=True)
-                    except Exception as img_err:
-                        print(f"Error downloading image {image_url} for SKU {sku}: {img_err}")
-
-                # Auto-save brand to brands list
-                brand_name = attributes.get('brand')
-                if brand_name:
-                    save_brand(brand_name)
-
-                Inventory.objects.update_or_create(
-                    product=product,
-                    defaults={'stock_level': stock_level}
-                )
-
-                CollectionSyncService.syncProductCollections(product)
-                products_imported += 1
-
-            cache.clear()
-            return Response({
-                'success': True,
-                'detail': f'Successfully imported {products_imported} products.'
-            })
-        except Exception as e:
-            return Response({'detail': f'Error reading Excel: {str(e)}'}, status=500)
-
-
 from .models import PageBanner
 
 def format_media_url(url, request=None):
@@ -1617,6 +437,11 @@ class PageBannerDetailView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, slug):
+        cache_key = f'catalog:banner:{slug}'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
         banner = PageBanner.objects.filter(page_slug=slug, is_active=True).first()
         if not banner:
             return Response({'detail': 'Banner not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1632,12 +457,15 @@ class PageBannerDetailView(APIView):
                 'link_url': img.link_url
             })
 
-        return Response({
+        data = {
             'id': str(banner.id),
             'page_slug': banner.page_slug,
             'title': banner.title,
+            'is_active': banner.is_active,
             'images': image_data
-        })
+        }
+        cache.set(cache_key, data, timeout=7200)
+        return Response(data)
 
 class PageBannerListCreateView(APIView):
     def get_permissions(self):
@@ -1698,6 +526,18 @@ class PageBannerListCreateView(APIView):
         from .models import PageBannerImage
         slide_id = request.data.get('slide_id')
         link_url = request.data.get('link_url', '')
+
+        # Validate any uploaded banner images
+        for img in request.FILES.getlist('image'):
+            try:
+                validate_image_upload(img)
+            except ValidationError as ve:
+                return Response({'detail': ve.detail if isinstance(ve.detail, str) else ve.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
+        for m_img in request.FILES.getlist('mobile_image'):
+            try:
+                validate_image_upload(m_img)
+            except ValidationError as ve:
+                return Response({'detail': ve.detail if isinstance(ve.detail, str) else ve.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
 
         if slide_id:
             try:
@@ -2022,63 +862,26 @@ class ProductReviewAPIView(APIView):
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
-class ProductRecommendationVectorView(APIView):
-    """
-    GET /api/shop/products/<slug>/recommendations/
-    Vector-distance similarity matching based on scent notes & profile attributes.
-    """
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request, slug):
-        try:
-            target = Product.objects.get(slug=slug, is_online=True)
-        except Product.DoesNotExist:
-            return Response({'detail': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        target_attrs = target.attributes or {}
-        target_notes = f"{target_attrs.get('top_notes', '')} {target_attrs.get('middle_notes', '')} {target_attrs.get('base_notes', '')} {target.description}".lower()
-        target_tokens = set(target_notes.split())
-
-        all_products = Product.objects.filter(is_online=True).exclude(id=target.id)
-        scored_products = []
-
-        for p in all_products:
-            p_attrs = p.attributes or {}
-            p_notes = f"{p_attrs.get('top_notes', '')} {p_attrs.get('middle_notes', '')} {p_attrs.get('base_notes', '')} {p.description}".lower()
-            p_tokens = set(p_notes.split())
-
-            intersection = target_tokens.intersection(p_tokens)
-            union = target_tokens.union(p_tokens)
-
-            # Jaccard similarity vector score
-            jaccard = len(intersection) / len(union) if union else 0.0
-
-            # Gender & Category boosts
-            if p_attrs.get('gender') == target_attrs.get('gender'):
-                jaccard += 0.1
-            if p_attrs.get('category') == target_attrs.get('category'):
-                jaccard += 0.1
-
-        scored_products.sort(key=lambda x: x[0], reverse=True)
-        recommendations = [flatten_product(item[1], request) for item in scored_products[:6]]
-
-        return Response(recommendations)
-
-
 class ProductExcelImportView(APIView):
     """
     POST /api/shop/products/excel-import/
-    Safe Partial Updates:
-    Upload a CSV/Excel file containing only a subset of products (e.g. 5 products).
-    Only those matching products and their provided columns (e.g. Price, Stock) are updated.
-    All other products and non-included fields remain untouched and safe.
+    Safe updates and imports for products from CSV/Excel files.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
     def post(self, request):
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response({'detail': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate file type, size, and content integrity
+        try:
+            validate_spreadsheet_upload(file_obj)
+        except ValidationError as ve:
+            return Response({'detail': ve.detail if isinstance(ve.detail, str) else ve.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return Response({'detail': 'Invalid file upload.'}, status=status.HTTP_400_BAD_REQUEST)
 
         filename = file_obj.name.lower()
         rows_data = []
@@ -2106,7 +909,8 @@ class ProductExcelImportView(APIView):
             else:
                 return Response({'detail': 'Unsupported file format. Please upload a .csv or .xlsx file.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({'detail': f'Error reading file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            logger.exception("Error parsing import file")
+            return Response({'detail': 'Failed to parse file. Please ensure the file is valid and correctly formatted.'}, status=status.HTTP_400_BAD_REQUEST)
 
         updated_count = 0
         created_count = 0
@@ -2164,6 +968,7 @@ class ProductExcelImportView(APIView):
                     except Exception:
                         pass
 
+                CollectionSyncService.syncProductCollections(product)
                 updated_count += 1
             elif handle or sku:
                 # Create product if missing
@@ -2178,18 +983,22 @@ class ProductExcelImportView(APIView):
                     title=new_title,
                     price=new_price,
                     is_online=str(status_val).lower() in ['active', 'true', '1', 'published'] if status_val else True,
-                    attributes={'brand': vendor or 'PerfumeBooth'}
+                    attributes={'brand': vendor or 'PerfumeBooth'},
+                    created_by=request.user if request.user and request.user.is_authenticated else None,
+                    updated_by=request.user if request.user and request.user.is_authenticated else None
                 )
                 if stock is not None and stock != '':
                     try:
                         Inventory.objects.create(product=new_product, stock_level=int(float(stock)))
                     except Exception:
                         pass
+                CollectionSyncService.syncProductCollections(new_product)
                 created_count += 1
 
         cache.clear()
+        log_action(request.user, f"Bulk imported {len(rows_data)} rows ({updated_count} updated, {created_count} created)", request)
         return Response({
-            'detail': f'Partial update successful! Updated {updated_count} products and created {created_count} products. All other products remained safe and untouched.',
+            'detail': f'Import successful! Updated {updated_count} products and created {created_count} products.',
             'updated_count': updated_count,
             'created_count': created_count,
             'total_rows_processed': len(rows_data)
@@ -2201,7 +1010,8 @@ class ProductExcelExportView(APIView):
     GET /api/shop/products/excel-export/
     Export catalog to XLSX format.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
     def get(self, request):
         import openpyxl
@@ -2262,7 +1072,8 @@ class AnalyticsAPIView(APIView):
     Dedicated Store Analytics & Reporting Endpoint.
     Calculates revenue, orders, AOV, sales trends, category distribution, and top products.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
     def get(self, request):
         timeframe = request.query_params.get('timeframe', '7d')

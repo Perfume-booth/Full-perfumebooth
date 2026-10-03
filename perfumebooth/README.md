@@ -21,7 +21,7 @@ To redefine the digital "Scent Journey" by merging state-of-the-art web technolo
 - **Smooth Scrolling**: Lenis
 
 ### Data & State
-- **Backend**: Shopify (Headless via GraphQL)
+- **Backend**: Django REST Framework with PostgreSQL
 - **State Management**: Zustand
 - **API Clients**: GraphQL, Axios
 
@@ -39,7 +39,7 @@ src/
 ├── app/          # Next.js App Router (Pages, Layouts, API)
 ├── components/   # Reusable UI components (Atomic design)
 ├── hooks/        # Custom React hooks (e.g., useDraggableScroll)
-├── lib/          # External service configurations (Shopify, etc.)
+├── lib/          # Django API clients, server actions, and utilities
 ├── services/     # API services and data fetching logic
 ├── store/        # Zustand state definitions   
 ├── styles/       # Global styles and typography (Tailwind v4)
@@ -58,8 +58,8 @@ src/
 ### 2. Environment Setup
 Create a `.env.local` file in the root directory and add the following (refer to the team Lead for production keys):
 ```env
-SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
-SHOPIFY_STOREFRONT_ACCESS_TOKEN=your-access-token
+BACKEND_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 ```
 
 ### 3. Installation

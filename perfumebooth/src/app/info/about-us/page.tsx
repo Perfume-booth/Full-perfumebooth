@@ -1,4 +1,4 @@
-import { getAboutUs } from "@/lib/shopify";
+import { getAboutUs } from "@/lib/catalog";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import InfoHero from "@/components/layout/InfoHero";
@@ -21,8 +21,8 @@ export default async function AboutUsPage() {
 
       <InfoHero 
         title={policy.title} 
-        desktopSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/about_782d7c52-96ce-47ad-b030-d50b3961e3a4.jpg?v=1778134332" 
-        mobileSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/about.jpg?v=1778130177" 
+        desktopSrc="/images/fallback-luxury.svg"
+        mobileSrc="/images/fallback-luxury.svg"
         pillText="PerfumeBooth Official Policy" 
         effectiveDate="09.08.2024" 
       />

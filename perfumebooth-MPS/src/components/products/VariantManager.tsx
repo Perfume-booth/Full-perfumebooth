@@ -110,7 +110,7 @@ export default function VariantManager({
         <div className="flex items-center gap-2.5">
           <Layers className="w-5 h-5 text-primary" />
           <div>
-            <h3 className="text-sm font-bold text-foreground">Shopify Product Variants (Sizes & Volume)</h3>
+            <h3 className="text-sm font-bold text-foreground">Product Variants (Sizes & Volume)</h3>
             <p className="text-xs text-muted-foreground">
               Add multiple bottle sizes (e.g. 50ml, 100ml, Scent Shot) under 1 single product page
             </p>

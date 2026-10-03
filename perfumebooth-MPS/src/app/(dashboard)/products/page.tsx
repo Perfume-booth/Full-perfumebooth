@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import ShopifyImportModal from '@/components/products/ShopifyImportModal';
-import ShopifyExportModal from '@/components/products/ShopifyExportModal';
+import CatalogImportModal from '@/components/products/CatalogImportModal';
+import CatalogExportModal from '@/components/products/CatalogExportModal';
 import BatchImageDropzone from '@/components/products/BatchImageDropzone';
 import VariantManager, { VariantItem } from '@/components/products/VariantManager';
 import { apiFetch } from '@/lib/api';
@@ -1192,7 +1192,7 @@ export default function ProductsPage() {
               />
             </div>
 
-            {/* Shopify Product Variant Manager */}
+            {/* Product variant manager */}
             <VariantManager
               baseSku={sku}
               basePrice={price}
@@ -1305,6 +1305,7 @@ export default function ProductsPage() {
     try {
       const res = await fetch('http://localhost:8000/api/shop/products/excel-export/', {
         method: 'GET',
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
@@ -1810,8 +1811,8 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Shopify Native Import & Export Modals */}
-      <ShopifyImportModal
+      {/* Catalog import and export modals */}
+      <CatalogImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onSuccess={() => {
@@ -1820,7 +1821,7 @@ export default function ProductsPage() {
         }}
       />
 
-      <ShopifyExportModal
+      <CatalogExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         products={products}

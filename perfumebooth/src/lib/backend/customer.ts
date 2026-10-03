@@ -48,6 +48,74 @@ export async function getCustomer(token: string) {
   }
 }
 
+function mapOrder(order: any) {
+  const status = String(order.status || "Pending").toUpperCase();
+  const shippingAddress = order.shipping_address || {};
+  const items = order.items || [];
+  return {
+    id: String(order.id),
+    name: order.order_number,
+    processedAt: order.created_at,
+    cancelledAt: status === "CANCELLED" ? order.updated_at || order.created_at : null,
+    cancelReason: status === "CANCELLED" ? "Cancelled" : null,
+    financialStatus: status === "PAID" || status === "SHIPPED" || status === "DELIVERED" ? "PAID" : "PENDING",
+    fulfillmentStatus: status === "DELIVERED" ? "FULFILLED" : status === "SHIPPED" ? "IN_PROGRESS" : status,
+    subtotalPrice: { amount: String(order.subtotal || order.total || 0), currencyCode: "INR" },
+    totalPrice: { amount: String(order.total || 0), currencyCode: "INR" },
+    totalShipping: String(shippingAddress.shipping_cost || 0),
+    totalDiscounts: String(order.discount_amount || 0),
+    shippingAddress: {
+      firstName: shippingAddress.firstName || shippingAddress.first_name || "",
+      lastName: shippingAddress.lastName || shippingAddress.last_name || "",
+      address1: shippingAddress.address1 || "",
+      address2: shippingAddress.address2 || "",
+      city: shippingAddress.city || "",
+      province: shippingAddress.state || shippingAddress.province || "",
+      zip: shippingAddress.zip || "",
+      phone: shippingAddress.phone || "",
+    },
+    email: shippingAddress.email || order.customer_email || "",
+    trackingUrl: order.tracking_url,
+    awb: order.awb_code,
+    courierName: order.courier_name,
+    lineItems: {
+      edges: items.map((item: any) => ({
+        node: {
+          id: String(item.id),
+          title: item.product_title,
+          quantity: item.quantity,
+          variant: {
+            title: item.product_title,
+            image: item.product_image ? { url: item.product_image, altText: item.product_title } : null,
+            price: { amount: String(item.unit_price || 0), currencyCode: "INR" },
+          },
+          originalTotalPrice: { amount: String(item.line_total || 0), currencyCode: "INR" },
+        },
+      })),
+    },
+    metafields: [],
+  };
+}
+
+export async function getCustomerOrders(token: string) {
+  const response = await fetch(`${API_URL}/api/orders/`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) return [];
+  const orders = await response.json();
+  return orders.map(mapOrder);
+}
+
+export async function getCustomerOrder(token: string, orderId: string) {
+  const response = await fetch(`${API_URL}/api/orders/${orderId}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+  return mapOrder(await response.json());
+}
+
 export async function updateCustomer(token: string, input: any) {
   if (!token) return { customer: null, customerUserErrors: [{ message: "Not authenticated" }] };
   try {

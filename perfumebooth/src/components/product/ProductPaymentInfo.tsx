@@ -51,10 +51,10 @@ export default function ProductPaymentInfo({ className = "" }: { className?: str
   };
 
   const PAYMENT_METHODS = [
-    { label: "Visa", src: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/visa.png?v=1781164108" },
-    { label: "Mastercard", src: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mastercard.png?v=1781164108" },
-    { label: "UPI", src: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/upi.png?v=1781164108" },
-    { label: "COD", src: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/pay-money-icon.webp?v=1781178695" },
+    { label: "Visa", src: "/images/payments/visa.png" },
+    { label: "Mastercard", src: "/images/payments/mastercard.png" },
+    { label: "UPI", src: "/images/payments/upi.png" },
+    { label: "COD", src: "/images/payments/cod.png" },
   ];
 
   return (

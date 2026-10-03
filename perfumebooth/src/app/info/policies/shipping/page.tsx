@@ -1,4 +1,4 @@
-import { getShippingPolicy } from "@/lib/shopify";
+import { getShippingPolicy } from "@/lib/catalog";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import InfoHero from "@/components/layout/InfoHero";
@@ -21,8 +21,8 @@ export default async function ShippingPolicyPage() {
 
       <InfoHero 
         title={policy.title} 
-        desktopSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/Shipping_0e5a3f4a-d7db-4672-b172-d55ad85be6c0.jpg?v=1778133308" 
-        mobileSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/shipping.jpg?v=1778130176" 
+        desktopSrc="/images/fallback-luxury.svg"
+        mobileSrc="/images/fallback-luxury.svg"
         pillText="PerfumeBooth Official Policy" 
         effectiveDate="09.08.2024" 
       />

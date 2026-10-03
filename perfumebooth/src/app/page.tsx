@@ -1,6 +1,6 @@
 import HeroBanner from "@/components/home/HeroBanner";
 import TopCategories from "@/components/home/CategoryList";
-import { getBanner } from "@/lib/shopify";
+import { getBanner } from "@/lib/catalog";
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { CollectionSkeleton } from "@/components/ui/CollectionSkeleton";
@@ -9,9 +9,6 @@ import NewLaunchesSection from "@/components/home/NewLaunchesSection";
 import BestSellerSection from "@/components/home/BestSellerSection";
 import BlogSectionWrapper from "@/components/home/BlogSectionWrapper";
 
-const VideoSection = dynamic(() => import("@/components/home/VideoSection"), {
-  loading: () => <div className="h-[300px] md:h-[500px] w-full bg-white/[0.02] animate-pulse rounded-2xl" />
-});
 const ScentGrid = dynamic(() => import("@/components/home/ScentGrid"), {
   loading: () => <div className="h-[400px] md:h-[600px] w-full bg-white/[0.02] animate-pulse rounded-2xl" />
 });
@@ -39,12 +36,7 @@ export default async function HomePage() {
         mobileImage: img.mobile_image_url || img.image_url,
         href: img.link_url || undefined,
       }))
-    : [
-        { id: 1, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ARABIYAT_PRESTIGE.webp?v=1784546289", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ap.jpg?v=1778130171", href: "/arabiyat-prestige", alt_text: "Arabiyat Prestige Premium Fragrances" },
-          { id: 2, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-haramain-banner-24001030.webp?v=17845462886", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-banner.jpg?v=1778130178", href: "/al-haramain", alt_text: "Al Haramain Exclusive Perfumes" },
-          { id: 3, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori-website.webp?v=1784546289", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.jpg?v=1778130173", href: "/otoori", alt_text: "Otoori Luxury Attars and Perfumes" },
-          { id: 4, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf-website.webp?v=1784546288", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf.jpg?v=1778130170", href: "/mpf", alt_text: "MPF Signature Scents Collection" },
-      ];
+    : [{ id: 1, image: "/images/fallback-luxury.svg", mobileImage: "/images/fallback-luxury.svg", href: "/all", alt_text: "Explore PerfumeBooth fragrances" }];
 
   return (
     <>
@@ -53,8 +45,6 @@ export default async function HomePage() {
       <TopCategories />
 
       <GenderSection />
-
-      <VideoSection />
 
       <ScentGrid />
 

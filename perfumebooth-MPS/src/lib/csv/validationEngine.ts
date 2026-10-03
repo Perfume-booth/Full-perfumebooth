@@ -1,7 +1,7 @@
-import { ShopifyProduct, FieldChange, ValidationIssue } from './types';
+import { CatalogProduct, FieldChange, ValidationIssue } from './types';
 
-export function validateShopifyChanges(
-  products: ShopifyProduct[],
+export function validateCatalogChanges(
+  products: CatalogProduct[],
   changesList: FieldChange[]
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -63,8 +63,8 @@ export function validateShopifyChanges(
         handle: c.productHandle,
         sku: c.variantSku,
         field: String(c.field),
-        message: `Field '${String(c.field)}' is selected but empty. Exporting will CLEAR the existing value in Shopify!`,
-        suggestedFix: 'If you do not want to delete this field value in Shopify, reset this field.',
+        message: `Field '${String(c.field)}' is selected but empty. Exporting will clear the existing catalog value.`,
+        suggestedFix: 'If you do not want to delete this field value, reset this field.',
       });
     }
 
@@ -74,8 +74,8 @@ export function validateShopifyChanges(
         severity: 'WARNING',
         handle: c.productHandle,
         field: 'handle',
-        message: `Changing Handle from '${c.oldValue}' to '${c.newValue}' will break existing product URL links in Shopify!`,
-        suggestedFix: 'Set up 301 URL redirects in Shopify after exporting.',
+        message: `Changing Handle from '${c.oldValue}' to '${c.newValue}' can break existing product URLs.`,
+        suggestedFix: 'Set up a permanent redirect after importing the change.',
       });
     }
 

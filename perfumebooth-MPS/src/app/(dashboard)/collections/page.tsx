@@ -386,7 +386,7 @@ export default function CollectionsPage() {
               </div>
             </div>
 
-            {/* Products Card (Shopify Style) */}
+            {/* Products card */}
             <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
               <div className="flex items-center justify-between border-b border-border pb-2.5">
                 <h2 className="text-sm font-bold text-foreground">Products in Collection</h2>

@@ -127,7 +127,7 @@ export const downloadInvoice = async (order: any, trackingInfo: any) => {
           <p style="margin: 4px 0; color: #444;"><strong>INVOICE DATE</strong> : ${invoiceDate}</p>
           <p style="margin: 4px 0; color: #444;"><strong>ORDER NO.</strong> : ${order.name}</p>
           <p style="margin: 4px 0; color: #444;"><strong>ORDER DATE</strong> : ${invoiceDate}</p>
-          <p style="margin: 4px 0; color: #444;"><strong>CHANNEL</strong> : Perfume Booth (Shopify_1)</p>
+          <p style="margin: 4px 0; color: #444;"><strong>CHANNEL</strong> : Perfume Booth Web Store</p>
           <p style="margin: 4px 0; color: #444;"><strong>SHIPPED BY</strong> : ${courier}</p>
           <p style="margin: 4px 0; color: #444;"><strong>AWB NO.</strong> : ${awb}</p>
           <p style="margin: 4px 0; color: #444;"><strong>PAYMENT METHOD</strong> : ${payMethod}</p>

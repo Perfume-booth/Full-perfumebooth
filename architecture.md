@@ -37,10 +37,10 @@ perfumebooth/
 │   │   ├── layout/          # Navbar, Footer, WhatsApp CTA, overlays
 │   │   └── ui/              # Atom components (buttons, inputs, loaders)
 │   ├── hooks/               # Custom hooks (e.g., animations, cart helpers)
-│   ├── lib/                 # Core utilities and backend/Shopify API wrappers
+│   ├── lib/                 # Core utilities and Django API adapters
 │   │   ├── actions/         # Server Actions (Auth, user operations)
 │   │   ├── backend/         # API wrappers mapping to Django endpoints
-│   │   └── shopify.ts       # Shopify headless integrations (if active)
+│   │   └── catalog.ts       # Unified catalog API exported to the storefront
 │   ├── services/            # Client-side API fetch services
 │   ├── store/               # Zustand global state (cart, auth, ui)
 │   └── types/               # TypeScript interfaces & types

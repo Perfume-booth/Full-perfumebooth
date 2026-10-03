@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import CSVEditorNav from '@/components/csv/CSVEditorNav';
 import { useCSVEditorStore } from '@/lib/csv/changeSetStore';
-import { validateShopifyChanges } from '@/lib/csv/validationEngine';
-import { generateMinimalShopifyCsv } from '@/lib/csv/minimalCsvGenerator';
-import { generateFullShopifyCsv } from '@/lib/csv/fullCsvGenerator';
+import { validateCatalogChanges } from '@/lib/csv/validationEngine';
+import { generateMinimalCatalogCsv } from '@/lib/csv/minimalCsvGenerator';
+import { generateFullCatalogCsv } from '@/lib/csv/fullCsvGenerator';
 import {
   Download,
   ShieldCheck,
@@ -21,7 +21,7 @@ export default function ExportCenterPage() {
   const changes = getChangesList();
   const stats = getStats();
 
-  const validationIssues = validateShopifyChanges(products, changes);
+  const validationIssues = validateCatalogChanges(products, changes);
   const errors = validationIssues.filter((i) => i.severity === 'ERROR');
   const warnings = validationIssues.filter((i) => i.severity === 'WARNING');
 
@@ -32,12 +32,12 @@ export default function ExportCenterPage() {
     let filename = '';
 
     if (exportMode === 'MINIMAL') {
-      const { csvString } = generateMinimalShopifyCsv(products, changes);
+      const { csvString } = generateMinimalCatalogCsv(products, changes);
       csvData = csvString;
-      filename = `shopify_safe_update_${Date.now()}.csv`;
+      filename = `catalog_safe_update_${Date.now()}.csv`;
     } else {
-      csvData = generateFullShopifyCsv(products, rawHeaders);
-      filename = `shopify_full_catalog_${Date.now()}.csv`;
+      csvData = generateFullCatalogCsv(products, rawHeaders);
+      filename = `catalog_full_export_${Date.now()}.csv`;
     }
 
     if (!csvData) {
@@ -56,7 +56,7 @@ export default function ExportCenterPage() {
   };
 
   const handleDownloadReport = () => {
-    let reportText = `SHOPIFY UPDATE VALIDATION REPORT\nGenerated: ${new Date().toISOString()}\n\n`;
+    let reportText = `CATALOG UPDATE VALIDATION REPORT\nGenerated: ${new Date().toISOString()}\n\n`;
     reportText += `Total Products: ${stats.totalProducts}\nTotal Variants: ${stats.totalVariants}\nChanged Products: ${stats.changedProductsCount}\nChanged Fields: ${stats.changedFieldsCount}\n\n`;
     reportText += `VALIDATION ISSUES (${validationIssues.length}):\n`;
     validationIssues.forEach((issue) => {
@@ -67,7 +67,7 @@ export default function ExportCenterPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `shopify_validation_report_${Date.now()}.txt`;
+    a.download = `catalog_validation_report_${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -85,9 +85,9 @@ export default function ExportCenterPage() {
               <Download className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-foreground">Generate Shopify Import CSV</h2>
+              <h2 className="text-lg font-bold text-foreground">Generate Catalog Import CSV</h2>
               <p className="text-xs text-muted-foreground">
-                Export update files ready for uploading into your Shopify store admin.
+                Export update files ready for importing into PerfumeBooth.
               </p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function ExportCenterPage() {
                   {exportMode === 'MINIMAL' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  Exports <strong>ONLY</strong> product handles, required identifiers, and explicitly edited fields. Guarantees zero side-effects on untouched Shopify data.
+                  Exports <strong>ONLY</strong> product handles, required identifiers, and explicitly edited fields. Untouched catalog data remains unchanged.
                 </p>
               </div>
 

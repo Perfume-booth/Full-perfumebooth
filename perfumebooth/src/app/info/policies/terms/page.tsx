@@ -1,4 +1,4 @@
-import { getTermsAndConditions } from "@/lib/shopify";
+import { getTermsAndConditions } from "@/lib/catalog";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import InfoHero from "@/components/layout/InfoHero";
@@ -21,8 +21,8 @@ export default async function TermsAndConditionsPage() {
 
       <InfoHero 
         title={policy.title} 
-        desktopSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/terms.jpg?v=1778133307" 
-        mobileSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/TERMS-AND-CONDITIONS-900-600_jpg.jpg?v=1778136087" 
+        desktopSrc="/images/fallback-luxury.svg"
+        mobileSrc="/images/fallback-luxury.svg"
         pillText="PerfumeBooth Official Policy" 
         effectiveDate="09.08.2024" 
       />

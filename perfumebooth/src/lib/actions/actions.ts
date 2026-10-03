@@ -4,13 +4,14 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 
-import { 
+import {
   updateCustomer, 
   createCustomerAddress, 
   updateCustomerAddress, 
   deleteCustomerAddress, 
   updateDefaultAddress 
 } from "../backend/customer";
+import { getCollectionProducts } from "../backend/collections";
 
 /* ── Account Actions ── */
 
@@ -162,186 +163,39 @@ export async function setDefaultAddressAction(id: string) {
 
 /* ── Cart & Other Actions ── */
 
-export async function updateCartDiscountAction(discountCodes: string[], clientCartId?: string) {
-  // TODO: Replace with your own backend API call
-  console.log("updateCartDiscountAction: Shopify removed.", { discountCodes, clientCartId });
-  return null;
-}
-
-
 export async function loadMoreCollectionProducts(handle: string, after: string, filterOptions?: any, sortKey?: string, reverse?: boolean) {
-  // TODO: Replace with your own backend API call
-  console.log("loadMoreCollectionProducts: Shopify removed.", { handle, after });
-  return null;
-}
-
-export async function getCartId() {
-  const cookieStore = await cookies();
-  return cookieStore.get("cartId")?.value || null;
-}
-
-export async function fetchCart() {
-  console.log("fetchCart: Shopify mock.");
-  return await getMockCart();
-}
-
-export async function createBuyNowCartAction(variantId: string, quantity: number) {
-  // TODO: Replace with your own backend API call
-  console.log("createBuyNowCartAction: Shopify removed.", { variantId, quantity });
-  return null;
-}
-
-async function getMockCart() {
-  const cookieStore = await cookies();
-  const mockCartCookie = cookieStore.get("mockCart")?.value;
-  if (mockCartCookie) {
-    try {
-      return JSON.parse(mockCartCookie);
-    } catch (e) {
-      // ignore
-    }
-  }
-  return {
-    id: "mock-cart-id",
-    checkoutUrl: "/checkout",
-    cost: {
-      subtotalAmount: { amount: "0.00", currencyCode: "INR" },
-      totalAmount: { amount: "0.00", currencyCode: "INR" }
-    },
-    lines: { edges: [] },
-    discountCodes: []
-  };
-}
-
-async function saveMockCart(cart: any) {
-  const cookieStore = await cookies();
-  cookieStore.set("mockCart", JSON.stringify(cart), {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7 // 7 days
-  });
-}
-
-export async function addCartItemAction(variantId: string, quantity: number, currentLines?: { merchandiseId: string; quantity: number }[]) {
-  console.log("addCartItemAction: Shopify mock.", { variantId, quantity });
-  const cart = await getMockCart();
-  const cleanId = variantId.replace("gid://shopify/ProductVariant/", "");
-  
-  const existingLineIdx = cart.lines.edges.findIndex((edge: any) => edge.node.merchandise.id === variantId);
-  if (existingLineIdx >= 0) {
-    cart.lines.edges[existingLineIdx].node.quantity += quantity;
-  } else {
-    cart.lines.edges.push({
-      node: {
-        id: `line-${Date.now()}`,
-        quantity: quantity,
-        cost: {
-          totalAmount: { amount: (1299 * quantity).toString(), currencyCode: "INR" }
-        },
-        merchandise: {
-          id: variantId,
-          title: "Default Title",
-          requiresShipping: true,
-          quantityAvailable: 50,
-          product: {
-            id: undefined,
-            handle: "ahmed-al-maghribi-exotic-edp-100ml-unisex-perfume",
-            title: "Ahmed Al Maghribi Exotic EDP 100ml Unisex Perfume",
-            featuredImage: { url: "" }
-          }
-        }
-      }
-    });
-  }
-  
-  let subtotal = 0;
-  cart.lines.edges.forEach((edge: any) => {
-    subtotal += 1299 * edge.node.quantity;
-    edge.node.cost.totalAmount.amount = (1299 * edge.node.quantity).toString();
-  });
-  
-  cart.cost.subtotalAmount.amount = subtotal.toString();
-  cart.cost.totalAmount.amount = subtotal.toString();
-  
-  await saveMockCart(cart);
-  return cart;
-}
-
-export async function updateCartItemAction(lineId: string, quantity: number, clientCartId?: string) {
-  console.log("updateCartItemAction: Shopify mock.", { lineId, quantity });
-  const cart = await getMockCart();
-  
-  const lineIdx = cart.lines.edges.findIndex((edge: any) => edge.node.id === lineId);
-  if (lineIdx >= 0) {
-    cart.lines.edges[lineIdx].node.quantity = quantity;
-  }
-  
-  let subtotal = 0;
-  cart.lines.edges.forEach((edge: any) => {
-    subtotal += 1299 * edge.node.quantity;
-    edge.node.cost.totalAmount.amount = (1299 * edge.node.quantity).toString();
-  });
-  
-  cart.cost.subtotalAmount.amount = subtotal.toString();
-  cart.cost.totalAmount.amount = subtotal.toString();
-  
-  await saveMockCart(cart);
-  return cart;
-}
-
-export async function removeCartItemAction(lineId: string, clientCartId?: string) {
-  console.log("removeCartItemAction: Shopify mock.", { lineId });
-  const cart = await getMockCart();
-  
-  cart.lines.edges = cart.lines.edges.filter((edge: any) => edge.node.id !== lineId);
-  
-  let subtotal = 0;
-  cart.lines.edges.forEach((edge: any) => {
-    subtotal += 1299 * edge.node.quantity;
-    edge.node.cost.totalAmount.amount = (1299 * edge.node.quantity).toString();
-  });
-  
-  cart.cost.subtotalAmount.amount = subtotal.toString();
-  cart.cost.totalAmount.amount = subtotal.toString();
-  
-  await saveMockCart(cart);
-  return cart;
-}
-
-export async function updateCartBuyerIdentityAction(customerAccessToken: string, clientCartId?: string) {
-  // TODO: Replace with your own backend API call
-  console.log("updateCartBuyerIdentityAction: Shopify removed.");
-  return null;
+  return getCollectionProducts(handle, 20, after, filterOptions, sortKey, reverse);
 }
 
 export async function trackShiprocketOrder(orderNumber: string, email: string) {
   // TODO: Replace with your own backend API call
-  console.log("trackShiprocketOrder: Shopify removed.", { orderNumber, email });
-  return { success: false, error: "Shopify connection removed. Not implemented." };
+  console.log("trackShiprocketOrder is not implemented yet.", { orderNumber, email });
+  return { success: false, error: "Order tracking is not implemented yet." };
 }
 
 // Get Logged In User's Default Address for Navbar
 export async function getLoggedAddressAction() {
   // TODO: Replace with your own backend API call
-  console.log("getLoggedAddressAction: Shopify removed.");
+  console.log("getLoggedAddressAction is not implemented yet.");
   return null;
 }
 
 export async function getCustomerOrdersAction() {
   // TODO: Replace with your own backend API call
-  console.log("getCustomerOrdersAction: Shopify removed.");
-  return { success: false, message: "Shopify connection removed. Not implemented.", orders: [] };
+  console.log("getCustomerOrdersAction is not implemented yet.");
+  return { success: false, message: "Order lookup is not implemented yet.", orders: [] };
 }
 
 export async function getAdminOrderAction(orderName: string) {
   // TODO: Replace with your own backend API call
-  console.log("getAdminOrderAction: Shopify removed.", { orderName });
-  return { success: false, error: "Shopify connection removed. Not implemented." };
+  console.log("getAdminOrderAction is not implemented yet.", { orderName });
+  return { success: false, error: "Order lookup is not implemented yet." };
 }
 
 export async function getAdminOrderByIdAction(orderId: string) {
   // TODO: Replace with your own backend API call
-  console.log("getAdminOrderByIdAction: Shopify removed.", { orderId });
-  return { success: false, error: "Shopify connection removed. Not implemented." };
+  console.log("getAdminOrderByIdAction is not implemented yet.", { orderId });
+  return { success: false, error: "Order lookup is not implemented yet." };
 }
 
 
@@ -374,7 +228,7 @@ export async function getProductOffers(productId: string, productTags: string[] 
   offers.push({ code: 'FREESHIP', description: 'Free shipping on all orders', type: 'global' });
   offers.push({ code: 'SAVE10', description: 'Save 10% on your order', type: 'global' });
 
-  // Conditional / Product-Specific Coupons (no Shopify dependency)
+  // Conditional and product-specific coupons
   const collectionsLower = collections.map(c => c.toLowerCase());
   const tagsLower = productTags.map(t => t.toLowerCase());
 
@@ -391,19 +245,18 @@ export async function getProductOffers(productId: string, productTags: string[] 
 
 export async function cancelOrder(orderId: string, customerId: string) {
   // TODO: Replace with your own backend API call
-  console.log("cancelOrder: Shopify removed.", { orderId, customerId });
-  return { success: false, error: "Shopify connection removed. Not implemented." };
+  console.log("cancelOrder is not implemented yet.", { orderId, customerId });
+  return { success: false, error: "Order cancellation is not implemented yet." };
 }
 
 export async function getGuestOrderAction(orderName: string, email: string) {
   // TODO: Replace with your own backend API call
-  console.log("getGuestOrderAction: Shopify removed.", { orderName, email });
-  return { success: false, error: "Shopify connection removed. Not implemented." };
+  console.log("getGuestOrderAction is not implemented yet.", { orderName, email });
+  return { success: false, error: "Guest order lookup is not implemented yet." };
 }
 
 export async function getProductAction(handle: string) {
   // TODO: Replace with your own backend API call
-  console.log("getProductAction: Shopify removed.", { handle });
+  console.log("getProductAction is not implemented yet.", { handle });
   return null;
 }
- 

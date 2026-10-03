@@ -4,14 +4,14 @@ export interface FieldChange {
   id: string; // e.g. "blue-shirt:BS001:price"
   productHandle: string;
   variantSku?: string;
-  field: keyof ShopifyVariant | keyof ShopifyProduct | string;
+  field: keyof CatalogVariant | keyof CatalogProduct | string;
   oldValue: any;
   newValue: any;
   state: FieldState;
   timestamp: number;
 }
 
-export interface ShopifyVariant {
+export interface CatalogVariant {
   internalId: string;
   productHandle: string;
   sku: string;
@@ -38,7 +38,7 @@ export interface ShopifyVariant {
   rawRow: Record<string, string>;
 }
 
-export interface ShopifyProduct {
+export interface CatalogProduct {
   internalId: string;
   handle: string;
   title: string;
@@ -51,7 +51,7 @@ export interface ShopifyProduct {
   status: string;
   seoTitle: string;
   seoDescription: string;
-  variants: ShopifyVariant[];
+  variants: CatalogVariant[];
   images: { src: string; position: string; altText: string }[];
   // Raw first row fallback for reference
   rawRow: Record<string, string>;

@@ -3,6 +3,7 @@ Orders Views — Checkout & Webhook Endpoints
 """
 import json
 import datetime
+import logging
 import random
 import uuid
 from django.db import transaction
@@ -10,12 +11,29 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .services import verify_razorpay_signature, process_payment_webhook
+from .services import verify_razorpay_signature, process_payment_webhook, calculate_coupon
 from .tasks import send_order_email_receipt
 from .models import Order, OrderItem, AbandonedCart
-from apps.shop.models import Product, Inventory
+from apps.shop.models import Product, ProductVariant, Inventory
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
+from core.throttling import CheckoutRateThrottle
+from apps.checkout.validators import validate_checkout_request
+from apps.checkout.services.checkout_service import CheckoutService
+
+logger = logging.getLogger(__name__)
+
+
+class CouponValidationView(APIView):
+    """Validate a coupon and calculate its server-authoritative discount."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            subtotal = float(request.data.get('subtotal', 0))
+        except (TypeError, ValueError):
+            return Response({'detail': 'Invalid subtotal.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(calculate_coupon(request.data.get('code', ''), subtotal))
 
 
 class OrderListView(APIView):
@@ -25,6 +43,11 @@ class OrderListView(APIView):
         if self.request.method == 'GET':
             return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
+
+    def get_throttles(self):
+        if self.request.method == 'POST':
+            return [CheckoutRateThrottle()]
+        return super().get_throttles()
 
     def get(self, request):
         is_merchant = any(
@@ -80,99 +103,15 @@ class OrderListView(APIView):
         return Response(data)
 
     def post(self, request):
-        items_data = request.data.get('items', [])
-        shipping_address = request.data.get('shipping_address', {})
-        payment_method = request.data.get('payment_method', 'COD')
-        coupon_code = request.data.get('coupon_code', '')
-        discount_amount_val = float(request.data.get('discount_amount', 0.0))
+        clean_input = validate_checkout_request(request.data)
+        result = CheckoutService.process_checkout(request.user if request.user.is_authenticated else None, clean_input)
+        return Response({
+            'success': True,
+            'order_id': result['order_id'],
+            'order_number': result['order_number'],
+            'total': result['total']
+        }, status=status.HTTP_201_CREATED)
 
-        if not items_data:
-            return Response({'detail': 'Cart is empty.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            with transaction.atomic():
-                subtotal = 0.0
-                order_items_to_create = []
-                inventory_updates = []
-
-                for item in items_data:
-                    product_id = item.get('id')
-                    quantity = int(item.get('quantity', 1))
-
-                    try:
-                        product = Product.objects.get(id=product_id)
-                    except Product.DoesNotExist:
-                        return Response({'detail': f'Product {product_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-                    try:
-                        inventory = Inventory.objects.select_for_update().get(product=product)
-                    except Inventory.DoesNotExist:
-                        return Response({'detail': f'Inventory for product {product.title} not initialized.'}, status=status.HTTP_400_BAD_REQUEST)
-
-                    if inventory.stock_level < quantity:
-                        return Response({'detail': f'Insufficient stock for product {product.title}. Only {inventory.stock_level} available.'}, status=status.HTTP_400_BAD_REQUEST)
-
-                    # Deduct stock level directly
-                    inventory.stock_level -= quantity
-                    inventory_updates.append(inventory)
-
-                    line_price = float(product.price)
-                    subtotal += line_price * quantity
-
-                    order_items_to_create.append({
-                        'product': product,
-                        'quantity': quantity,
-                        'unit_price': line_price
-                    })
-
-                discount_amount = min(discount_amount_val, subtotal)
-                total = max(subtotal - discount_amount, 0.0)
-                tax = 0.0
-
-                timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-                rand = random.randint(1000, 9999)
-                order_number = f'PB-{timestamp}-{rand}'
-
-                order_user = request.user if request.user and request.user.is_authenticated else None
-
-                # Inject payment method into shipping address JSON to save it without database schema changes
-                if isinstance(shipping_address, dict):
-                    shipping_address['payment_method'] = payment_method
-
-                order = Order.objects.create(
-                    user=order_user,
-                    order_number=order_number,
-                    status=Order.Status.PENDING,
-                    subtotal=subtotal,
-                    tax=tax,
-                    total=total,
-                    shipping_address=shipping_address
-                )
-
-                for item_data in order_items_to_create:
-                    OrderItem.objects.create(
-                        order=order,
-                        product=item_data['product'],
-                        quantity=item_data['quantity'],
-                        unit_price=item_data['unit_price']
-                    )
-
-                for inv in inventory_updates:
-                    inv.save()
-
-                if payment_method == 'COD':
-                    order.status = Order.Status.PROCESSING
-                    order.save(update_fields=['status'])
-
-                return Response({
-                    'success': True,
-                    'order_id': str(order.id),
-                    'order_number': order.order_number,
-                    'total': str(order.total)
-                }, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class OrderDetailView(APIView):
@@ -304,7 +243,8 @@ class RazorpayWebhookView(APIView):
         except RuntimeError:
             return Response({'detail': 'Already processed.'}, status=status.HTTP_200_OK)
         except ValueError as e:
-            return Response({'detail': str(e)}, status=status.HTTP_404_NOT_FOUND)
+            logger.warning("Razorpay webhook order lookup failed: %s", e)
+            return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         send_order_email_receipt.apply_async(
             args=[str(order.id)], queue='emails'

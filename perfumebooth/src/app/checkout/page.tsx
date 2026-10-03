@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getCustomer } from "@/lib/shopify";
+import { getCustomer } from "@/lib/catalog";
 import { redirect } from "next/navigation";
 import CheckoutClient from "./CheckoutClient";
 

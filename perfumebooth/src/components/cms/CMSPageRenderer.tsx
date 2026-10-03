@@ -70,7 +70,7 @@ export default function CMSPageRenderer({ page }: { page: CMSPage }) {
                   </h2>
                 </div>
               )}
-              <ProductCarousel title={content.title || "Featured Fragrances"} />
+              <ProductCarousel products={content.products || []} title={content.title || "Featured Fragrances"} />
             </section>
           );
         }

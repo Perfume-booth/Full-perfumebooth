@@ -1,4 +1,4 @@
-import { getBlogArticles } from "@/lib/shopify";
+import { getBlogArticles } from "@/lib/catalog";
 import dynamic from "next/dynamic";
 
 const BlogSection = dynamic(() => import("@/components/home/BlogSection"));

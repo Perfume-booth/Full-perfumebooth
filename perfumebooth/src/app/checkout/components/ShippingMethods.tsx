@@ -19,10 +19,9 @@ interface ShippingMethodsProps {
     email: string;
     phone: string;
   };
-  cartId: string | null;
 }
 
-export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) {
+export default function ShippingMethods({ form }: ShippingMethodsProps) {
   const {
     availableShippingRates,
     selectedShippingRate,
@@ -44,7 +43,6 @@ export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) 
   // Function to execute the query against our Serverless API
   const calculateRates = async () => {
     if (!hasPhysicalItems) return;
-    if (!cartId) return;
     if (!form.zip || form.zip.trim().length < 5) {
       setErrorMsg("Please enter a valid PIN Code to calculate shipping.");
       return;
@@ -58,7 +56,6 @@ export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cartId: cartId,
           subtotal: subtotal,
           shippingAddress: {
             firstName: form.firstName,
@@ -145,7 +142,7 @@ export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) 
           {isCalculating ? (
             <div className="py-6 flex flex-col items-center justify-center gap-3 text-sm text-gray-500 font-medium">
               <AnimatedLoader2 size={20} className="animate-spin text-[#b8924a]" />
-              <span>Consulting Shopify shipping profiles...</span>
+              <span>Calculating available delivery options...</span>
             </div>
           ) : availableShippingRates.length > 0 ? (
             <div className="grid grid-cols-1 gap-3">
@@ -170,7 +167,7 @@ export default function ShippingMethods({ form, cartId }: ShippingMethodsProps) 
                       />
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-gray-900 uppercase tracking-wider">{rate.title}</span>
-                        <span className="text-[10px] text-gray-400 font-medium tracking-wide mt-0.5">Shopify Verified Delivery</span>
+                        <span className="text-[10px] text-gray-400 font-medium tracking-wide mt-0.5">Verified delivery option</span>
                       </div>
                     </div>
                     <span className="text-sm font-bold text-gray-900 font-sans">

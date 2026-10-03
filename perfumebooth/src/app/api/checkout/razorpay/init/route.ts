@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     // 1. Create a pending order in custom Django database first
     const djangoItems = items.map((item: any) => ({
       id: item.id,
+      variant_id: item.selectedVariantId || null,
       quantity: item.cartQuantity || item.quantity,
     }));
 
@@ -68,14 +69,15 @@ export async function POST(request: Request) {
       console.error("Django Order Creation failed in Razorpay Init:", err);
       return NextResponse.json({ 
         success: false, 
-        message: err.detail || "Failed to initialize order in database" 
+        message: err.error?.message || err.detail || "Failed to initialize order in database"
       }, { status: 400 });
     }
 
-    const djangoOrder = await djangoRes.json();
+    const djangoResponse = await djangoRes.json();
+    const djangoOrder = djangoResponse.data || djangoResponse;
 
     // 2. Convert amount to paise
-    const amountInPaise = Math.round(parseFloat(finalTotal) * 100);
+    const amountInPaise = Math.round(parseFloat(djangoOrder.total) * 100);
 
     if (isNaN(amountInPaise) || amountInPaise <= 0) {
       return NextResponse.json({ success: false, message: "Invalid payment amount" }, { status: 400 });
@@ -114,6 +116,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       orderId: order.id,
+      internalOrderId: djangoOrder.order_id,
+      orderName: djangoOrder.order_number,
       amount: order.amount,
       keyId: keyId
     });

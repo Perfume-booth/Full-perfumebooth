@@ -107,7 +107,7 @@ export default function SideFilter({
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Dynamic filter lists from Shopify
+  // Dynamic filter lists from the catalog API
   const brandFilter = filters.find((f) => f.id.toLowerCase().includes("vendor") || f.label.toLowerCase() === "brand");
   const typeFilter = filters.find((f) => f.id.toLowerCase().includes("product_type") || f.label.toLowerCase().includes("type") || f.label.toLowerCase().includes("category"));
   const availabilityFilter = filters.find((f) => f.id.toLowerCase().includes("available") || f.label.toLowerCase().includes("availability"));

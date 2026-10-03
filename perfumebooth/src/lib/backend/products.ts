@@ -53,17 +53,19 @@ export function mapDjangoProductToProduct(p: any): Product {
       { key: "concentration", value: p.concentration || "" },
       { key: "origin_country", value: p.origin_country || "India" },
     ],
-    variants: [
-      {
-        id: `gid://shopify/ProductVariant/${p.id}`,
-        title: "Default Title",
-        price: priceVal,
-        compareAtPrice: comparePriceVal,
-        availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
-        quantityAvailable: p.stock_count || p.stock || 50,
-        requiresShipping: true
-      }
-    ]
+    variants: p.variants?.length ? p.variants.map((variant: any) => ({
+      id: String(variant.id),
+      title: variant.title || variant.option1_value || "Default Title",
+      price: String(variant.price),
+      compareAtPrice: variant.compare_at_price ? String(variant.compare_at_price) : undefined,
+      availableForSale: Number(variant.stock_level) > 0,
+      quantityAvailable: Number(variant.stock_level || 0),
+      requiresShipping: true,
+    })) : [{
+      id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
+      availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
+      quantityAvailable: p.stock_count || p.stock || 0, requiresShipping: true,
+    }]
   };
 }
 

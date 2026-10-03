@@ -1,5 +1,5 @@
 import ProductCarousel from "@/components/home/ProductCarousel";
-import { getCollection } from "@/lib/shopify";
+import { getCollection } from "@/lib/catalog";
 import type { Product } from "@/types/product";
 
 interface ProductEdge {

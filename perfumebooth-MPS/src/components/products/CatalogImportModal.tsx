@@ -2,16 +2,16 @@
 
 import React, { useState } from 'react';
 import { X, Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { parseShopifyCsv } from '@/lib/csv/csvParser';
+import { parseCatalogCsv } from '@/lib/csv/csvParser';
 import { apiFetch } from '@/lib/api';
 
-interface ShopifyImportModalProps {
+interface CatalogImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function ShopifyImportModal({ isOpen, onClose, onSuccess }: ShopifyImportModalProps) {
+export default function CatalogImportModal({ isOpen, onClose, onSuccess }: CatalogImportModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [overwrite, setOverwrite] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -63,7 +63,7 @@ export default function ShopifyImportModal({ isOpen, onClose, onSuccess }: Shopi
       // Client-side parse fallback if backend endpoint expects client payload
       try {
         const text = await file.text();
-        const parsed = parseShopifyCsv(text);
+        const parsed = parseCatalogCsv(text);
 
         if (parsed.products.length === 0) {
           throw new Error('No valid products found in CSV file.');
@@ -153,7 +153,7 @@ export default function ShopifyImportModal({ isOpen, onClose, onSuccess }: Shopi
           >
             <Upload className="w-10 h-10 text-muted-foreground mb-3" />
             <p className="text-sm font-semibold text-foreground mb-1">
-              Drag and drop your Shopify CSV file here
+              Drag and drop your product CSV file here
             </p>
             <p className="text-xs text-muted-foreground mb-4">or click to browse from your computer (.csv)</p>
             <label className="px-4 py-2 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-semibold rounded-xl text-xs transition cursor-pointer">

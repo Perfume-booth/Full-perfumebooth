@@ -1,11 +1,11 @@
 import Papa from 'papaparse';
-import { ShopifyProduct, FieldChange } from './types';
+import { CatalogProduct, FieldChange } from './types';
 import { getRequiredHeadersForFields } from './dependencyEngine';
 
 /**
- * Mapping of internal model key -> Shopify CSV standard column name
+ * Mapping of internal model keys to import/export CSV columns
  */
-export const FIELD_TO_SHOPIFY_HEADER: Record<string, string> = {
+export const FIELD_TO_CSV_HEADER: Record<string, string> = {
   handle: 'Handle',
   title: 'Title',
   bodyHtml: 'Body (HTML)',
@@ -46,8 +46,8 @@ export interface MinimalExportResult {
   exportedHeaders: string[];
 }
 
-export function generateMinimalShopifyCsv(
-  products: ShopifyProduct[],
+export function generateMinimalCatalogCsv(
+  products: CatalogProduct[],
   changesList: FieldChange[]
 ): MinimalExportResult {
   if (changesList.length === 0) {
@@ -68,7 +68,7 @@ export function generateMinimalShopifyCsv(
   // 3. Determine required headers using Dependency Engine
   const requiredHeadersSet = getRequiredHeadersForFields(editedFields);
 
-  // 4. Map edited fields + required identifiers to Shopify CSV Header names
+  // 4. Map edited fields and required identifiers to CSV column names
   const exportedHeadersList: string[] = [];
 
   // Always put Handle first
@@ -78,11 +78,11 @@ export function generateMinimalShopifyCsv(
   if (requiredHeadersSet.has('Option1 Name')) exportedHeadersList.push('Option1 Name');
   if (requiredHeadersSet.has('Option1 Value')) exportedHeadersList.push('Option1 Value');
 
-  // Add all edited fields mapped to Shopify headers
+  // Add all edited fields mapped to CSV headers
   editedFields.forEach((field) => {
-    const shopifyHeader = FIELD_TO_SHOPIFY_HEADER[field] || field;
-    if (!exportedHeadersList.includes(shopifyHeader)) {
-      exportedHeadersList.push(shopifyHeader);
+    const csvHeader = FIELD_TO_CSV_HEADER[field] || field;
+    if (!exportedHeadersList.includes(csvHeader)) {
+      exportedHeadersList.push(csvHeader);
     }
   });
 
@@ -100,8 +100,8 @@ export function generateMinimalShopifyCsv(
       exportedHeadersList.forEach((header) => {
         // Find corresponding internal key
         const internalKey =
-          Object.keys(FIELD_TO_SHOPIFY_HEADER).find(
-            (k) => FIELD_TO_SHOPIFY_HEADER[k].toLowerCase() === header.toLowerCase()
+          Object.keys(FIELD_TO_CSV_HEADER).find(
+            (k) => FIELD_TO_CSV_HEADER[k].toLowerCase() === header.toLowerCase()
           ) || header;
 
         let val = '';

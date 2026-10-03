@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import CSVEditorNav from '@/components/csv/CSVEditorNav';
 import { useCSVEditorStore } from '@/lib/csv/changeSetStore';
-import { parseShopifyCsv } from '@/lib/csv/csvParser';
+import { parseCatalogCsv } from '@/lib/csv/csvParser';
 import { FileUp, FileSpreadsheet, Sparkles, CheckCircle2, ArrowRight, ShieldAlert } from 'lucide-react';
 
-const SAMPLE_SHOPIFY_CSV = `Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Variant SKU,Variant Price,Variant Compare At Price,Variant Inventory Qty,Image Src,Status
+const SAMPLE_CATALOG_CSV = `Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Variant SKU,Variant Price,Variant Compare At Price,Variant Inventory Qty,Image Src,Status
 noir-oud-100ml,Noir Oud Eau de Parfum,"Luxurious Oud fragrance with notes of saffron and amber.",PerfumeBooth,Eau de Parfum,"Attar, Oud, Luxury, Men",true,Size,100ml,NOIR-OUD-100,2499.00,2999.00,45,https://images.unsplash.com/photo-1541643600914-78b084683601,active
 royal-jasmine-50ml,Royal Jasmine Extrait,"Exquisite night-blooming white floral perfume.",PerfumeBooth,Extrait de Parfum,"Floral, Women, Gift",true,Size,50ml,ROYAL-JAS-50,1899.00,2299.00,30,https://images.unsplash.com/photo-1594035910387-fea47794261f,active
 al-haramain-attar,Al Haramain Classic Attar,"Concentrated pure perfume oil without alcohol.",Al Haramain,Attar Oil,"Attar, Unisex, Concentrated",true,Size,12ml,HARAMAIN-ATT-12,1299.00,1499.00,80,https://images.unsplash.com/photo-1592945403244-b3fbafd7f539,active
@@ -28,7 +28,7 @@ export default function CSVImportPage() {
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (text) {
-        const { products: parsedProducts, rawHeaders } = parseShopifyCsv(text);
+        const { products: parsedProducts, rawHeaders } = parseCatalogCsv(text);
         setImportedData(parsedProducts, rawHeaders);
       }
       setIsParsing(false);
@@ -39,7 +39,7 @@ export default function CSVImportPage() {
   const handleLoadSample = () => {
     setIsParsing(true);
     setFileName('sample_perfume_catalog.csv');
-    const { products: parsedProducts, rawHeaders } = parseShopifyCsv(SAMPLE_SHOPIFY_CSV);
+    const { products: parsedProducts, rawHeaders } = parseCatalogCsv(SAMPLE_CATALOG_CSV);
     setImportedData(parsedProducts, rawHeaders);
     setIsParsing(false);
   };
@@ -52,9 +52,9 @@ export default function CSVImportPage() {
         {/* Upload Card */}
         <div className="md:col-span-2 bg-card p-6 rounded-2xl border border-border flex flex-col gap-6 shadow-xs">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Import Shopify Product CSV</h2>
+            <h2 className="text-lg font-bold text-foreground">Import Product CSV</h2>
             <p className="text-sm text-muted-foreground">
-              Select or drop your Shopify product catalog file (`.csv`).
+              Select or drop your product catalog file (`.csv`).
             </p>
           </div>
 
@@ -76,7 +76,7 @@ export default function CSVImportPage() {
               Click to browse or drag & drop CSV file here
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Supports standard Shopify CSV header formats
+              Supports the standard PerfumeBooth product CSV columns
             </p>
           </label>
 

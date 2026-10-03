@@ -11,12 +11,12 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#b8924a",
     icons: [
       {
-        src: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/android-chrome-192x192.png?v=1778479434",
+        src: "/favicon.ico",
         sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/android-chrome-512x512.png?v=1778479436",
+        src: "/favicon.ico",
         sizes: "512x512",
         type: "image/png",
       },

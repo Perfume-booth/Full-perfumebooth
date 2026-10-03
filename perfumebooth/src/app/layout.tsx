@@ -62,7 +62,7 @@ export const viewport = {
   initialScale: 1,
 };
 
-import { getBrands } from "@/lib/shopify";
+import { getBrands } from "@/lib/catalog";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const brands = await getBrands();
@@ -71,7 +71,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={`${inter.variable} ${cormorant.variable}`} suppressHydrationWarning>
       <GoogleTagManager gtmId="GTM-PLC7P2NZ" />
       <head>
-        <link rel="preconnect" href="https://cdn.shopify.com" crossOrigin="anonymous" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -80,7 +79,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               "@type": "Organization",
               name: "Perfume Booth",
               url: "https://www.perfumebooth.com",
-              logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/android-chrome-512x512.png"
+              logo: "/favicon.ico"
             })
           }}
         />

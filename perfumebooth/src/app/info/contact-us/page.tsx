@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import InfoHero from '@/components/layout/InfoHero';
-import { getContactUs } from '@/lib/shopify';
+import { getContactUs } from '@/lib/catalog';
 
 export const metadata: Metadata = {
   title: 'Contact Us | PerfumeBooth',
@@ -23,8 +23,8 @@ export default async function ContactUsPage() {
       {/* ── Editorial Hero Section ── */}
       <InfoHero 
         title={page?.title || "We're Here For You"} 
-        desktopSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/contact_139b629a-4e56-42a7-9441-4750a1995629.png?v=1779253483" 
-        mobileSrc="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/contact_139b629a-4e56-42a7-9441-4750a1995629.png?v=1779253483" 
+        desktopSrc="/images/fallback-luxury.svg"
+        mobileSrc="/images/fallback-luxury.svg"
         pillText="Get In Touch" 
         description="Elevate your senses. Whether it's a question about a fragrance note or your recent order, our bespoke service team awaits."
       />
@@ -87,7 +87,7 @@ export default async function ContactUsPage() {
           {/* Editorial Image Left */}
           <div className="relative hidden lg:block h-full min-h-[700px]">
             <Image
-              src="https://cdn.shopify.com/s/files/1/0718/5786/4996/files/contact_139b629a-4e56-42a7-9441-4750a1995629.png?v=1779253483"
+              src="/images/fallback-luxury.svg"
               alt="Exclusive Fragrance"
               fill
               className="absolute inset-0 h-full w-full object-cover"

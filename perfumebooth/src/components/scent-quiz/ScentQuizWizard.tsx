@@ -14,7 +14,7 @@ interface Product {
   title: string;
   description: string;
   priceRange: { minVariantPrice: { amount: string; currencyCode: string } };
-  featuredImage?: { url: string; altText: string };
+  featuredImage?: { url: string; altText?: string };
   vendor: string;
   metafields?: { key: string; value: string }[];
 }

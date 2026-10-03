@@ -17,19 +17,19 @@ interface Product {
   attributes: Record<string, any>;
 }
 
-interface ShopifyExportModalProps {
+interface CatalogExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   products: Product[];
   selectedSlugs: string[];
 }
 
-export default function ShopifyExportModal({
+export default function CatalogExportModal({
   isOpen,
   onClose,
   products,
   selectedSlugs,
-}: ShopifyExportModalProps) {
+}: CatalogExportModalProps) {
   const [exportScope, setExportScope] = useState<'all' | 'current' | 'selected'>('all');
   const [isExporting, setIsExporting] = useState(false);
 
@@ -64,7 +64,7 @@ export default function ShopifyExportModal({
         'Option3 Value': '',
         'Variant SKU': p.sku,
         'Variant Grams': '350',
-        'Variant Inventory Tracker': 'shopify',
+        'Variant Inventory Tracker': 'catalog',
         'Variant Inventory Qty': String(p.stock || 0),
         'Variant Inventory Policy': 'deny',
         'Variant Fulfillment Service': 'manual',
@@ -89,7 +89,7 @@ export default function ShopifyExportModal({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `shopify_products_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `catalog_products_export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -161,7 +161,7 @@ export default function ShopifyExportModal({
               Export Format
             </span>
             <div className="p-3.5 bg-secondary/40 border border-border rounded-xl text-xs text-foreground font-medium">
-              CSV file for Excel, Numbers, or other spreadsheet programs (Standard Shopify Format)
+              CSV file for Excel, Numbers, or other spreadsheet programs
             </div>
           </div>
         </div>

@@ -1,10 +1,10 @@
-import { getCollectionProducts, getBrands, getProductTypes, getBanner } from "@/lib/shopify";
+import { getCollectionProducts, getBrands, getProductTypes, getBanner } from "@/lib/catalog";
 import SideFilter from "@/components/product/SideFilter";
 import CollectionProductGrid from "@/components/product/CollectionProductGrid";
 import CollectionBanner from "@/components/ui/CollectionBanner";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import { notFound } from "next/navigation";
-import { buildShopifyFilters, getSortConfig } from "@/lib/shop-utils";
+import { buildCatalogFilters, getSortConfig } from "@/lib/catalog-filters";
 
 interface CollectionTemplateProps {
   handle: string;
@@ -45,7 +45,7 @@ export default async function CollectionTemplate({
     ? (price.split("-").map(Number) as [number, number]) 
     : [0, 10000];
 
-  const filterOptions = buildShopifyFilters({
+  const filterOptions = buildCatalogFilters({
     brands: brand?.split(","),
     types: type?.split(","),
     availability: availability?.split(","),

@@ -6,13 +6,13 @@ import SectionHeader from "@/components/ui/SectionHeader";
 import Carousel from "@/components/ui/Carousel";
 
 const FEATURED_BRANDS = [
-  { name: "Otoori", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori.png?v=1778136280", href: "/otoori" },
-  { name: "New NB", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/new.png?v=1778136280", href: "/new-nb" },
-  { name: "Lomani", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/lomani_e0e49660-4025-4d49-a39a-917abc67ff8b.png?v=1778136280", href: "/lomani" },
-  { name: "MPF", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf_d95f9db9-b52a-4894-8e31-92e11b2d5342.png?v=1778136279", href: "/mpf" },
-  { name: "Prestige Arabiyat", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/arabiyat.png?v=1778136278", href: "/arabiyat-prestige" },
-  { name: "Lattaffa", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/lattaffa.png?v=1778136279", href: "/lattaffa" },
-  { name: "Swiss Arabian", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/swiss.png?v=1778136279", href: "/swiss-arabian" },
+  { name: "Otoori", logo: "/images/fallback-luxury.svg", href: "/otoori" },
+  { name: "New NB", logo: "/images/fallback-luxury.svg", href: "/new-nb" },
+  { name: "Lomani", logo: "/images/fallback-luxury.svg", href: "/lomani" },
+  { name: "MPF", logo: "/images/fallback-luxury.svg", href: "/mpf" },
+  { name: "Prestige Arabiyat", logo: "/images/fallback-luxury.svg", href: "/arabiyat-prestige" },
+  { name: "Lattaffa", logo: "/images/fallback-luxury.svg", href: "/lattaffa" },
+  { name: "Swiss Arabian", logo: "/images/fallback-luxury.svg", href: "/swiss-arabian" },
 ];
 
 export default function BrandSlider() {

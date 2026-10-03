@@ -11,6 +11,7 @@ import jwt
 
 from .models import CustomUser, OTPVerification, SocialAccount, CustomerAddress
 from core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
+from core.throttling import AuthRateThrottle, OTPRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class CustomerRegisterView(APIView):
     Register a customer using Email + Password.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         email = request.data.get('email')
@@ -78,6 +80,7 @@ class CustomerLoginView(APIView):
     Login a customer using Email + Password.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         email = request.data.get('email')
@@ -116,6 +119,7 @@ class CustomerSendOTPView(APIView):
     Send a 6-digit OTP code to the provided phone number.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [OTPRateThrottle]
 
     def post(self, request):
         phone = request.data.get('phone')
@@ -148,6 +152,7 @@ class CustomerVerifyOTPView(APIView):
     Verify OTP code and authenticate/register the customer.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [OTPRateThrottle]
 
     def post(self, request):
         phone = request.data.get('phone')

@@ -1,4 +1,4 @@
-import { getAllCollections } from '@/lib/shopify';
+import { getAllCollections } from '@/lib/catalog';
 import CollectionsGrid from '@/components/product/CollectionsGrid';
 import { Metadata } from 'next';
 

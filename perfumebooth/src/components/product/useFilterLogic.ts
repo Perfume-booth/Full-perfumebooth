@@ -5,8 +5,8 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Product } from "@/types/product";
 import { PageInfo } from "./useCollection";
 import { loadMoreCollectionProducts } from "@/lib/actions/actions";
-import { getCollectionProducts } from "@/lib/shopify";
-import { buildShopifyFilters, getSortConfig } from "@/lib/shop-utils";
+import { getCollectionProducts } from "@/lib/catalog";
+import { buildCatalogFilters, getSortConfig } from "@/lib/catalog-filters";
 import { SORT_OPTIONS, TOP_BRANDS } from "@/lib/constants";
 
 interface UseFilterLogicProps {
@@ -172,7 +172,7 @@ export const useFilterLogic = ({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
 
     // Build filter options for API
-    const filterOptions = buildShopifyFilters({
+    const filterOptions = buildCatalogFilters({
       types,
       brands,
       price,
@@ -211,7 +211,7 @@ export const useFilterLogic = ({
     if (!pageInfo.hasNextPage || !pageInfo.endCursor || isLoadingMore) return;
 
     setIsLoadingMore(true);
-    const filterOptions = buildShopifyFilters({
+    const filterOptions = buildCatalogFilters({
       types: selectedTypes,
       brands: selectedBrands,
       price: priceRange,

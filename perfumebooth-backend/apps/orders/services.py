@@ -4,6 +4,29 @@ Orders Services — Webhook & Dispatch Logic
 import hashlib
 import hmac
 from django.conf import settings
+
+
+COUPONS = {
+    'SAVE10': 10,
+    'BLOOM15': 15,
+    'MEN15': 15,
+    'WOMEN15': 15,
+}
+
+
+def calculate_coupon(code, subtotal):
+    """Return a deterministic discount calculation owned by the backend."""
+    normalized = str(code or '').strip().upper()
+    subtotal = max(float(subtotal or 0), 0.0)
+    if not normalized:
+        return {'valid': True, 'code': '', 'discount_percent': 0, 'discount_amount': 0.0}
+    if normalized == 'FREESHIP':
+        return {'valid': True, 'code': normalized, 'discount_percent': 0, 'discount_amount': 0.0, 'free_shipping': True}
+    percentage = COUPONS.get(normalized)
+    if percentage is None:
+        return {'valid': False, 'code': normalized, 'discount_percent': 0, 'discount_amount': 0.0, 'message': 'Invalid coupon code.'}
+    amount = round(subtotal * percentage / 100, 2)
+    return {'valid': True, 'code': normalized, 'discount_percent': percentage, 'discount_amount': amount}
 from django.core.cache import cache
 
 from .models import Order

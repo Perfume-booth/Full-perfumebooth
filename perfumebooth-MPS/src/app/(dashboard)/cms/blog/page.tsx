@@ -85,7 +85,7 @@ export default function CMSBlogManagerPage() {
     setTitle('');
     setSlug('');
     setAuthor('PerfumeBooth Editorial');
-    setCoverImage('https://cdn.shopify.com/s/files/1/0718/5786/4996/files/drifter-white-bg_f9e6aa82-fe9d-4c5c-9b7a-3aa35f1f02f5.jpg?v=1756122933');
+    setCoverImage('');
     setExcerpt('');
     setContentHtml('<h3>Scent Notes & Insights</h3><p>Write your blog post article content here...</p>');
     setTagsInput('Perfumes, Lifestyle');

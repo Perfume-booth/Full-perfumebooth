@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion, cubicBezier } from "framer-motion";
 import Link from "next/link";
-import { Collection } from "@/lib/shopify";
+import { Collection } from "@/lib/catalog";
 import { AnimatedChevronRight } from "@/components/ui/icons";
 
 interface CollectionsClientProps {
@@ -13,30 +13,11 @@ interface CollectionsClientProps {
 // ─── Image metadata keyed by handle fragment ──────────────────────────────────
 // type: "banner" = wide 4.66:1 JPEG scene photo  → object-cover, aspect-[21/9]
 // type: "product" = ~1.18:1 PNG product shot      → object-contain, aspect-[5/4]
-const FALLBACK_MAP: Record<string, { url: string; type: "banner" | "product" }> = {
-  oud:     { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/OUD_jpg.jpg?v=1778239125",     type: "banner" },
-  floral:  { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/FLORAL_jpg.jpg?v=1778239125",  type: "banner" },
-  citrus:  { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/CITRUS_jpg.jpg?v=1778239125",  type: "banner" },
-  woody:   { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/WOODY_jpg.jpg?v=1778239125",   type: "banner" },
-  spicy:   { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/SPICY_jpg.jpg?v=1778239125",   type: "banner" },
-  aquatic: { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/AQUA_jpg.jpg?v=1778239125",    type: "banner" },
-  oriental:{ url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/ORIENTAL_jpg.jpg?v=1778239125",type: "banner" },
-  fresh:   { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh.jpg?v=1778136299",        type: "banner" },
-  men:     { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/OUD_jpg.jpg?v=1778239125",     type: "banner" },
-  women:   { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/FLORAL_jpg.jpg?v=1778239125",  type: "banner" },
-  unisex:  { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/unisex.png?v=1780126452",      type: "banner" },
-  mist:    { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mist.png?v=1778139272",        type: "product" },
-  attar:   { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/attar.png?v=1778139272",       type: "product" },
-  deo:     { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/deo_888a2919-741e-4acc-a2d1-692e69d8e819.png?v=1778139272", type: "product" },
-  gift:    { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/gift-sets.png?v=1778139271",   type: "product" },
-  scent:   { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/scent.png?v=1778139274",       type: "product" },
-  perfume: { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/perfume.png?v=1778139272",     type: "product" },
-};
-
-const DEFAULT = { url: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/perfume.png?v=1778139272", type: "product" as const };
+const FALLBACK_MAP: Record<string, { url: string; type: "banner" | "product" }> = {};
+const DEFAULT = { url: "/images/fallback-luxury.svg", type: "banner" as const };
 
 function getMedia(collection: Collection): { url: string; type: "banner" | "product" } {
-  // Shopify native collection image — detect type by checking if it's a jpg (wide banner) or png (product)
+  // Catalog collection image — infer its presentation from the source format.
   if (collection.image?.url) {
     const url = collection.image.url;
     const isJpeg = url.includes(".jpg") || url.includes(".jpeg") || url.includes("_jpg") || url.includes(".webp") || url.includes(".avif");

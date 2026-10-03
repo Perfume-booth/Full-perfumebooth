@@ -1,4 +1,4 @@
-import { getArticle, getBlogArticles } from "@/lib/shopify";
+import { getArticle, getBlogArticles } from "@/lib/catalog";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";

@@ -26,7 +26,7 @@ function AuthPageContent() {
 
   const content = {
     signin: {
-      image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/Gemini_Generated_Image.png?v=1778485955",
+      image: "/images/fallback-luxury.svg",
       pill: "The Curatorial Circle",
       title: (
         <>
@@ -40,7 +40,7 @@ function AuthPageContent() {
       feature: "Authored Verification"
     },
     signup: {
-      image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/Gemini_Generated_Image.png?v=1778485955",
+      image: "/images/fallback-luxury.svg",
       pill: "Join the Essence",
       title: (
         <>

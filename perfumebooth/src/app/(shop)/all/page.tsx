@@ -9,12 +9,7 @@ export default async function AllCollectionsPage({ searchParams }: { searchParam
       handle="all" 
       searchParams={sParams}
       defaultLimit={80}
-      bannerImages={[
-          "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/him-1.jpg?v=1778138409",
-          "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/her_68d94e46-14e2-4643-af21-57c8e879b257.jpg?v=1778138409",
-          "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/arabiyat-banner-new_jpg.jpg?v=1778478265",
-          "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-haramain.jpg?v=1778138073",
-      ]}
+      bannerImages={["/images/fallback-luxury.svg"]}
     />
   );
 }

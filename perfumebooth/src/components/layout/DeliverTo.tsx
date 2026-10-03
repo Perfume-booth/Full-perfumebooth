@@ -50,11 +50,11 @@ export default function DeliverTo() {
   const [locating, setLocating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Load from Shopify (if logged in) or localStorage
+  // Load from the customer account (if logged in) or localStorage
   useEffect(() => {
     async function initAddress() {
       try {
-        // 1. Try to get logged in address from Shopify
+        // 1. Try to get the logged-in customer's default address
         const loggedAddr = await getLoggedAddressAction();
         
         // 2. Try to get saved choice from localStorage
@@ -63,7 +63,7 @@ export default function DeliverTo() {
 
         // Priority: If we have a local choice that is NOT the same as logged, 
         // we might want to respect it, but requirement says "address select last time for purchase".
-        // Let's prioritize Shopify default if available, otherwise fallback.
+        // Prefer the account default when available, otherwise use the local fallback.
         if (loggedAddr) {
           setLocation(loggedAddr);
         } else if (localLoc) {

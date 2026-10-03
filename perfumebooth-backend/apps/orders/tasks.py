@@ -48,8 +48,10 @@ def send_order_email_receipt(self, order_id: str) -> dict:
         message = f'Thank you! Your order #{order.order_number} is confirmed. Total: ₹{order.total}'
         
         items_html = "".join([
-            f"<li>{item.product.title} (x{item.quantity}) - ₹{item.price}</li>"
-            for item in order.items.all() if item.product
+            f"<li>{item.product_title or (item.product.title if item.product else 'Product')}"
+            f"{f' — {item.variant_title}' if item.variant_title else ''} "
+            f"(x{item.quantity}) - ₹{item.unit_price}</li>"
+            for item in order.items.all()
         ])
         
         html_message = f"""

@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     // Format items for custom Django order layout (using product UUID and quantity)
     const djangoItems = items.map((item: any) => ({
       id: item.id,
+      variant_id: item.selectedVariantId || null,
       quantity: item.cartQuantity || item.quantity,
     }));
 
@@ -51,11 +52,12 @@ export async function POST(request: Request) {
       console.error("Django Order Create Error:", err);
       return NextResponse.json({ 
         success: false, 
-        message: err.detail || "Failed to create order in database" 
+        message: err.error?.message || err.detail || "Failed to create order in database"
       }, { status: 400 });
     }
 
-    const orderData = await res.json();
+    const orderResponse = await res.json();
+    const orderData = orderResponse.data || orderResponse;
     return NextResponse.json({ 
       success: true, 
       orderId: orderData.order_id, 
