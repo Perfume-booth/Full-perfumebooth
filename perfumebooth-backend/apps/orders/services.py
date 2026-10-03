@@ -72,8 +72,9 @@ def process_payment_webhook(payment_intent_id: str, order_id: str) -> Order:
     try:
         order = Order.objects.get(id=order_id)
         order.status = Order.Status.PAID
+        order.payment_status = Order.PaymentStatus.PAID
         order.payment_intent_id = payment_intent_id
-        order.save(update_fields=['status', 'payment_intent_id', 'updated_at'])
+        order.save(update_fields=['status', 'payment_status', 'payment_intent_id', 'updated_at'])
 
         # Enqueue background Celery tasks
         from .tasks import send_order_email_receipt, push_order_to_shiprocket_task

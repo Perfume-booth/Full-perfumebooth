@@ -68,9 +68,19 @@ class CheckoutService:
             order_number=order_number,
             status=initial_status,
             subtotal=totals.subtotal,
-            tax=totals.tax,
+            discount_amount=totals.discount_amount,
+            shipping_amount=totals.shipping_cost,
+            tax_amount=totals.tax,
             total=totals.total,
-            shipping_address=shipping_snapshot
+            currency='INR',
+            payment_method=input_data.payment_method,
+            payment_status=Order.PaymentStatus.PENDING,
+            shipping_address=shipping_snapshot,
+            customer_email=(
+                input_data.shipping_address.get('email')
+                or (user.email if user and user.is_authenticated else '')
+            ),
+            customer_phone=input_data.shipping_address.get('phone', ''),
         )
 
         # Create OrderItem records

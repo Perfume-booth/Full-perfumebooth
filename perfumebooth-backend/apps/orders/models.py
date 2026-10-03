@@ -22,6 +22,19 @@ class Order(models.Model):
         CANCELLED  = 'Cancelled',  'Cancelled'
         REFUNDED   = 'Refunded',   'Refunded'
 
+    class PaymentMethod(models.TextChoices):
+        COD = 'COD', 'Cash on Delivery'
+        RAZORPAY = 'RAZORPAY', 'Razorpay'
+
+    class PaymentStatus(models.TextChoices):
+        PENDING = 'Pending', 'Pending'
+        AUTHORIZED = 'Authorized', 'Authorized'
+        PAID = 'Paid', 'Paid'
+        FAILED = 'Failed', 'Failed'
+        REFUNDED = 'Refunded', 'Refunded'
+        PARTIALLY_REFUNDED = 'Partially Refunded', 'Partially Refunded'
+        CANCELLED = 'Cancelled', 'Cancelled'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -35,8 +48,24 @@ class Order(models.Model):
         max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
     )
     subtotal = models.DecimalField(max_digits=12, decimal_places=2)
-    tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default='INR')
+
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.COD,
+        db_index=True,
+    )
+    payment_status = models.CharField(
+        max_length=30,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.PENDING,
+        db_index=True,
+    )
 
     # Payment gateway reference (Razorpay payment_intent / Stripe PaymentIntent ID)
     payment_intent_id = models.CharField(
@@ -45,15 +74,8 @@ class Order(models.Model):
 
     # Shipping address snapshot
     shipping_address = models.JSONField(default=dict)
-
-    # Shiprocket Logistics & Fulfillment Fields
-    shiprocket_order_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
-    shiprocket_shipment_id = models.CharField(max_length=100, blank=True, null=True)
-    awb_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)
-    courier_name = models.CharField(max_length=150, blank=True, null=True)
-    tracking_url = models.URLField(max_length=500, blank=True, null=True)
-    shipped_at = models.DateTimeField(blank=True, null=True)
-    delivered_at = models.DateTimeField(blank=True, null=True)
+    customer_email = models.EmailField(blank=True, default='', db_index=True)
+    customer_phone = models.CharField(max_length=30, blank=True, default='')
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -71,6 +93,48 @@ class Order(models.Model):
 
     def __str__(self) -> str:
         return f'Order #{self.order_number} — {self.status}'
+
+
+class Shipment(models.Model):
+    """Provider-neutral fulfilment record for an order."""
+
+    class Status(models.TextChoices):
+        PENDING = 'Pending', 'Pending'
+        AWB_ASSIGNED = 'AWB Assigned', 'AWB Assigned'
+        SHIPPED = 'Shipped', 'Shipped'
+        IN_TRANSIT = 'In Transit', 'In Transit'
+        OUT_FOR_DELIVERY = 'Out for Delivery', 'Out for Delivery'
+        DELIVERED = 'Delivered', 'Delivered'
+        FAILED = 'Failed', 'Failed'
+        CANCELLED = 'Cancelled', 'Cancelled'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='shipments')
+    provider = models.CharField(max_length=50, default='shiprocket', db_index=True)
+    provider_order_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    provider_shipment_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    awb_code = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    courier_name = models.CharField(max_length=150, blank=True, default='')
+    tracking_url = models.URLField(max_length=500, blank=True, default='')
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING, db_index=True)
+    shipped_at = models.DateTimeField(blank=True, null=True)
+    delivered_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'orders_shipment'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['provider', 'provider_shipment_id'],
+                condition=~models.Q(provider_shipment_id=''),
+                name='unique_provider_shipment_id',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.provider}: {self.order.order_number} — {self.status}'
 
 
 class OrderItem(models.Model):

@@ -111,7 +111,7 @@ def send_shipping_dispatch_email(self, order_id: str) -> dict:
     Sends a transactional dispatch email with AWB & tracking details.
     """
     try:
-        order = Order.objects.select_related('user').get(id=order_id)
+        order = Order.objects.select_related('user').prefetch_related('shipments').get(id=order_id)
     except Order.DoesNotExist:
         return {'status': 'skipped', 'reason': 'order not found'}
 
@@ -124,9 +124,10 @@ def send_shipping_dispatch_email(self, order_id: str) -> dict:
         from django.conf import settings
 
         subject = f'Your Order #{order.order_number} Has Been Dispatched! — PerfumeBooth'
-        courier = order.courier_name or 'Shiprocket Courier Partner'
-        awb = order.awb_code or 'N/A'
-        track_url = order.tracking_url or f"https://shiprocket.co/tracking/{awb}"
+        shipment = order.shipments.first()
+        courier = shipment.courier_name if shipment and shipment.courier_name else 'Shiprocket Courier Partner'
+        awb = shipment.awb_code if shipment and shipment.awb_code else 'N/A'
+        track_url = shipment.tracking_url if shipment and shipment.tracking_url else f"https://shiprocket.co/tracking/{awb}"
 
         message = f"Great news! Your order #{order.order_number} has been dispatched via {courier}. AWB: {awb}. Track: {track_url}"
         html_message = f"""
@@ -149,5 +150,5 @@ def send_shipping_dispatch_email(self, order_id: str) -> dict:
     except Exception as exc:
         raise self.retry(exc=exc)
 
-    return {'status': 'sent', 'order_number': order.order_number, 'awb': order.awb_code}
+    return {'status': 'sent', 'order_number': order.order_number, 'awb': awb}
 

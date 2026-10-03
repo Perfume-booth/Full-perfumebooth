@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from .services import verify_razorpay_signature, process_payment_webhook, calculate_coupon
 from .tasks import send_order_email_receipt
-from .models import Order, OrderItem, AbandonedCart
+from .models import Order, OrderItem, Shipment, AbandonedCart
 from apps.shop.models import Product, ProductVariant, Inventory
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
@@ -55,7 +55,7 @@ class OrderListView(APIView):
             for role in request.user.roles.values_list('role__name', flat=True)
         )
 
-        orders_query = Order.objects.prefetch_related('items').all()
+        orders_query = Order.objects.prefetch_related('items', 'shipments').all()
         if not is_merchant:
             orders_query = orders_query.filter(user=request.user)
 
@@ -65,15 +65,7 @@ class OrderListView(APIView):
             
             shipping = order.shipping_address or {}
             delivery_method = shipping.get('shipping_carrier', 'Standard Shipping')
-            pay_method = shipping.get('payment_method', 'COD')
-
-            payment_status = "Pending"
-            if order.status in ['Paid', 'Shipped', 'Delivered']:
-                payment_status = "Paid"
-            elif order.status == 'Refunded':
-                payment_status = "Refunded"
-            elif order.status == 'Cancelled':
-                payment_status = "Cancelled"
+            latest_shipment = order.shipments.first()
                 
             fulfillment_status = "Unfulfilled"
             if order.status == 'Shipped':
@@ -92,12 +84,14 @@ class OrderListView(APIView):
                 'total': str(order.total),
                 'created_at': order.created_at,
                 'customer_name': order.user.full_name if order.user else 'N/A',
-                'customer_email': order.user.email if order.user else 'N/A',
-                'payment_status': payment_status,
+                'customer_email': order.customer_email or (order.user.email if order.user else 'N/A'),
+                'customer_phone': order.customer_phone,
+                'payment_status': order.payment_status,
                 'fulfillment_status': fulfillment_status,
                 'item_quantity': item_qty,
-                'delivery_method': delivery_method,
-                'payment_method': pay_method,
+                'delivery_method': latest_shipment.courier_name if latest_shipment and latest_shipment.courier_name else delivery_method,
+                'payment_method': order.payment_method,
+                'currency': order.currency,
             })
             
         return Response(data)
@@ -120,7 +114,7 @@ class OrderDetailView(APIView):
 
     def get(self, request, pk: str):
         try:
-            order = Order.objects.prefetch_related('items__product').get(id=pk)
+            order = Order.objects.prefetch_related('items__product', 'items__variant', 'shipments').get(id=pk)
         except Order.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -153,25 +147,48 @@ class OrderDetailView(APIView):
                 'product_id': str(item.product.id) if item.product else None,
                 'product_slug': item.product.slug if item.product else None,
                 'product_image': prod_img,
-                'product_title': item.product.title if item.product else 'Deleted Product',
-                'sku': item.product.sku if item.product else 'N/A',
+                'product_title': item.product_title or (item.product.title if item.product else 'Deleted Product'),
+                'variant_id': str(item.variant_id) if item.variant_id else None,
+                'variant_title': item.variant_title,
+                'sku': item.sku or (item.product.sku if item.product else 'N/A'),
                 'quantity': item.quantity,
                 'unit_price': str(item.unit_price),
                 'line_total': str(item.line_total),
             })
+
+        shipments = [{
+            'id': str(shipment.id),
+            'provider': shipment.provider,
+            'provider_order_id': shipment.provider_order_id,
+            'provider_shipment_id': shipment.provider_shipment_id,
+            'awb_code': shipment.awb_code,
+            'courier_name': shipment.courier_name,
+            'tracking_url': shipment.tracking_url,
+            'status': shipment.status,
+            'shipped_at': shipment.shipped_at,
+            'delivered_at': shipment.delivered_at,
+        } for shipment in order.shipments.all()]
 
         return Response({
             'id': str(order.id),
             'order_number': order.order_number,
             'status': order.status,
             'subtotal': str(order.subtotal),
-            'tax': str(order.tax),
+            'discount_amount': str(order.discount_amount),
+            'shipping_amount': str(order.shipping_amount),
+            'tax': str(order.tax_amount),
+            'tax_amount': str(order.tax_amount),
             'total': str(order.total),
+            'currency': order.currency,
+            'payment_method': order.payment_method,
+            'payment_status': order.payment_status,
             'shipping_address': order.shipping_address,
             'created_at': order.created_at,
             'items': items_data,
-            'customer_email': order.user.email if order.user else 'N/A',
+            'customer_email': order.customer_email or (order.user.email if order.user else 'N/A'),
+            'customer_phone': order.customer_phone,
             'customer_name': order.user.full_name if order.user else 'N/A',
+            'shipments': shipments,
         })
 
     def put(self, request, pk: str):
@@ -192,6 +209,10 @@ class OrderDetailView(APIView):
             if status_val not in Order.Status.values:
                 return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
             order.status = status_val
+            if status_val == Order.Status.REFUNDED:
+                order.payment_status = Order.PaymentStatus.REFUNDED
+            elif status_val == Order.Status.CANCELLED and order.payment_status == Order.PaymentStatus.PENDING:
+                order.payment_status = Order.PaymentStatus.CANCELLED
 
         tracking_number = request.data.get('tracking_number')
         carrier = request.data.get('shipping_carrier')
@@ -299,16 +320,27 @@ class ShiprocketWebhookView(APIView):
 
         from django.utils import timezone
 
+        shipment = order.shipments.filter(provider='shiprocket').first()
+        if shipment is None:
+            shipment = Shipment(order=order, provider='shiprocket', provider_order_id=str(order_number))
         if awb_code:
-            order.awb_code = awb_code
+            shipment.awb_code = awb_code
         if courier_name:
-            order.courier_name = courier_name
+            shipment.courier_name = courier_name
         if tracking_url:
-            order.tracking_url = tracking_url
+            shipment.tracking_url = tracking_url
+        if data.get('shipment_id'):
+            shipment.provider_shipment_id = str(data['shipment_id'])
 
-        if current_status in ['AWB ASSIGNED', 'SHIPPED', 'IN TRANSIT', 'OUT FOR DELIVERY'] and order.status != Order.Status.SHIPPED:
+        if current_status in ['SHIPPED', 'IN TRANSIT', 'OUT FOR DELIVERY'] and order.status != Order.Status.SHIPPED:
             order.status = Order.Status.SHIPPED
-            order.shipped_at = timezone.now()
+            shipment.status = {
+                'SHIPPED': Shipment.Status.SHIPPED,
+                'IN TRANSIT': Shipment.Status.IN_TRANSIT,
+                'OUT FOR DELIVERY': Shipment.Status.OUT_FOR_DELIVERY,
+            }[current_status]
+            shipment.shipped_at = shipment.shipped_at or timezone.now()
+            shipment.save()
             order.save()
 
             # Trigger transactional dispatch email
@@ -317,10 +349,23 @@ class ShiprocketWebhookView(APIView):
 
         elif current_status in ['DELIVERED'] and order.status != Order.Status.DELIVERED:
             order.status = Order.Status.DELIVERED
-            order.delivered_at = timezone.now()
+            shipment.status = Shipment.Status.DELIVERED
+            shipment.delivered_at = shipment.delivered_at or timezone.now()
+            shipment.save()
+            if order.payment_method == Order.PaymentMethod.COD:
+                order.payment_status = Order.PaymentStatus.PAID
             order.save()
 
         else:
+            shipment_statuses = {
+                'AWB ASSIGNED': Shipment.Status.AWB_ASSIGNED,
+                'IN TRANSIT': Shipment.Status.IN_TRANSIT,
+                'OUT FOR DELIVERY': Shipment.Status.OUT_FOR_DELIVERY,
+                'CANCELLED': Shipment.Status.CANCELLED,
+            }
+            if current_status in shipment_statuses:
+                shipment.status = shipment_statuses[current_status]
+            shipment.save()
             order.save()
 
         return Response({'detail': 'Webhook processed.'}, status=status.HTTP_200_OK)
@@ -378,6 +423,3 @@ class AbandonedCartRecoverView(APIView):
             })
         except AbandonedCart.DoesNotExist:
             return Response({'detail': 'Invalid or expired cart recovery token.'}, status=status.HTTP_404_NOT_FOUND)
-
-
-

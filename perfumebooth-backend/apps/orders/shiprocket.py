@@ -4,6 +4,7 @@ import requests
 from decimal import Decimal
 from django.conf import settings
 from django.core.cache import cache
+from .models import Shipment
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ def create_shiprocket_order(order) -> dict:
         'billing_phone': addr.get('phone', '9999999999'),
         'shipping_is_billing': True,
         'order_items': shipment_items,
-        'payment_method': 'Prepaid',
+        'payment_method': 'COD' if order.payment_method == order.PaymentMethod.COD else 'Prepaid',
         'sub_total': float(order.subtotal),
         'length': 15,
         'width': 10,
@@ -176,13 +177,17 @@ def create_shiprocket_order(order) -> dict:
 
         if res.status_code in [200, 201]:
             data = res.json()
-            order.shiprocket_order_id = str(data.get('order_id', ''))
-            order.shiprocket_shipment_id = str(data.get('shipment_id', ''))
-            order.save(update_fields=['shiprocket_order_id', 'shiprocket_shipment_id', 'updated_at'])
+            shipment = order.shipments.filter(provider='shiprocket').first()
+            if shipment is None:
+                shipment = Shipment(order=order, provider='shiprocket')
+            shipment.provider_order_id = str(data.get('order_id', ''))
+            shipment.provider_shipment_id = str(data.get('shipment_id', ''))
+            shipment.status = Shipment.Status.PENDING
+            shipment.save()
             return {
                 'success': True,
-                'shiprocket_order_id': order.shiprocket_order_id,
-                'shiprocket_shipment_id': order.shiprocket_shipment_id
+                'shiprocket_order_id': shipment.provider_order_id,
+                'shiprocket_shipment_id': shipment.provider_shipment_id
             }
         else:
             logger.error(f"Shiprocket order creation failed: {res.status_code} - {res.text}")
