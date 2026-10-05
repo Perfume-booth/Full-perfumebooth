@@ -86,6 +86,7 @@ class ProductVariant(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     stock_level = models.PositiveIntegerField(default=0)
+    reserved_stock = models.PositiveIntegerField(default=0)
     image = models.FileField(upload_to='variants/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -98,6 +99,10 @@ class ProductVariant(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product.title} — {self.option1_value} ({self.sku})"
+
+    @property
+    def available_stock(self) -> int:
+        return max(self.stock_level - self.reserved_stock, 0)
 
 
 class Inventory(models.Model):
@@ -347,4 +352,3 @@ class ProductReview(models.Model):
 
     def __str__(self) -> str:
         return f"{self.rating}* Review for {self.product.title} by {self.user.email}"
-

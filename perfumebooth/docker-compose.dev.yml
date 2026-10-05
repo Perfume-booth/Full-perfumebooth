@@ -48,6 +48,11 @@ services:
       - ../perfumebooth-backend:/app
     command: celery -A core worker -Q ai_tasks --loglevel=debug --concurrency=1
 
+  celery_beat:
+    volumes:
+      - ../perfumebooth-backend:/app
+    command: celery -A core beat --loglevel=debug
+
   # ─────────────────────────────────────────────────────────────
   # FRONTEND — Next.js dev server with hot-reload
   # ─────────────────────────────────────────────────────────────

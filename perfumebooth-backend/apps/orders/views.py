@@ -20,6 +20,7 @@ from apps.authentication.helpers import log_action
 from core.throttling import CheckoutRateThrottle
 from apps.checkout.validators import validate_checkout_request
 from apps.checkout.services.checkout_service import CheckoutService
+from apps.inventory.services import InventoryReservationService
 
 logger = logging.getLogger(__name__)
 
@@ -200,31 +201,34 @@ class OrderDetailView(APIView):
             return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            order = Order.objects.get(id=pk)
+            with transaction.atomic():
+                order = Order.objects.select_for_update().get(id=pk)
+
+                status_val = request.data.get('status')
+                if status_val:
+                    if status_val not in Order.Status.values:
+                        return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
+                    order.status = status_val
+                    if status_val == Order.Status.REFUNDED:
+                        order.payment_status = Order.PaymentStatus.REFUNDED
+                    elif status_val == Order.Status.CANCELLED and order.payment_status == Order.PaymentStatus.PENDING:
+                        InventoryReservationService.release_order(order)
+                        order.payment_status = Order.PaymentStatus.CANCELLED
+
+                tracking_number = request.data.get('tracking_number')
+                carrier = request.data.get('shipping_carrier')
+                if tracking_number is not None or carrier is not None:
+                    addr = dict(order.shipping_address)
+                    if tracking_number is not None:
+                        addr['tracking_number'] = tracking_number
+                    if carrier is not None:
+                        addr['shipping_carrier'] = carrier
+                    order.shipping_address = addr
+
+                order.save()
         except Order.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        status_val = request.data.get('status')
-        if status_val:
-            if status_val not in Order.Status.values:
-                return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
-            order.status = status_val
-            if status_val == Order.Status.REFUNDED:
-                order.payment_status = Order.PaymentStatus.REFUNDED
-            elif status_val == Order.Status.CANCELLED and order.payment_status == Order.PaymentStatus.PENDING:
-                order.payment_status = Order.PaymentStatus.CANCELLED
-
-        tracking_number = request.data.get('tracking_number')
-        carrier = request.data.get('shipping_carrier')
-        if tracking_number is not None or carrier is not None:
-            addr = dict(order.shipping_address)
-            if tracking_number is not None:
-                addr['tracking_number'] = tracking_number
-            if carrier is not None:
-                addr['shipping_carrier'] = carrier
-            order.shipping_address = addr
-
-        order.save()
         log_action(request.user, f"Updated Order #{order.order_number} (Status: {order.status})", request)
         return Response({'detail': 'Order updated successfully.'})
 
@@ -250,7 +254,7 @@ class RazorpayWebhookView(APIView):
             return Response({'detail': 'Invalid JSON.'}, status=status.HTTP_400_BAD_REQUEST)
 
         event_type = event.get('event')
-        if event_type != 'payment.captured':
+        if event_type not in {'payment.captured', 'payment.failed'}:
             return Response({'detail': 'Event not handled.'}, status=status.HTTP_200_OK)
 
         payment_intent_id = event['payload']['payment']['entity']['id']
@@ -258,6 +262,19 @@ class RazorpayWebhookView(APIView):
 
         if not order_id:
             return Response({'detail': 'Missing order_id in notes.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if event_type == 'payment.failed':
+            try:
+                with transaction.atomic():
+                    order = Order.objects.select_for_update().get(id=order_id)
+                    if order.payment_status == Order.PaymentStatus.PENDING:
+                        InventoryReservationService.release_order(order)
+                        order.payment_status = Order.PaymentStatus.FAILED
+                        order.status = Order.Status.CANCELLED
+                        order.save(update_fields=['payment_status', 'status', 'updated_at'])
+            except Order.DoesNotExist:
+                return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'detail': 'OK'}, status=status.HTTP_200_OK)
 
         try:
             order = process_payment_webhook(payment_intent_id, order_id)

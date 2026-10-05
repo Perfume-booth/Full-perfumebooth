@@ -55,6 +55,7 @@ LOCAL_APPS = [
     'apps.cms',
     'apps.checkout',
     'apps.catalog',
+    'apps.inventory',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -166,7 +167,17 @@ CELERY_TASK_ROUTES = {
     'apps.shop.tasks.process_bulk_csv_import':    {'queue': 'imports'},
     'apps.orders.tasks.send_order_email_receipt': {'queue': 'emails'},
     'apps.shop.tasks.generate_product_embeddings':{'queue': 'ai_tasks'},
+    'apps.inventory.tasks.release_expired_inventory_reservations': {'queue': 'default'},
 }
+
+CELERY_BEAT_SCHEDULE = {
+    'release-expired-inventory-reservations': {
+        'task': 'apps.inventory.tasks.release_expired_inventory_reservations',
+        'schedule': 60.0,
+    },
+}
+
+INVENTORY_RESERVATION_MINUTES = config('INVENTORY_RESERVATION_MINUTES', default=15, cast=int)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Django REST Framework

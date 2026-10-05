@@ -16,6 +16,7 @@ import datetime
 from django.db import transaction
 
 from apps.orders.models import Order, OrderItem
+from apps.inventory.services import InventoryReservationService
 from core.money import format_money
 from ..validators import CheckoutInput
 from .inventory_service import InventoryService
@@ -96,8 +97,11 @@ class CheckoutService:
                 unit_price=item.unit_price
             )
 
-        # 8: Decrement inventory stock levels
-        InventoryService.decrement_stock(locked_items)
+        # 8: Reserve stock. COD is immediately committed; prepaid stock remains
+        # reserved until the verified payment webhook arrives.
+        InventoryReservationService.reserve(order, locked_items)
+        if input_data.payment_method == Order.PaymentMethod.COD:
+            InventoryReservationService.commit_order(order)
 
         # 9: Return structured checkout result
         return {

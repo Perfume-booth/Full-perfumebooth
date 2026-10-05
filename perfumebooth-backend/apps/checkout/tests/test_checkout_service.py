@@ -124,7 +124,7 @@ class PricingServiceTests(TestCase):
 
 
 class InventoryServiceTests(TestCase):
-    """Test stock locking, validation, and decrementing."""
+    """Test stock locking and available-stock validation."""
 
     def setUp(self):
         self.product = Product.objects.create(
@@ -146,16 +146,15 @@ class InventoryServiceTests(TestCase):
             stock_level=3
         )
 
-    def test_simple_product_stock_lock_and_decrement(self):
+    def test_simple_product_stock_lock(self):
         # Available stock is 5 - 1 = 4. Requesting 3 is valid.
         item_input = [CartItemInput(product_id=str(self.product.id), quantity=3)]
         locked = InventoryService.lock_and_validate_stock(item_input)
         self.assertEqual(len(locked), 1)
         self.assertIsNone(locked[0].variant)
 
-        InventoryService.decrement_stock(locked)
         self.inventory.refresh_from_db()
-        self.assertEqual(self.inventory.stock_level, 2)
+        self.assertEqual(self.inventory.stock_level, 5)
 
     def test_simple_product_insufficient_stock(self):
         # Available stock is 4. Requesting 5 should fail.
@@ -163,7 +162,7 @@ class InventoryServiceTests(TestCase):
         with self.assertRaises(InsufficientStockException):
             InventoryService.lock_and_validate_stock(item_input)
 
-    def test_variant_stock_lock_and_decrement(self):
+    def test_variant_stock_lock(self):
         # Variant stock is 3. Requesting 2 is valid.
         item_input = [CartItemInput(
             product_id=str(self.product.id),
@@ -174,9 +173,8 @@ class InventoryServiceTests(TestCase):
         self.assertEqual(len(locked), 1)
         self.assertEqual(locked[0].variant.id, self.variant.id)
 
-        InventoryService.decrement_stock(locked)
         self.variant.refresh_from_db()
-        self.assertEqual(self.variant.stock_level, 1)
+        self.assertEqual(self.variant.stock_level, 3)
 
     def test_variant_insufficient_stock(self):
         item_input = [CartItemInput(

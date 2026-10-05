@@ -92,6 +92,12 @@ services:
     networks:
       - perfumebooth_net
     command: celery -A core worker -Q default --loglevel=info --concurrency=4
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping --destination celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   celery_imports:
     build:
@@ -109,6 +115,12 @@ services:
     networks:
       - perfumebooth_net
     command: celery -A core worker -Q imports --loglevel=info --concurrency=2
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping --destination celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   celery_emails:
     build:
@@ -126,6 +138,12 @@ services:
     networks:
       - perfumebooth_net
     command: celery -A core worker -Q emails --loglevel=info --concurrency=4
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping --destination celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   celery_ai:
     build:
@@ -143,6 +161,36 @@ services:
     networks:
       - perfumebooth_net
     command: celery -A core worker -Q ai_tasks --loglevel=info --concurrency=2
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping --destination celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Periodic scheduler — releases expired checkout inventory reservations
+  celery_beat:
+    build:
+      context: ../perfumebooth-backend
+      dockerfile: Dockerfile
+    container_name: perfumebooth_celery_beat
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - perfumebooth_net
+    command: celery -A core beat --loglevel=info
+    healthcheck:
+      test: ["CMD-SHELL", "grep -aq beat /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # ─────────────────────────────────────────────────────────────
   # FRONTEND — Next.js 16 (standalone production build)
@@ -155,6 +203,23 @@ services:
     restart: unless-stopped
     env_file:
       - .env.docker
+    depends_on:
+      - django
+    networks:
+      - perfumebooth_net
+
+  # Merchant Portal (MPS)
+  mps:
+    build:
+      context: ../perfumebooth-MPS
+      dockerfile: Dockerfile
+    container_name: perfumebooth_mps
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:8000
     depends_on:
       - django
     networks:

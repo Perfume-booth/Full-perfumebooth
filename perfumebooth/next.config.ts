@@ -8,6 +8,7 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: ["@/components/ui/icons"],

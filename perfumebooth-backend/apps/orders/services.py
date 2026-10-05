@@ -4,6 +4,7 @@ Orders Services — Webhook & Dispatch Logic
 import hashlib
 import hmac
 from django.conf import settings
+from django.db import transaction
 
 
 COUPONS = {
@@ -45,6 +46,7 @@ def verify_razorpay_signature(payload_body: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+@transaction.atomic
 def process_payment_webhook(payment_intent_id: str, order_id: str) -> Order:
     """
     Idempotent order payment confirmation.
@@ -70,7 +72,9 @@ def process_payment_webhook(payment_intent_id: str, order_id: str) -> Order:
         raise RuntimeError(f'Webhook for {payment_intent_id} already processed.')
 
     try:
-        order = Order.objects.get(id=order_id)
+        order = Order.objects.select_for_update().get(id=order_id)
+        from apps.inventory.services import InventoryReservationService
+        InventoryReservationService.commit_order(order)
         order.status = Order.Status.PAID
         order.payment_status = Order.PaymentStatus.PAID
         order.payment_intent_id = payment_intent_id
@@ -84,5 +88,8 @@ def process_payment_webhook(payment_intent_id: str, order_id: str) -> Order:
     except Order.DoesNotExist:
         cache.delete(lock_key)
         raise ValueError(f'Order {order_id} not found.')
+    except Exception:
+        cache.delete(lock_key)
+        raise
 
     return order

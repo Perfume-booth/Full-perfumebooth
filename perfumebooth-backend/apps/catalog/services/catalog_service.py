@@ -99,7 +99,7 @@ class CatalogService:
                 'sku': var.sku,
                 'price': str(var.price),
                 'compare_at_price': str(var.compare_at_price) if var.compare_at_price else None,
-                'stock': var.stock_level,
+                'stock': var.available_stock,
             })
 
         attrs = product.attributes or {}

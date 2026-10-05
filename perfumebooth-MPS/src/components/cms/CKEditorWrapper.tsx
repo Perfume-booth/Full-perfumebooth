@@ -10,11 +10,18 @@ interface CKEditorWrapperProps {
   placeholder?: string;
 }
 
+// The predefined build bundles its own CKEditor types. The React adapter uses
+// the equivalent types from the `ckeditor5` package, so TypeScript sees two
+// nominally different Editor classes even though their runtime API matches.
+const CompatibleClassicEditor = ClassicEditor as unknown as React.ComponentProps<
+  typeof CKEditor
+>['editor'];
+
 export default function CKEditorWrapper({ value, onChange, placeholder }: CKEditorWrapperProps) {
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-background text-foreground text-sm">
       <CKEditor
-        editor={ClassicEditor}
+        editor={CompatibleClassicEditor}
         data={value || ''}
         config={{
           placeholder: placeholder || 'Type your content here...',

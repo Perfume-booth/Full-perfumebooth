@@ -1,11 +1,9 @@
 """
-Inventory Service — Stock Locking and Decrementing
-Guarantees race-condition-safe inventory deductions using SELECT FOR UPDATE row-level locking.
+Inventory Service — Stock Locking and Validation
+Guarantees race-condition-safe availability checks using SELECT FOR UPDATE row-level locking.
 """
 from dataclasses import dataclass
 from typing import Optional, List
-from django.db import transaction
-
 from apps.shop.models import Product, ProductVariant, Inventory
 from ..validators import CartItemInput
 from ..exceptions import (
@@ -26,8 +24,9 @@ class LockedStockItem:
 
 class InventoryService:
     """
-    Handles locking inventory rows, validating stock quantities,
-    and decrementing stock within a transactional boundary.
+    Handles locking inventory rows and validating stock quantities within a
+    transactional boundary. Reservation and deduction are owned by the
+    inventory domain service.
     """
 
     @classmethod
@@ -57,10 +56,10 @@ class InventoryService:
                 except ProductVariant.DoesNotExist:
                     raise VariantNotFoundException(product.title, item.variant_id)
 
-                if variant.stock_level < item.quantity:
+                if variant.available_stock < item.quantity:
                     raise InsufficientStockException(
                         product_title=product.title,
-                        available=variant.stock_level,
+                        available=variant.available_stock,
                         requested=item.quantity,
                         variant_title=variant.title
                     )
@@ -95,16 +94,3 @@ class InventoryService:
                 ))
 
         return locked_items
-
-    @classmethod
-    def decrement_stock(cls, locked_items: List[LockedStockItem]) -> None:
-        """
-        Deducts purchased quantities from locked variant or inventory records.
-        """
-        for item in locked_items:
-            if item.variant:
-                item.variant.stock_level -= item.quantity
-                item.variant.save(update_fields=['stock_level'])
-            elif item.inventory:
-                item.inventory.stock_level -= item.quantity
-                item.inventory.save(update_fields=['stock_level'])
