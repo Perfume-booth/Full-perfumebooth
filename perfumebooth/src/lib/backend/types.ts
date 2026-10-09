@@ -92,3 +92,28 @@ export interface PageData {
   body: string;
 }
 
+/**
+ * Unwraps standardized API response envelope: { data: ..., meta: { request_id: ... } }
+ * If the payload is already unwrapped (raw), it returns it as-is.
+ */
+export function unwrapApiData<T = any>(payload: any): T {
+  if (payload && typeof payload === 'object' && 'data' in payload && 'meta' in payload) {
+    return payload.data as T;
+  }
+  return payload as T;
+}
+
+/**
+ * Ensures an array is returned from an API response, unwrapping any standard envelopes
+ * or DRF { results: [...] } pagination containers, and falling back safely to [].
+ */
+export function ensureArray<T = any>(payload: any): T[] {
+  const unwrapped = unwrapApiData(payload);
+  if (Array.isArray(unwrapped)) {
+    return unwrapped as T[];
+  }
+  if (unwrapped && typeof unwrapped === 'object' && Array.isArray((unwrapped as any).results)) {
+    return (unwrapped as any).results as T[];
+  }
+  return [];
+}

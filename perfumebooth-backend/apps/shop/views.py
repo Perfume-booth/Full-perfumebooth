@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 # pyrefly: ignore [missing-import]
 from django.core.cache import cache
+from django.db import transaction
 import json
 import logging
 from decimal import Decimal
@@ -14,7 +15,8 @@ from core.validators import validate_image_upload, validate_spreadsheet_upload
 
 logger = logging.getLogger(__name__)
 
-from .models import Product, Inventory, ProductImage, Collection, AutoCollection, WishlistItem, ProductReview
+from .models import Product, Inventory, ProductImage, Collection, AutoCollection, WishlistItem, ProductReview, ProductImportJob
+from .product_imports import apply_preview, create_preview
 # pyrefly: ignore [missing-import]
 from django.utils.text import slugify
 # pyrefly: ignore [missing-import]
@@ -865,7 +867,7 @@ class ProductReviewAPIView(APIView):
 class ProductExcelImportView(APIView):
     """
     POST /api/shop/products/excel-import/
-    Safe updates and imports for products from CSV/Excel files.
+    Create a validated, update-only preview. This endpoint never changes products.
     """
     permission_classes = [permissions.IsAuthenticated, HasRolePermission]
     allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
@@ -883,126 +885,186 @@ class ProductExcelImportView(APIView):
         except Exception:
             return Response({'detail': 'Invalid file upload.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        filename = file_obj.name.lower()
-        rows_data = []
-
+        mode = str(request.data.get('mode', 'UPDATE_ONLY')).upper()
+        if mode not in {'UPDATE_ONLY', 'CREATE_ONLY', 'UPSERT'}:
+            return Response({'detail': 'Invalid import mode.'}, status=status.HTTP_400_BAD_REQUEST)
+        draft_default = str(request.data.get('draft_default', 'true')).lower() in {'true', '1', 'yes'}
+        job = ProductImportJob.objects.create(
+            created_by=request.user, filename=file_obj.name[:255], file_sha256='',
+            mode=mode, status=ProductImportJob.Status.QUEUED,
+            operation='preview',
+            summary={'draft_default': draft_default}, source_file=file_obj,
+            progress_current=0, progress_total=1,
+        )
         try:
-            if filename.endswith('.csv'):
-                import csv
-                import io
-                decoded = file_obj.read().decode('utf-8-sig')
-                reader = csv.DictReader(io.StringIO(decoded))
-                for row in reader:
-                    rows_data.append(row)
-            elif filename.endswith('.xlsx') or filename.endswith('.xls'):
-                import openpyxl
-                wb = openpyxl.load_workbook(file_obj, data_only=True)
-                sheet = wb.active
-                headers = [str(cell.value or '').strip() for cell in sheet[1]]
-                for row_cells in sheet.iter_rows(min_row=2, values_only=True):
-                    row_dict = {}
-                    for h, val in zip(headers, row_cells):
-                        if h and val is not None:
-                            row_dict[h] = str(val).strip()
-                    if row_dict:
-                        rows_data.append(row_dict)
-            else:
-                return Response({'detail': 'Unsupported file format. Please upload a .csv or .xlsx file.'}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.exception("Error parsing import file")
-            return Response({'detail': 'Failed to parse file. Please ensure the file is valid and correctly formatted.'}, status=status.HTTP_400_BAD_REQUEST)
+            from .tasks import process_catalog_preview_job
+            result = process_catalog_preview_job.delay(str(job.id))
+            job.task_id = result.id
+            job.save(update_fields=['task_id'])
+        except Exception as exc:
+            logger.exception('Could not queue catalog preview')
+            job.status = ProductImportJob.Status.FAILED
+            job.error_message = 'The import worker is unavailable. Try again.'
+            job.finished_at = timezone.now()
+            job.save(update_fields=['status', 'error_message', 'finished_at'])
+            return Response({'detail': job.error_message, 'job_id': str(job.id)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        log_action(request.user, f"Queued catalog import preview {job.id} ({job.filename})", request)
+        return Response(_catalog_import_payload(job, 'Preview queued.'), status=status.HTTP_202_ACCEPTED)
 
-        updated_count = 0
-        created_count = 0
 
-        for row in rows_data:
-            # Case-insensitive helper to get column value
-            def get_val(keys):
-                for k in keys:
-                    for rk in row.keys():
-                        if rk.lower().strip() == k.lower().strip():
-                            return row[rk]
-                return None
+def _catalog_import_payload(job, detail=None):
+    return {
+        'detail': detail or ('Import failed.' if job.status == ProductImportJob.Status.FAILED else 'Import status.'),
+        'job_id': str(job.id), 'status': job.status, 'mode': job.mode,
+        'operation': job.operation,
+        'progress': {'current': job.progress_current, 'total': job.progress_total},
+        'error_message': job.error_message,
+        'summary': job.summary, 'changes': job.changes[:200], 'creates': job.creates[:200],
+        'variants': job.variant_operations[:200], 'images': job.image_operations[:200],
+        'bulk_actions': job.bulk_operations[:200], 'errors': job.errors[:200],
+    }
 
-            handle = get_val(['Handle', 'handle', 'slug', 'URL Slug'])
-            sku = get_val(['Variant SKU', 'SKU', 'sku'])
-            title = get_val(['Title', 'title', 'Product Title'])
-            price = get_val(['Variant Price', 'Price', 'price'])
-            compare_price = get_val(['Variant Compare At Price', 'Compare At Price', 'compare_at_price'])
-            stock = get_val(['Variant Inventory Qty', 'Inventory Qty', 'stock', 'Stock Quantity'])
-            vendor = get_val(['Vendor', 'vendor', 'Brand', 'brand'])
-            status_val = get_val(['Status', 'status', 'Published', 'is_online'])
 
-            product = None
-            if handle:
-                product = Product.objects.filter(slug=handle).first()
-            if not product and sku:
-                product = Product.objects.filter(sku=sku).first()
+class ProductExcelImportStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
-            if product:
-                # Update ONLY fields provided in the row (Safe Partial Update)
-                if price is not None and price != '':
-                    try:
-                        product.price = Decimal(str(price))
-                    except Exception:
-                        pass
-                if compare_price is not None and compare_price != '':
-                    try:
-                        product.compare_at_price = Decimal(str(compare_price))
-                    except Exception:
-                        pass
-                if title is not None and title != '':
-                    product.title = title
-                if status_val is not None:
-                    product.is_online = str(status_val).lower() in ['active', 'true', '1', 'published']
+    def get(self, request, job_id):
+        try:
+            job = ProductImportJob.objects.get(pk=job_id)
+        except ProductImportJob.DoesNotExist:
+            return Response({'detail': 'Import job not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if job.created_by_id != request.user.id and not request.user.is_superuser:
+            return Response({'detail': 'You can only view your own import jobs.'}, status=status.HTTP_403_FORBIDDEN)
+        payload = _catalog_import_payload(job)
+        if job.task_id and job.status in {
+            ProductImportJob.Status.PROCESSING, ProductImportJob.Status.APPLYING,
+            ProductImportJob.Status.QUEUED, ProductImportJob.Status.APPLY_QUEUED,
+        }:
+            from celery.result import AsyncResult
+            info = AsyncResult(job.task_id).info
+            if isinstance(info, dict) and 'current' in info:
+                payload['progress'] = {'current': info['current'], 'total': info.get('total', 1)}
+        return Response(payload)
 
-                if request.user and request.user.is_authenticated:
-                    product.updated_by = request.user
 
-                product.save()
+class ProductExcelImportRetryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
-                if stock is not None and stock != '':
-                    try:
-                        stock_int = int(float(stock))
-                        Inventory.objects.update_or_create(product=product, defaults={'stock_level': stock_int})
-                    except Exception:
-                        pass
+    def post(self, request, job_id):
+        try:
+            with transaction.atomic():
+                job = ProductImportJob.objects.select_for_update().get(pk=job_id)
+                if job.created_by_id != request.user.id and not request.user.is_superuser:
+                    raise PermissionError('You can only retry your own import job.')
+                if job.status != ProductImportJob.Status.FAILED:
+                    raise ValueError('Only failed import jobs can be retried.')
+                if job.operation == 'preview' and not job.source_file:
+                    raise ValueError('The source workbook is no longer available.')
+                job.status = ProductImportJob.Status.QUEUED if job.operation == 'preview' else ProductImportJob.Status.APPLY_QUEUED
+                job.error_message = ''
+                job.finished_at = None
+                job.progress_current = 0
+                job.save(update_fields=['status', 'error_message', 'finished_at', 'progress_current'])
+            from .tasks import apply_catalog_import_job, process_catalog_preview_job
+            task = process_catalog_preview_job if job.operation == 'preview' else apply_catalog_import_job
+            result = task.delay(str(job.id))
+            job.task_id = result.id
+            job.save(update_fields=['task_id'])
+        except ProductImportJob.DoesNotExist:
+            return Response({'detail': 'Import job not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except PermissionError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_409_CONFLICT)
+        except Exception:
+            logger.exception('Could not retry catalog import job')
+            ProductImportJob.objects.filter(pk=job_id).update(status=ProductImportJob.Status.FAILED)
+            return Response({'detail': 'The import worker is unavailable.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response(_catalog_import_payload(job, 'Import retry queued.'), status=status.HTTP_202_ACCEPTED)
 
-                CollectionSyncService.syncProductCollections(product)
-                updated_count += 1
-            elif handle or sku:
-                # Create product if missing
-                new_slug = handle or slugify(title or sku)
-                new_sku = sku or f"SKU-{new_slug.upper()}"
-                new_title = title or new_slug.replace('-', ' ').title()
-                new_price = Decimal(str(price)) if price else Decimal('0.00')
 
-                new_product = Product.objects.create(
-                    slug=new_slug,
-                    sku=new_sku,
-                    title=new_title,
-                    price=new_price,
-                    is_online=str(status_val).lower() in ['active', 'true', '1', 'published'] if status_val else True,
-                    attributes={'brand': vendor or 'PerfumeBooth'},
-                    created_by=request.user if request.user and request.user.is_authenticated else None,
-                    updated_by=request.user if request.user and request.user.is_authenticated else None
-                )
-                if stock is not None and stock != '':
-                    try:
-                        Inventory.objects.create(product=new_product, stock_level=int(float(stock)))
-                    except Exception:
-                        pass
-                CollectionSyncService.syncProductCollections(new_product)
-                created_count += 1
+class ProductExcelImportTemplateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
-        cache.clear()
-        log_action(request.user, f"Bulk imported {len(rows_data)} rows ({updated_count} updated, {created_count} created)", request)
-        return Response({
-            'detail': f'Import successful! Updated {updated_count} products and created {created_count} products.',
-            'updated_count': updated_count,
-            'created_count': created_count,
-            'total_rows_processed': len(rows_data)
-        })
+    def get(self, request):
+        from django.http import HttpResponse
+        from .product_import_template import build_product_import_template
+        mode = str(request.query_params.get('mode', 'UPDATE_ONLY')).upper()
+        if mode not in {'UPDATE_ONLY', 'CREATE_ONLY', 'UPSERT'}:
+            return Response({'detail': 'Invalid template mode.'}, status=status.HTTP_400_BAD_REQUEST)
+        response = HttpResponse(
+            build_product_import_template(mode),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename=perfumebooth-products-{mode.lower()}-template-v7.xlsx'
+        return response
+
+
+class ProductExcelImportApplyView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def post(self, request, job_id):
+        try:
+            with transaction.atomic():
+                job = ProductImportJob.objects.select_for_update().get(pk=job_id)
+                if job.created_by_id != request.user.id and not request.user.is_superuser:
+                    raise PermissionError('You can only apply your own import preview.')
+                if job.status != ProductImportJob.Status.PREVIEW_READY or job.errors:
+                    raise ValueError('Only a valid preview can be queued for application.')
+                job.status = ProductImportJob.Status.APPLY_QUEUED
+                job.operation = 'apply'
+                job.progress_current = 0
+                job.progress_total = 1
+                job.error_message = ''
+                job.finished_at = None
+                job.save(update_fields=['status', 'operation', 'progress_current', 'progress_total', 'error_message', 'finished_at'])
+            from .tasks import apply_catalog_import_job
+            result = apply_catalog_import_job.delay(str(job.id))
+            job.task_id = result.id
+            job.save(update_fields=['task_id'])
+        except ProductImportJob.DoesNotExist:
+            return Response({'detail': 'Import preview not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except PermissionError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_409_CONFLICT)
+        except Exception:
+            logger.exception('Could not queue catalog import apply job')
+            ProductImportJob.objects.filter(pk=job_id, status=ProductImportJob.Status.APPLY_QUEUED).update(
+                status=ProductImportJob.Status.PREVIEW_READY, task_id=''
+            )
+            return Response({'detail': 'The import worker is unavailable. Try applying again.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        log_action(request.user, f"Queued catalog import apply {job.id}", request)
+        return Response(_catalog_import_payload(job, 'Catalog application queued.'), status=status.HTTP_202_ACCEPTED)
+
+
+class ProductExcelImportErrorsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get(self, request, job_id):
+        from django.http import HttpResponse
+        import openpyxl
+        try:
+            job = ProductImportJob.objects.get(pk=job_id)
+        except ProductImportJob.DoesNotExist:
+            return Response({'detail': 'Import preview not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if job.created_by_id != request.user.id and not request.user.is_superuser:
+            return Response({'detail': 'You can only download your own import errors.'}, status=status.HTTP_403_FORBIDDEN)
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = 'Import errors'
+        sheet.append(['Sheet', 'Row', 'Column', 'Error'])
+        for error in job.errors:
+            sheet.append([error.get('sheet', 'Products'), error.get('row'), error.get('column'), error.get('message')])
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename=product-import-errors-{job.id}.xlsx'
+        workbook.save(response)
+        return response
 
 
 class ProductExcelExportView(APIView):
@@ -1015,53 +1077,67 @@ class ProductExcelExportView(APIView):
 
     def get(self, request):
         import openpyxl
+        from io import BytesIO
         from django.http import HttpResponse
+        from .product_import_template import build_product_import_template
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Products"
-
-        headers = [
-            "Handle", "Title", "Body (HTML)", "Vendor", "Product Category",
-            "Type", "Tags", "Published", "Option1 Name", "Option1 Value",
-            "Variant SKU", "Variant Inventory Qty", "Variant Price",
-            "Variant Compare At Price", "Image Src", "SEO Title", "SEO Description", "Status"
-        ]
-        ws.append(headers)
-
-        products = Product.objects.filter(is_online=True)
-        for p in products:
+        wb = openpyxl.load_workbook(BytesIO(build_product_import_template('UPSERT')))
+        products_sheet = wb['Products']
+        variants_sheet = wb['Variants']
+        images_sheet = wb['Images']
+        variant_row = 2
+        image_row = 2
+        products = Product.objects.select_related('inventory').prefetch_related('variants', 'images').order_by('created_at', 'id')
+        for row_number, p in enumerate(products, start=2):
             attrs = p.attributes or {}
-            stock_val = p.inventory.stock_level if hasattr(p, 'inventory') else 0
-            img_url = request.build_absolute_uri(p.image.url) if p.image else ''
             tags_str = ', '.join(attrs.get('tags', [])) if isinstance(attrs.get('tags'), list) else str(attrs.get('tags', ''))
-
-            row = [
-                p.slug,
-                p.title,
-                p.description,
-                attrs.get('brand', 'PerfumeBooth'),
-                attrs.get('category', 'Perfume'),
-                attrs.get('productType', 'Eau de Parfum'),
-                tags_str,
-                'true' if p.is_online else 'false',
-                'Title',
-                'Default Title',
-                p.sku,
-                stock_val,
-                str(p.price),
-                str(p.compare_at_price) if p.compare_at_price else '',
-                img_url,
-                attrs.get('meta_title', p.title),
-                attrs.get('meta_description', ''),
-                'active' if p.is_online else 'draft'
+            values = [
+                p.slug, p.sku, p.title, p.price, p.compare_at_price or '',
+                p.inventory.stock_level if hasattr(p, 'inventory') else 0,
+                'active' if p.is_online else 'draft', attrs.get('brand', ''),
+                attrs.get('category', ''), attrs.get('productType', ''), attrs.get('gender', ''),
+                tags_str, attrs.get('meta_title', ''), attrs.get('meta_description', ''),
+                p.description, attrs.get('ideal_for', ''), attrs.get('top_notes', ''),
+                attrs.get('middle_notes', ''), attrs.get('base_notes', ''), attrs.get('size', ''),
+                attrs.get('olfactory_family', ''), attrs.get('fragrance', ''), attrs.get('scent', ''),
+                attrs.get('season', ''), attrs.get('occasion', ''), attrs.get('dispenser_type', ''),
+                attrs.get('product_form', ''), attrs.get('short_description', ''),
+                p.cost_per_item or '', attrs.get('weight', ''), attrs.get('barcode', ''),
+                attrs.get('material', ''), attrs.get('color', ''),
             ]
-            ws.append(row)
+            for column, value in enumerate(values, start=1):
+                products_sheet.cell(row_number, column, value)
+            for variant in p.variants.all():
+                variant_values = [
+                    p.slug, '', variant.sku, variant.title, variant.option1_name,
+                    variant.option1_value, variant.option2_name, variant.option2_value,
+                    variant.price, variant.compare_at_price or '', variant.stock_level,
+                    'active' if variant.is_active else 'draft', '',
+                ]
+                for column, value in enumerate(variant_values, start=1):
+                    variants_sheet.cell(variant_row, column, value)
+                variant_row += 1
+                if variant.image:
+                    image_values = [
+                        p.slug, variant.sku, '', request.build_absolute_uri(variant.image.url), '',
+                        variant.title, 0, 'no', '',
+                    ]
+                    for column, value in enumerate(image_values, start=1):
+                        images_sheet.cell(image_row, column, value)
+                    image_row += 1
+            for image in p.images.all():
+                image_values = [
+                    p.slug, '', '', request.build_absolute_uri(image.image.url), str(image.id),
+                    image.alt_text, image.position, 'yes' if image.is_primary else 'no', '',
+                ]
+                for column, value in enumerate(image_values, start=1):
+                    images_sheet.cell(image_row, column, value)
+                image_row += 1
 
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = 'attachment; filename=perfumebooth_products.xlsx'
+        response['Content-Disposition'] = 'attachment; filename=perfumebooth-catalog-v8.xlsx'
         wb.save(response)
         return response
 

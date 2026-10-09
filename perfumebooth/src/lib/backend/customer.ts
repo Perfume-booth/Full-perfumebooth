@@ -1,3 +1,5 @@
+import { unwrapApiData, ensureArray } from './types';
+
 const isServer = typeof window === 'undefined';
 const isDocker = process.env.WATCHPACK_POLLING === "true";
 const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
@@ -13,7 +15,8 @@ export async function getCustomer(token: string) {
       cache: 'no-store'
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = unwrapApiData(rawData) || {};
     
     const addresses = (data.addresses || []).map((addr: any) => ({
       node: {
@@ -49,6 +52,7 @@ export async function getCustomer(token: string) {
 }
 
 function mapOrder(order: any) {
+  if (!order) return null;
   const status = String(order.status || "Pending").toUpperCase();
   const shippingAddress = order.shipping_address || {};
   const items = order.items || [];
@@ -103,8 +107,9 @@ export async function getCustomerOrders(token: string) {
     cache: "no-store",
   });
   if (!response.ok) return [];
-  const orders = await response.json();
-  return orders.map(mapOrder);
+  const rawOrders = await response.json();
+  const orders = ensureArray(rawOrders);
+  return orders.map(mapOrder).filter(Boolean);
 }
 
 export async function getCustomerOrder(token: string, orderId: string) {
@@ -113,7 +118,8 @@ export async function getCustomerOrder(token: string, orderId: string) {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  return mapOrder(await response.json());
+  const rawOrder = await response.json();
+  return mapOrder(unwrapApiData(rawOrder));
 }
 
 export async function updateCustomer(token: string, input: any) {
@@ -163,7 +169,8 @@ export async function createCustomerAddress(token: string, address: any) {
       const errData = await res.json();
       return { customerAddress: null, customerUserErrors: [{ message: errData.detail || "Failed to add address" }] };
     }
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = unwrapApiData(rawData);
     return { customerAddress: data, customerUserErrors: [] };
   } catch (err: any) {
     return { customerAddress: null, customerUserErrors: [{ message: err.message || "Server error" }] };
@@ -195,7 +202,8 @@ export async function updateCustomerAddress(token: string, addressId: string, ad
       const errData = await res.json();
       return { customerAddress: null, customerUserErrors: [{ message: errData.detail || "Failed to update address" }] };
     }
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = unwrapApiData(rawData);
     return { customerAddress: data, customerUserErrors: [] };
   } catch (err: any) {
     return { customerAddress: null, customerUserErrors: [{ message: err.message || "Server error" }] };

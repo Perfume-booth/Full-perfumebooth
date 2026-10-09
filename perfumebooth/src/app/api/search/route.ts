@@ -28,9 +28,15 @@ export async function GET(request: NextRequest) {
       fetch(`${BACKEND_URL}/api/shop/facets/`, { cache: "no-store" }),
     ]);
 
-    let products = productsRes.ok ? (await productsRes.json()).map(mapDjangoProductToProduct) : [];
-    const brands = brandsRes.ok ? await brandsRes.json() : [];
-    const facets = facetsRes.ok ? await facetsRes.json() : null;
+    const rawProducts = productsRes.ok ? await productsRes.json() : [];
+    const productsData = Array.isArray(rawProducts) ? rawProducts : (rawProducts?.data && Array.isArray(rawProducts.data) ? rawProducts.data : []);
+    let products = productsData.map(mapDjangoProductToProduct);
+
+    const rawBrands = brandsRes.ok ? await brandsRes.json() : [];
+    const brands = Array.isArray(rawBrands) ? rawBrands : (rawBrands?.data && Array.isArray(rawBrands.data) ? rawBrands.data : []);
+
+    const rawFacets = facetsRes.ok ? await facetsRes.json() : null;
+    const facets = (rawFacets?.data && typeof rawFacets.data === 'object') ? rawFacets.data : rawFacets;
     const productTypes = facets?.productTypes?.map((f: any) => f.value) || [];
 
     // Sort

@@ -83,32 +83,7 @@ export const TOP_CATEGORIES = [
 ];
 
 export const TOP_BRANDS = [
-  "Al Haramain",
-  "Arabiyat Prestige",
-  "Lomani",
-  "Louis Cardin",
-  "MPF",
-  "New NB",
-  "Otoori",
-  "Lattafa",
-  "Swiss Arabian",
-  "Scent Shot",
-  "Ahmed",
-  "Khadlaj",
-  "Boys Perfume, Deo for Women, imported perfume, long lasting perfume, oriental fragrance, Perfume for Girls, Perfume for Men, Perfume for Women, Unisex Perfume, Unisex Perfumes",
-  "Unisex Perfume",
-  "Royal Mirage",
-  "Perfume for Girls, Perfume for Women",
-  "Perfume for Boys, Perfume for Men",
-  "Tom Louis",
-  "Perfume for Men, Perfume for Women, Unisex Perfume",
-  "Arabiyat Prestige, long lasting perfume, Men & Women, Perfume for Boys, Perfume for Girls, Perfume for Men, Perfume for Women",
-  "Arabiyat Prestige, Men & Women, Perfume for Boys, Perfume for Girls, Perfume for Men, Perfume for Women",
-  "Arabiyat Prestige, Men & Women",
-  "Arabiyat Prestige, Perfume for Men",
-  "Arabiyat Prestige, Men & Women, Perfume for Boys, Perfume for Girls, Perfume for Men, Perfume for Women, Unisex Perfume, Unisex Perfumes",
-  "imported perfume, long lasting perfume, Luxury Parfum, Men & Women, Perfume for Men, Perfume for Women, Unisex Perfume",
-  "Louis Cardian"];
+  "Ahmed Al"];
 
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",

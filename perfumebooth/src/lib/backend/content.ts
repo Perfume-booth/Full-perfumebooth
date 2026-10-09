@@ -1,4 +1,4 @@
-import { Article, BlogData } from "./types";
+import { Article, BlogData, unwrapApiData, ensureArray } from "./types";
 
 
 const MOCK_ARTICLES: Article[] = [
@@ -38,7 +38,8 @@ export async function getBlog(handle: string = 'news', first: number = 20): Prom
   try {
     const res = await fetch(`${DJANGO_URL}/api/cms/blogs/`, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error('Failed to fetch blog posts');
-    const posts = await res.json();
+    const rawPosts = await res.json();
+    const posts = ensureArray(rawPosts);
     const articles: Article[] = posts.slice(0, first).map((p: any) => ({
       id: p.id,
       handle: p.slug,
@@ -49,7 +50,7 @@ export async function getBlog(handle: string = 'news', first: number = 20): Prom
       publishedAt: p.published_at,
       authorV2: { name: p.author },
       image: p.cover_image ? { url: p.cover_image, altText: p.title } : undefined,
-      tags: p.tags || []
+      tags: p.tags ? (Array.isArray(p.tags) ? p.tags : String(p.tags).split(' ')) : []
     }));
     return {
       title: "Fragrance Journal & Stories",
@@ -74,7 +75,9 @@ export async function getArticle(blogHandle: string, articleHandle: string): Pro
       const blog = await getBlog('news', 50);
       return blog.articles.find((a: any) => a.handle === articleHandle) || null;
     }
-    const p = await res.json();
+    const rawData = await res.json();
+    const p = unwrapApiData(rawData);
+    if (!p || typeof p !== 'object' || !p.id) return null;
     return {
       id: p.id,
       handle: p.slug,
@@ -85,7 +88,7 @@ export async function getArticle(blogHandle: string, articleHandle: string): Pro
       publishedAt: p.published_at,
       authorV2: { name: p.author },
       image: p.cover_image ? { url: p.cover_image, altText: p.title } : undefined,
-      tags: p.tags || []
+      tags: p.tags ? (Array.isArray(p.tags) ? p.tags : String(p.tags).split(' ')) : []
     };
   } catch (err) {
     console.error('Failed to fetch article detail from backend:', err);
@@ -97,7 +100,8 @@ export async function getCMSPage(slug: string) {
   try {
     const res = await fetch(`${DJANGO_URL}/api/cms/pages/${slug}/`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`CMS Page ${slug} not found`);
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = unwrapApiData(rawData) || {};
 
     let bodyHtml = '';
     let contactInfo = { email: '', phone: '', hours: '', address: '' };

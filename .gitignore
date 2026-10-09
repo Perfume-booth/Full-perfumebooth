@@ -49,6 +49,7 @@ next-env.d.ts
 *.sqlite3
 *.db
 postgres_data/
+perfumebooth-backend/media/
 
 # IDE & OS
 .DS_Store

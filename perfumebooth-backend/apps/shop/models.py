@@ -26,6 +26,9 @@ class Product(models.Model):
     compare_at_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    cost_per_item = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     image = models.FileField(upload_to='products/', null=True, blank=True)
     # JSONB — stores dynamic attributes e.g. {"scent_notes": "Citrus", "volume_ml": 100}
     attributes = models.JSONField(default=dict)
@@ -87,6 +90,7 @@ class ProductVariant(models.Model):
     )
     stock_level = models.PositiveIntegerField(default=0)
     reserved_stock = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
     image = models.FileField(upload_to='variants/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -96,6 +100,9 @@ class ProductVariant(models.Model):
         ordering = ['created_at']
         verbose_name = 'Product Variant'
         verbose_name_plural = 'Product Variants'
+        constraints = [
+            models.UniqueConstraint(fields=['sku'], name='unique_product_variant_sku'),
+        ]
 
     def __str__(self) -> str:
         return f"{self.product.title} — {self.option1_value} ({self.sku})"
@@ -133,6 +140,53 @@ class Inventory(models.Model):
         return max(self.stock_level - self.reserved_stock, 0)
 
 
+class ProductImportJob(models.Model):
+    """Immutable preview plus audit record for a selective catalog update."""
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Queued'
+        PROCESSING = 'processing', 'Processing'
+        PREVIEW_READY = 'preview_ready', 'Preview ready'
+        INVALID = 'invalid', 'Invalid'
+        APPLY_QUEUED = 'apply_queued', 'Apply queued'
+        APPLYING = 'applying', 'Applying'
+        APPLIED = 'applied', 'Applied'
+        FAILED = 'failed', 'Failed'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(
+        'authentication.CustomUser', on_delete=models.SET_NULL, null=True,
+        related_name='product_import_jobs'
+    )
+    filename = models.CharField(max_length=255)
+    file_sha256 = models.CharField(max_length=64)
+    mode = models.CharField(max_length=32, default='UPDATE_ONLY')
+    status = models.CharField(max_length=32, choices=Status.choices)
+    summary = models.JSONField(default=dict)
+    changes = models.JSONField(default=list)
+    creates = models.JSONField(default=list)
+    variant_operations = models.JSONField(default=list)
+    image_operations = models.JSONField(default=list)
+    bulk_operations = models.JSONField(default=list)
+    errors = models.JSONField(default=list)
+    source_file = models.FileField(upload_to='catalog-imports/', null=True, blank=True)
+    task_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    operation = models.CharField(max_length=16, default='preview')
+    progress_current = models.PositiveIntegerField(default=0)
+    progress_total = models.PositiveIntegerField(default=0)
+    error_message = models.TextField(blank=True, default='')
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'shop_product_import_job'
+        ordering = ['-created_at']
+
+
+
 class ProductImage(models.Model):
     """
     Additional gallery images for a product.
@@ -144,6 +198,9 @@ class ProductImage(models.Model):
     )
     image = models.FileField(upload_to='products/')
     alt_text = models.CharField(max_length=500, blank=True, default='')
+    position = models.PositiveIntegerField(default=0, db_index=True)
+    is_primary = models.BooleanField(default=False, db_index=True)
+    source_url = models.URLField(max_length=2000, blank=True, default='')
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -151,9 +208,15 @@ class ProductImage(models.Model):
 
     class Meta:
         db_table = 'shop_product_image'
-        ordering = ['created_at']
+        ordering = ['position', 'created_at']
         verbose_name = 'Product Image'
         verbose_name_plural = 'Product Images'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['product'], condition=models.Q(is_primary=True),
+                name='one_primary_image_per_product',
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Image for {self.product.title} ({self.id})"

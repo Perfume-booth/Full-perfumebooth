@@ -70,7 +70,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const res = await fetch('http://django:8000/api/shop/products/');
     if (res.ok) {
-      const products = await res.json();
+      const rawProducts = await res.json();
+      const products = Array.isArray(rawProducts) ? rawProducts : (rawProducts?.data && Array.isArray(rawProducts.data) ? rawProducts.data : []);
       const productRoutes = products.map((p: any) => ({
         url: `${baseUrl}/products/${p.slug}`,
         lastModified: new Date(p.updated_at || lastModified),

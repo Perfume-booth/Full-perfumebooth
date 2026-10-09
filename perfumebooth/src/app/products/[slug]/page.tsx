@@ -102,7 +102,9 @@ async function getProduct(slug: string): Promise<Product | null> {
             next: { revalidate: 3600 }
         });
         if (!res.ok) return null;
-        const p = await res.json();
+        const rawJson = await res.json();
+        const p = (rawJson && typeof rawJson === 'object' && 'data' in rawJson && 'meta' in rawJson) ? rawJson.data : rawJson;
+        if (!p) return null;
 
         const images = p.images?.map((img: any, i: number) => ({
             id: i,

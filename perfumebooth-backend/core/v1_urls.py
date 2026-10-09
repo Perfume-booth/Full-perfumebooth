@@ -21,7 +21,8 @@ from apps.shop.views import (
     PageBannerDetailView, PageBannerDeleteView, PageBannerImageDeleteView,
     WishlistAPIView, WishlistDeleteView, CartValidationAPIView,
     ProductReviewAPIView,
-    ProductExcelExportView, ProductExcelImportView,
+    ProductExcelExportView, ProductExcelImportView, ProductExcelImportApplyView,
+    ProductExcelImportErrorsView, ProductExcelImportTemplateView,
     AnalyticsAPIView, DashboardAnalyticsView
 )
 
@@ -83,6 +84,9 @@ admin_patterns = [
     path('products/', ProductListView.as_view(), name='v1-admin-products'),
     path('products/excel-export/', ProductExcelExportView.as_view(), name='v1-admin-products-excel-export'),
     path('products/excel-import/', ProductExcelImportView.as_view(), name='v1-admin-products-excel-import'),
+    path('products/excel-import/template/', ProductExcelImportTemplateView.as_view(), name='v1-admin-products-excel-import-template'),
+    path('products/excel-import/<uuid:job_id>/apply/', ProductExcelImportApplyView.as_view(), name='v1-admin-products-excel-import-apply'),
+    path('products/excel-import/<uuid:job_id>/errors/', ProductExcelImportErrorsView.as_view(), name='v1-admin-products-excel-import-errors'),
     path('products/<slug:slug>/', ProductDetailView.as_view(), name='v1-admin-product-detail'),
     path('collections/', CollectionListCreateView.as_view(), name='v1-admin-collections'),
     path('collections/<path:slug>/', CollectionDetailView.as_view(), name='v1-admin-collection-detail'),

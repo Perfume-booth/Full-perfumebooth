@@ -16,19 +16,21 @@ export async function GET(request: NextRequest) {
         headers: { "Content-Type": "application/json" }
       });
       if (res.ok) {
-        const data = await res.json();
+        const raw = await res.json();
+        const data = (raw && typeof raw === 'object' && 'data' in raw && 'meta' in raw) ? raw.data : raw;
+        const reviewsList = Array.isArray(data?.reviews) ? data.reviews : (Array.isArray(data) ? data : []);
         return NextResponse.json({
           success: true,
-          reviews: data.reviews.map((r: any) => ({
+          reviews: reviewsList.map((r: any) => ({
             id: r.id,
-            name: r.user_name,
-            text: r.comment,
+            name: r.user_name || r.name,
+            text: r.comment || r.text,
             rating: r.rating,
-            isVerified: r.is_verified_buyer,
-            date: r.created_at
+            isVerified: r.is_verified_buyer || r.isVerified,
+            date: r.created_at || r.date
           })),
-          rating: data.average_rating,
-          ratingCount: data.review_count
+          rating: data?.average_rating || data?.rating || 5,
+          ratingCount: data?.review_count || data?.ratingCount || reviewsList.length
         });
       }
     } catch (e) {
@@ -98,15 +100,17 @@ export async function POST(request: NextRequest) {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const raw = await res.json();
+        const data = (raw && typeof raw === 'object' && 'data' in raw && 'meta' in raw) ? raw.data : raw;
+        const reviewObj = data?.review || data || {};
         return NextResponse.json({
           success: true,
           review: {
-            id: data.review.id,
+            id: reviewObj.id,
             name: name || "You",
-            text: data.review.comment,
-            rating: data.review.rating,
-            isVerified: data.review.is_verified_buyer,
+            text: reviewObj.comment || text,
+            rating: reviewObj.rating || rating,
+            isVerified: reviewObj.is_verified_buyer || false,
             date: new Date().toISOString()
           }
         });

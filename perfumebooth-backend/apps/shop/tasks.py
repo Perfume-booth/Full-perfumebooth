@@ -8,8 +8,82 @@ import csv
 import requests
 from celery import shared_task
 from django.db import transaction
+from django.core.cache import cache
+from django.utils import timezone
 
-from .models import Product, Inventory
+from .models import Product, Inventory, ProductImportJob
+from .product_imports import apply_preview, create_preview
+
+
+@shared_task(bind=True, queue='imports', name='apps.shop.tasks.process_catalog_preview_job')
+def process_catalog_preview_job(self, job_id: str) -> dict:
+    """Build a durable catalog preview outside the HTTP request lifecycle."""
+    job = None
+    try:
+        with transaction.atomic():
+            job = ProductImportJob.objects.select_for_update().get(pk=job_id)
+            if job.status in {ProductImportJob.Status.PREVIEW_READY, ProductImportJob.Status.INVALID}:
+                return {'status': job.status, 'job_id': job_id}
+            if job.status not in {ProductImportJob.Status.QUEUED, ProductImportJob.Status.PROCESSING}:
+                return {'status': 'skipped', 'job_id': job_id}
+            job.status = ProductImportJob.Status.PROCESSING
+            job.started_at = job.started_at or timezone.now()
+            job.task_id = self.request.id or job.task_id
+            job.progress_current = 0
+            job.progress_total = 1
+            job.error_message = ''
+            job.save(update_fields=['status', 'started_at', 'task_id', 'progress_current', 'progress_total', 'error_message'])
+        job.source_file.open('rb')
+        job.source_file.file.name = job.filename
+        def report_progress(current, total):
+            ProductImportJob.objects.filter(pk=job_id).update(progress_current=current, progress_total=total)
+            self.update_state(state='PROGRESS', meta={'current': current, 'total': total})
+        create_preview(
+            job.source_file.file, job.created_by, mode=job.mode,
+            draft_default=bool(job.summary.get('draft_default', True)), job=job,
+            progress_callback=report_progress,
+        )
+        return {'status': job.status, 'job_id': job_id}
+    except Exception as exc:
+        ProductImportJob.objects.filter(pk=job_id).update(
+            status=ProductImportJob.Status.FAILED, error_message=str(exc)[:2000],
+            finished_at=timezone.now(), progress_current=0, progress_total=1,
+        )
+        raise
+    finally:
+        if job and job.source_file:
+            job.source_file.close()
+
+
+@shared_task(bind=True, queue='imports', name='apps.shop.tasks.apply_catalog_import_job')
+def apply_catalog_import_job(self, job_id: str) -> dict:
+    """Apply an approved preview once; database writes remain transactional."""
+    try:
+        with transaction.atomic():
+            job = ProductImportJob.objects.select_for_update().get(pk=job_id)
+            if job.status == ProductImportJob.Status.APPLIED:
+                return {'status': job.status, 'job_id': job_id}
+            if job.status not in {ProductImportJob.Status.APPLY_QUEUED, ProductImportJob.Status.APPLYING}:
+                return {'status': 'skipped', 'job_id': job_id}
+            job.status = ProductImportJob.Status.APPLYING
+            job.started_at = timezone.now()
+            job.task_id = self.request.id or job.task_id
+            job.progress_current = 0
+            job.progress_total = 1
+            job.error_message = ''
+            job.save(update_fields=['status', 'started_at', 'task_id', 'progress_current', 'progress_total', 'error_message'])
+        def report_progress(current, total):
+            ProductImportJob.objects.filter(pk=job_id).update(progress_current=current, progress_total=total)
+            self.update_state(state='PROGRESS', meta={'current': current, 'total': total})
+        job = apply_preview(job_id, job.created_by, progress_callback=report_progress)
+        cache.clear()
+        return {'status': job.status, 'job_id': job_id}
+    except Exception as exc:
+        ProductImportJob.objects.filter(pk=job_id).update(
+            status=ProductImportJob.Status.FAILED, error_message=str(exc)[:2000],
+            finished_at=timezone.now(), progress_current=0, progress_total=1,
+        )
+        raise
 
 
 @shared_task(

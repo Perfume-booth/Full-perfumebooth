@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body)
     });
 
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = (rawData && typeof rawData === 'object' && 'data' in rawData && 'meta' in rawData) ? rawData.data : rawData;
     return NextResponse.json(data, { status: res.status });
   } catch (error: any) {
     console.error("Cart Validate API Proxy Error:", error);

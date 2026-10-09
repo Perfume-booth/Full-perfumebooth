@@ -302,9 +302,17 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       const data = await apiFetch('/shop/products/');
-      setProducts(data);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setProducts(list);
     } catch (err: any) {
       console.error(err);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -647,7 +655,8 @@ export default function ProductsPage() {
     }
   };
 
-  const filteredProducts = products.filter(p => {
+  const productList = Array.isArray(products) ? products : [];
+  const filteredProducts = productList.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.sku.toLowerCase().includes(search.toLowerCase());
     const matchesBrand = !filterBrand || p.brand === filterBrand;

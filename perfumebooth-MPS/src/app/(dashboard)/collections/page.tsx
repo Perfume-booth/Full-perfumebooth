@@ -91,10 +91,18 @@ export default function CollectionsPage() {
     try {
       setLoading(true);
       const data = await apiFetch('/shop/collections/');
-      setCollections(data);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setCollections(list);
     } catch (err: any) {
       console.error(err);
       setError('Failed to fetch collections');
+      setCollections([]);
     } finally {
       setLoading(false);
     }
@@ -103,9 +111,17 @@ export default function CollectionsPage() {
   const fetchProducts = async () => {
     try {
       const data = await apiFetch('/shop/products/');
-      setProducts(data);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setProducts(list);
     } catch (err: any) {
       console.error(err);
+      setProducts([]);
     }
   };
 
@@ -278,7 +294,8 @@ export default function CollectionsPage() {
   };
 
   // Filter products for the picker
-  const filteredProducts = products.filter(
+  const productList = Array.isArray(products) ? products : [];
+  const filteredProducts = productList.filter(
     p =>
       p.title.toLowerCase().includes(productSearch.toLowerCase()) ||
       p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
@@ -305,7 +322,7 @@ export default function CollectionsPage() {
   };
 
   if (modalOpen) {
-    const selectedProducts = products.filter(p => selectedProductIds.includes(p.id));
+    const selectedProducts = productList.filter(p => selectedProductIds.includes(p.id));
 
     return (
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12">

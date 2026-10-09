@@ -12,7 +12,8 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
       cache: "no-store",
     });
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = (rawData && typeof rawData === 'object' && 'data' in rawData && 'meta' in rawData) ? rawData.data : rawData;
     return NextResponse.json(data, { status: response.status });
   } catch {
     return NextResponse.json({ valid: false, message: "Coupon service unavailable." }, { status: 503 });

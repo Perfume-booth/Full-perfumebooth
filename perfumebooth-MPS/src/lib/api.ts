@@ -2,6 +2,17 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
+function apiUrl(path: string): string {
+  return `${BASE_URL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+}
+
+function connectionError(error: unknown): Error {
+  const detail = error instanceof Error ? ` (${error.message})` : '';
+  return new Error(
+    `Cannot connect to the API at ${BASE_URL}. Make sure the Django service is running and reachable${detail}`
+  );
+}
+
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
   const value = `; ${document.cookie}`;
@@ -47,7 +58,12 @@ export async function apiFetch<T = any>(
   }
 
   // Ensure cookies (sessionid, csrftoken) are sent with cross-origin requests
-  const response = await fetch(`${BASE_URL}${path}`, fetchOptions);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), fetchOptions);
+  } catch (error) {
+    throw connectionError(error);
+  }
 
   if (response.status === 401 || response.status === 403) {
     // Session expired or CSRF failed
@@ -75,6 +91,29 @@ export async function apiFetch<T = any>(
 
   const text = await response.text();
   const cleanedText = text.replace(/http:\/\/django:8000/g, '').replace(/http:\/\/localhost:8000/g, '');
-  return JSON.parse(cleanedText);
+  const parsed = JSON.parse(cleanedText);
+
+  // If response conforms to standard { data: ..., meta: ... } envelope, unwrap data
+  if (parsed && typeof parsed === 'object' && 'data' in parsed && 'meta' in parsed) {
+    return parsed.data as T;
+  }
+  return parsed as T;
 }
 
+export async function apiDownload(path: string): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), { credentials: 'include' });
+  } catch (error) {
+    throw connectionError(error);
+  }
+  if (!response.ok) {
+    let message = `Download failed: ${response.statusText}`;
+    try {
+      const body = await response.json();
+      message = body.detail || message;
+    } catch { /* response was not JSON */ }
+    throw new Error(message);
+  }
+  return response.blob();
+}

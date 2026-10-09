@@ -1,4 +1,4 @@
-import { Product } from './types';
+import { Product, unwrapApiData, ensureArray } from './types';
 import { cleanImageUrl } from '../transformers';
 
 const isServer = typeof window === 'undefined';
@@ -7,6 +7,8 @@ const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:
 
 
 export function mapDjangoProductToProduct(p: any): Product {
+  if (!p) return {} as Product;
+
   const images = p.images?.map((img: any) => ({
     url: cleanImageUrl(img.url) || '',
     altText: img.altText || p.title
@@ -75,7 +77,8 @@ export async function getProducts(first: number = 30): Promise<Product[]> {
       cache: 'no-store'
     });
     if (!res.ok) return [];
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = ensureArray(rawData);
     return data.map(mapDjangoProductToProduct).slice(0, first);
   } catch (err) {
     console.error("Error in getProducts:", err);
@@ -90,7 +93,9 @@ export async function getProduct(handle: string): Promise<Product | null> {
       cache: 'no-store'
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = unwrapApiData(rawData);
+    if (!data || typeof data !== 'object') return null;
     return mapDjangoProductToProduct(data);
   } catch (err) {
     console.error("Error in getProduct:", err);
@@ -113,7 +118,8 @@ export async function getBrands(): Promise<string[]> {
       cache: 'no-store'
     });
     if (!res.ok) return [];
-    return await res.json();
+    const rawData = await res.json();
+    return ensureArray<string>(rawData);
   } catch (err) {
     console.error("Error fetching brands:", err);
     return [];
@@ -141,7 +147,18 @@ export async function getFacets(): Promise<Facets | null> {
       cache: 'no-store'
     });
     if (!res.ok) return null;
-    return await res.json();
+    const rawData = await res.json();
+    const data = unwrapApiData<Facets>(rawData);
+    if (!data || typeof data !== 'object') return null;
+    return {
+      genders: ensureArray(data.genders),
+      brands: ensureArray(data.brands),
+      categories: ensureArray(data.categories),
+      productTypes: ensureArray(data.productTypes),
+      occasions: ensureArray(data.occasions),
+      seasons: ensureArray(data.seasons),
+      tags: ensureArray(data.tags),
+    };
   } catch (err) {
     console.error("Error fetching facets:", err);
     return null;
@@ -150,7 +167,7 @@ export async function getFacets(): Promise<Facets | null> {
 
 export async function getProductTypes(): Promise<string[]> {
   const facets = await getFacets();
-  if (facets) {
+  if (facets && Array.isArray(facets.productTypes)) {
     return facets.productTypes.map(f => f.value);
   }
   const products = await getProducts(200);
@@ -170,7 +187,8 @@ export async function searchProducts(
       cache: 'no-store'
     });
     if (!res.ok) return { totalCount: 0, products: [] };
-    const data = await res.json();
+    const rawData = await res.json();
+    const data = ensureArray(rawData);
     let products = data.map(mapDjangoProductToProduct);
 
     if (sortKey === "PRICE") {

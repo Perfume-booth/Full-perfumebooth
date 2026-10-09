@@ -1,4 +1,4 @@
-import { Collection, Product } from './types';
+import { Collection, Product, unwrapApiData, ensureArray } from './types';
 import { getProducts, getFacets, mapDjangoProductToProduct } from './products';
 import { cleanImageUrl } from '../transformers';
 
@@ -25,7 +25,8 @@ export async function getAllCollections(first: number = 250): Promise<Collection
       cache: 'no-store'
     });
     if (res.ok) {
-      const data = await res.json();
+      const rawData = await res.json();
+      const data = ensureArray(rawData);
       return data.map((col: any) => ({
         id: col.id,
         handle: col.slug,
@@ -46,12 +47,12 @@ export async function getAllCollections(first: number = 250): Promise<Collection
   
   // Add gender collections
   if (facets) {
-    facets.genders.forEach(g => {
+    (facets.genders || []).forEach(g => {
       const slug = g.value.toLowerCase().replace(/\s+/g, '-');
       if (!handles.includes(slug)) handles.push(slug);
     });
     // Add category collections
-    facets.categories.forEach(c => {
+    (facets.categories || []).forEach(c => {
       const slug = c.value.toLowerCase().replace(/\s+/g, '-');
       if (!handles.includes(slug)) handles.push(slug);
     });
@@ -88,23 +89,26 @@ export async function getCollection(
       cache: 'no-store'
     });
     if (res.ok) {
-      const data = await res.json();
-      const catalogProducts = data.products.map(mapDjangoProductToProduct);
-      return {
-        id: data.id,
-        handle: data.slug,
-        title: data.title,
-        description: data.description,
-        image: data.image ? { url: cleanImageUrl(data.image) || '' } : undefined,
-        products: {
-          edges: catalogProducts.slice(0, first).map((p: any) => ({ node: p })),
-          pageInfo: {
-            hasNextPage: catalogProducts.length > first,
-            endCursor: null
+      const rawData = await res.json();
+      const data = unwrapApiData(rawData);
+      if (data && typeof data === 'object') {
+        const rawProducts = ensureArray(data.products);
+        const catalogProducts = rawProducts.map(mapDjangoProductToProduct);
+        return {
+          id: data.id,
+          handle: data.slug,
+          title: data.title,
+          description: data.description,
+          image: data.image ? { url: cleanImageUrl(data.image) || '' } : undefined,
+          products: {
+            edges: catalogProducts.slice(0, first).map((p: any) => ({ node: p })),
+            pageInfo: {
+              hasNextPage: catalogProducts.length > first,
+              endCursor: null
+            }
           }
-        }
-      };
-
+        };
+      }
     }
   } catch (err) {
     console.error("Error fetching collection from backend API:", err);
@@ -242,7 +246,7 @@ export async function getCollectionProducts(
   
   if (facets) {
     // Gender filter
-    if (facets.genders.length > 0) {
+    if (facets.genders && facets.genders.length > 0) {
       filters.push({
         id: 'filter.v.gender',
         label: 'Gender',
@@ -257,7 +261,7 @@ export async function getCollectionProducts(
     }
     
     // Brand filter
-    if (facets.brands.length > 0) {
+    if (facets.brands && facets.brands.length > 0) {
       filters.push({
         id: 'filter.p.vendor',
         label: 'Brand',
@@ -272,7 +276,7 @@ export async function getCollectionProducts(
     }
     
     // Product Type filter
-    if (facets.productTypes.length > 0) {
+    if (facets.productTypes && facets.productTypes.length > 0) {
       filters.push({
         id: 'filter.p.product_type',
         label: 'Product Type',
@@ -287,7 +291,7 @@ export async function getCollectionProducts(
     }
     
     // Category filter
-    if (facets.categories.length > 0) {
+    if (facets.categories && facets.categories.length > 0) {
       filters.push({
         id: 'filter.v.category',
         label: 'Category',
@@ -302,7 +306,7 @@ export async function getCollectionProducts(
     }
     
     // Occasion filter
-    if (facets.occasions.length > 0) {
+    if (facets.occasions && facets.occasions.length > 0) {
       filters.push({
         id: 'filter.v.occasion',
         label: 'Occasion',
@@ -317,7 +321,7 @@ export async function getCollectionProducts(
     }
     
     // Season filter
-    if (facets.seasons.length > 0) {
+    if (facets.seasons && facets.seasons.length > 0) {
       filters.push({
         id: 'filter.v.season',
         label: 'Season',
@@ -362,9 +366,10 @@ export async function getBanner(slug: string): Promise<any | null> {
       cache: 'no-store'
     });
     if (res.ok) {
-      const data = await res.json();
+      const rawData = await res.json();
+      const data = unwrapApiData(rawData);
       // Use absolute URLs for Next.js Image component optimization
-      if (data.images && isServer) {
+      if (data && data.images && isServer) {
         data.images = data.images.map((img: any) => ({
           ...img,
           image_url: cleanImageUrl(img.image_url) || null,
@@ -389,7 +394,8 @@ export async function getCmsPage(slug: string): Promise<any | null> {
       cache: 'no-store'
     });
     if (res.ok) {
-      return await res.json();
+      const rawData = await res.json();
+      return unwrapApiData(rawData);
     }
   } catch (err) {
     console.error(`Error fetching CMS page for slug ${slug}:`, err);

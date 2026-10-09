@@ -3,7 +3,9 @@ from django.urls import path
 from .views import (
     ProductListView, ProductDetailView, DashboardAnalyticsView, AnalyticsAPIView, BrandListView, 
     ProductFacetsView, CollectionListCreateView, CollectionDetailView,
-    ProductExcelExportView, ProductExcelImportView, PageBannerDetailView,
+    ProductExcelExportView, ProductExcelImportView, ProductExcelImportApplyView,
+    ProductExcelImportErrorsView, ProductExcelImportTemplateView, ProductExcelImportStatusView,
+    ProductExcelImportRetryView, PageBannerDetailView,
     PageBannerListCreateView, PageBannerDeleteView, PageBannerImageDeleteView,
     WishlistAPIView, WishlistDeleteView, CartValidationAPIView, ProductReviewAPIView,
     ProductRecommendationVectorView
@@ -13,6 +15,11 @@ urlpatterns = [
     path('products/', ProductListView.as_view(), name='product-list'),
     path('products/excel-export/', ProductExcelExportView.as_view(), name='product-excel-export'),
     path('products/excel-import/', ProductExcelImportView.as_view(), name='product-excel-import'),
+    path('products/excel-import/template/', ProductExcelImportTemplateView.as_view(), name='product-excel-import-template'),
+    path('products/excel-import/<uuid:job_id>/apply/', ProductExcelImportApplyView.as_view(), name='product-excel-import-apply'),
+    path('products/excel-import/<uuid:job_id>/', ProductExcelImportStatusView.as_view(), name='product-excel-import-status'),
+    path('products/excel-import/<uuid:job_id>/retry/', ProductExcelImportRetryView.as_view(), name='product-excel-import-retry'),
+    path('products/excel-import/<uuid:job_id>/errors/', ProductExcelImportErrorsView.as_view(), name='product-excel-import-errors'),
     path('products/<slug:slug>/recommendations/', ProductRecommendationVectorView.as_view(), name='product-recommendations'),
     path('products/<slug:slug>/', ProductDetailView.as_view(), name='product-detail'),
     path('products/<uuid:product_id>/reviews/', ProductReviewAPIView.as_view(), name='product-reviews'),

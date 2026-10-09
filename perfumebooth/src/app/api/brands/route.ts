@@ -8,7 +8,8 @@ export async function GET() {
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Backend responded with ${res.status}`);
-    const brands = await res.json();
+    const rawBrands = await res.json();
+    const brands = (rawBrands?.data && Array.isArray(rawBrands.data)) ? rawBrands.data : (Array.isArray(rawBrands) ? rawBrands : []);
     return NextResponse.json(brands);
   } catch (error) {
     console.error("Brands API error:", error);

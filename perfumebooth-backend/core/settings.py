@@ -165,6 +165,8 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
 # Route tasks to isolated queues (matching Docker Compose worker containers)
 CELERY_TASK_ROUTES = {
     'apps.shop.tasks.process_bulk_csv_import':    {'queue': 'imports'},
+    'apps.shop.tasks.process_catalog_preview_job': {'queue': 'imports'},
+    'apps.shop.tasks.apply_catalog_import_job': {'queue': 'imports'},
     'apps.orders.tasks.send_order_email_receipt': {'queue': 'emails'},
     'apps.shop.tasks.generate_product_embeddings':{'queue': 'ai_tasks'},
     'apps.inventory.tasks.release_expired_inventory_reservations': {'queue': 'default'},

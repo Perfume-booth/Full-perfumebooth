@@ -32,9 +32,17 @@ export default function OrdersPage() {
     try {
       setLoading(true);
       const data = await apiFetch('/orders/');
-      setOrders(data);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setOrders(list);
     } catch (err) {
       console.error(err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -44,7 +52,8 @@ export default function OrdersPage() {
     fetchOrders();
   }, []);
 
-  const filteredOrders = orders.filter(o => 
+  const orderList = Array.isArray(orders) ? orders : [];
+  const filteredOrders = orderList.filter(o => 
     o.order_number.toLowerCase().includes(search.toLowerCase()) || 
     o.customer_name.toLowerCase().includes(search.toLowerCase())
   );
