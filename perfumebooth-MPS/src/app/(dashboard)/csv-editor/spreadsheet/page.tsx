@@ -25,16 +25,16 @@ export default function SpreadsheetEditorPage() {
     <div className="max-w-7xl mx-auto p-6">
       <CSVEditorNav />
 
-      <div className="bg-card rounded-2xl border border-border flex flex-col shadow-xs overflow-hidden">
+      <div className="bg-card neu-extruded rounded-3xl border-0 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="p-4 border-b border-border flex flex-wrap justify-between items-center gap-4 bg-secondary/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-              <TableIcon className="w-5 h-5" />
+        <div className="p-6 border-b border-border/50 flex flex-wrap justify-between items-center gap-4 bg-secondary/20">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-card neu-inset-sm rounded-2xl text-primary">
+              <TableIcon className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-foreground">Excel Data Grid Editor</h2>
-              <p className="text-xs text-muted-foreground">
+              <h2 className="text-lg font-extrabold text-foreground tracking-tight">Excel Data Grid Editor</h2>
+              <p className="text-xs text-muted-foreground font-medium mt-0.5">
                 Edit cells directly. Colors highlight changes: <span className="text-emerald-600 font-bold">Green = Edited</span>, <span className="text-amber-600 font-bold">Yellow = Warning</span>, <span className="text-muted-foreground font-bold">Gray = Untouched</span>.
               </p>
             </div>
@@ -43,13 +43,13 @@ export default function SpreadsheetEditorPage() {
           <div className="flex items-center gap-3">
             {/* Search Input */}
             <div className="relative">
-              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search products or SKUs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg text-foreground focus:ring-1 focus:ring-primary outline-hidden w-64"
+                className="pl-10 pr-4 py-2.5 text-xs neu-input rounded-2xl text-foreground font-medium w-72"
               />
             </div>
           </div>
@@ -58,21 +58,21 @@ export default function SpreadsheetEditorPage() {
         {/* Data Grid Table */}
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto text-xs">
           <table className="w-full text-left border-collapse min-w-[1200px]">
-            <thead className="bg-secondary/80 sticky top-0 border-b border-border z-10 font-semibold text-foreground">
+            <thead className="bg-secondary/40 sticky top-0 border-b border-border/50 z-10 font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="p-3 border-r border-border min-w-[150px]">Handle</th>
-                <th className="p-3 border-r border-border min-w-[200px]">Product Title</th>
-                <th className="p-3 border-r border-border min-w-[120px]">SKU</th>
-                <th className="p-3 border-r border-border min-w-[120px]">Option1 Value</th>
-                <th className="p-3 border-r border-border min-w-[110px]">Price (₹)</th>
-                <th className="p-3 border-r border-border min-w-[110px]">Compare Price</th>
-                <th className="p-3 border-r border-border min-w-[90px]">Stock</th>
-                <th className="p-3 border-r border-border min-w-[140px]">Vendor</th>
-                <th className="p-3 border-r border-border min-w-[150px]">Tags</th>
-                <th className="p-3 min-w-[100px]">Status</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[150px]">Handle</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[200px]">Product Title</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[120px]">SKU</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[120px]">Option1 Value</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[110px]">Price (₹)</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[110px]">Compare Price</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[90px]">Stock</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[140px]">Vendor</th>
+                <th className="p-3.5 border-r border-border/50 min-w-[150px]">Tags</th>
+                <th className="p-3.5 min-w-[100px]">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/50">
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="p-8 text-center text-muted-foreground text-xs">

@@ -216,15 +216,20 @@ export default function ProductDetailsClient({ product }: Props) {
     if (isSoldOut) return;
     setIsBuyingNow(true);
 
-    const variantId = product.variants?.[0]?.id;
-    if (!variantId) {
+    const variantId = selectedVariant?.id || product.variants?.[0]?.id;
+    if (!variantId && product.variants && product.variants.length > 0) {
       alert("Product variant not found.");
       setIsBuyingNow(false);
       return;
     }
 
     try {
-      await buyNow(product, quantity);
+      const prodPayload = {
+        ...product,
+        selectedVariantId: variantId,
+        price: selectedVariant ? selectedVariant.price : product.price,
+      };
+      await buyNow(prodPayload as any, quantity);
       trackAddToCart(product as any, quantity);
       router.push("/checkout");
     } catch (e) {
@@ -266,7 +271,12 @@ export default function ProductDetailsClient({ product }: Props) {
     if (isSoldOut || isAdding) return;
     setIsAdding(true);
     try {
-      const normalized = normalizeProduct(product);
+      const variantId = selectedVariant?.id || product.variants?.[0]?.id;
+      const normalized = normalizeProduct({
+        ...product,
+        selectedVariantId: variantId,
+        price: selectedVariant ? selectedVariant.price : product.price,
+      });
       await addToCart(toStoreProduct(normalized), quantity);
       trackAddToCart(product as any, quantity);
       openCart();
@@ -376,13 +386,18 @@ export default function ProductDetailsClient({ product }: Props) {
           <span className="text-[8px] uppercase tracking-widest text-[var(--color-text-muted)] font-bold ml-auto md:ml-0">Incl. all taxes</span>
         </div>
 
-        {/* Variant Size Selector Pills */}
+        {/* Variant Selector Pills */}
         {product.variants && product.variants.length > 0 && (
           <div className="space-y-2 py-1">
-            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">Select Bottle Size</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">
+              Select {product.variants[0]?.option1_name ? (product.variants[0].option2_name ? `${product.variants[0].option1_name} & ${product.variants[0].option2_name}` : product.variants[0].option1_name) : 'Option'}
+            </span>
             <div className="flex flex-wrap gap-2">
               {product.variants.map((v: any, idx: number) => {
                 const isSelected = selectedVariant?.id === v.id || (!selectedVariant && idx === 0);
+                const displayLabel = v.option2_value
+                  ? `${v.option1_value} • ${v.option2_value}`
+                  : (v.option1_value || v.title);
                 return (
                   <button
                     key={v.id || idx}
@@ -394,7 +409,7 @@ export default function ProductDetailsClient({ product }: Props) {
                         : 'border-[var(--color-border)] bg-[#fbfcfa] text-[var(--color-text-secondary)] hover:border-black'
                     }`}
                   >
-                    <span>{v.option1_value || v.title}</span>
+                    <span>{displayLabel}</span>
                     <span className="text-[10px] ml-1.5 opacity-80">Rs. {v.price}</span>
                   </button>
                 );

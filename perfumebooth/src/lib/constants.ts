@@ -83,7 +83,19 @@ export const TOP_CATEGORIES = [
 ];
 
 export const TOP_BRANDS = [
-  "Ahmed Al"];
+  "Perfume Booth",
+  "Al Haramain",
+  "Arabiyat Prestige",
+  "Lomani",
+  "Louis Cardin",
+  "MPF",
+  "New NB",
+  "Otoori",
+  "Lattafa",
+  "Swiss Arabian",
+  "Royal Mirage",
+  "Anfar"
+];
 
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",

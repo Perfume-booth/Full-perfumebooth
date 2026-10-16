@@ -10,9 +10,23 @@ export function mapDjangoProductToProduct(p: any): Product {
   if (!p) return {} as Product;
 
   const images = p.images?.map((img: any) => ({
-    url: cleanImageUrl(img.url) || '',
+    url: cleanImageUrl(img.url || img.image) || '',
     altText: img.altText || p.title
   })) || [];
+
+  const mainImageUrl = cleanImageUrl(p.image);
+  if (mainImageUrl) {
+    const existingIdx = images.findIndex((img: any) => img.url === mainImageUrl);
+    if (existingIdx > 0) {
+      const [item] = images.splice(existingIdx, 1);
+      images.unshift(item);
+    } else if (existingIdx === -1) {
+      images.unshift({
+        url: mainImageUrl,
+        altText: p.title
+      });
+    }
+  }
 
   const priceVal = parseFloat(p.price || "0").toFixed(2);
   const comparePriceVal = p.compare_at_price ? parseFloat(p.compare_at_price).toFixed(2) : undefined;
@@ -32,7 +46,7 @@ export function mapDjangoProductToProduct(p: any): Product {
     compareAtPriceRange: comparePriceVal ? {
       minVariantPrice: { amount: comparePriceVal, currencyCode: "INR" }
     } : undefined,
-    featuredImage: images.length > 0 ? images[0] : (p.image ? { url: cleanImageUrl(p.image) || '', altText: p.title } : undefined),
+    featuredImage: mainImageUrl ? { url: mainImageUrl, altText: p.title } : (images.length > 0 ? images[0] : undefined),
     images: {
       edges: images.map((img: any) => ({ node: img })),
       nodes: images

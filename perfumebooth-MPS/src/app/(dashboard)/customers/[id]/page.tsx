@@ -139,26 +139,27 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         <div className="flex items-center gap-4">
           <Link
             href="/customers"
-            className="p-2 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="p-2.5 neu-btn rounded-2xl text-muted-foreground hover:text-foreground flex items-center justify-center transition-all"
+            title="Return to Customers"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground">{customer.full_name}</h1>
+              <h1 className="text-2xl font-extrabold text-foreground tracking-tight">{customer.full_name}</h1>
               {customer.is_active ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-emerald-600">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                   Active Account
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-destructive">
                   <span className="w-1.5 h-1.5 rounded-full bg-destructive"></span>
                   Account Disabled
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5 font-medium">
               Member since {new Date(customer.date_joined).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </p>
           </div>
@@ -166,10 +167,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
         <button
           onClick={handleToggleStatus}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg border transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-2xl neu-btn transition-all cursor-pointer ${
             customer.is_active
-              ? 'border-destructive/30 text-destructive hover:bg-destructive/10'
-              : 'border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10'
+              ? 'text-destructive hover:text-destructive'
+              : 'text-emerald-600 hover:text-emerald-700'
           }`}
         >
           {customer.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
@@ -178,32 +179,38 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between text-muted-foreground mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Lifetime Value (LTV)</span>
-            <IndianRupee className="w-5 h-5 text-amber-600" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="bg-card neu-extruded p-6 rounded-3xl border-0">
+          <div className="flex items-center justify-between text-muted-foreground mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider">Lifetime Value (LTV)</span>
+            <div className="p-2 rounded-xl neu-inset-sm text-amber-600">
+              <IndianRupee className="w-4 h-4" />
+            </div>
           </div>
-          <h3 className="text-2xl font-extrabold text-foreground">₹{customer.metrics.lifetime_value}</h3>
-          <p className="text-[11px] text-muted-foreground mt-1">Total revenue from completed orders</p>
+          <h3 className="text-2xl font-extrabold text-foreground tracking-tight">₹{customer.metrics.lifetime_value}</h3>
+          <p className="text-[11px] text-muted-foreground mt-1 font-medium">Total revenue from completed orders</p>
         </div>
 
-        <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between text-muted-foreground mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Orders</span>
-            <ShoppingBag className="w-5 h-5 text-primary" />
+        <div className="bg-card neu-extruded p-6 rounded-3xl border-0">
+          <div className="flex items-center justify-between text-muted-foreground mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider">Total Orders</span>
+            <div className="p-2 rounded-xl neu-inset-sm text-primary">
+              <ShoppingBag className="w-4 h-4" />
+            </div>
           </div>
-          <h3 className="text-2xl font-extrabold text-foreground">{customer.metrics.orders_count}</h3>
-          <p className="text-[11px] text-muted-foreground mt-1">Orders placed across storefront</p>
+          <h3 className="text-2xl font-extrabold text-foreground tracking-tight">{customer.metrics.orders_count}</h3>
+          <p className="text-[11px] text-muted-foreground mt-1 font-medium">Orders placed across storefront</p>
         </div>
 
-        <div className="bg-card border border-border p-5 rounded-xl shadow-sm">
-          <div className="flex items-center justify-between text-muted-foreground mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Average Order Value (AOV)</span>
-            <PackageCheck className="w-5 h-5 text-blue-600" />
+        <div className="bg-card neu-extruded p-6 rounded-3xl border-0">
+          <div className="flex items-center justify-between text-muted-foreground mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider">Average Order Value (AOV)</span>
+            <div className="p-2 rounded-xl neu-inset-sm text-blue-600">
+              <PackageCheck className="w-4 h-4" />
+            </div>
           </div>
-          <h3 className="text-2xl font-extrabold text-foreground">₹{customer.metrics.average_order_value}</h3>
-          <p className="text-[11px] text-muted-foreground mt-1">Average spend per purchase</p>
+          <h3 className="text-2xl font-extrabold text-foreground tracking-tight">₹{customer.metrics.average_order_value}</h3>
+          <p className="text-[11px] text-muted-foreground mt-1 font-medium">Average spend per purchase</p>
         </div>
       </div>
 
@@ -212,8 +219,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         
         {/* Left Column (Order History) */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="bg-card neu-extruded rounded-3xl border-0 overflow-hidden">
+            <div className="p-5 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
               <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-primary" />
                 Purchase & Order History ({customer.orders.length})
@@ -221,43 +228,43 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             {customer.orders.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground space-y-2">
+              <div className="p-12 text-center text-muted-foreground space-y-2">
                 <ShoppingBag className="w-8 h-8 mx-auto text-muted-foreground/50" />
-                <p className="text-sm font-medium">No orders placed yet.</p>
+                <p className="text-sm font-semibold">No orders placed yet.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm border-collapse">
                   <thead>
-                    <tr className="border-b border-border bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      <th className="py-3 px-5">Order #</th>
-                      <th className="py-3 px-4">Date</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-center">Items</th>
-                      <th className="py-3 px-5 text-right">Total</th>
+                    <tr className="border-b border-border/50 bg-secondary/30 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="py-3.5 px-5">Order #</th>
+                      <th className="py-3.5 px-4">Date</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-center">Items</th>
+                      <th className="py-3.5 px-5 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-border/50">
                     {customer.orders.map((o) => (
                       <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                         <td className="py-3.5 px-5 font-bold text-primary">
-                          <Link href={`/orders`}>
+                          <Link href={`/orders/${o.id}`}>
                             #{o.order_number}
                           </Link>
                         </td>
-                        <td className="py-3.5 px-4 text-xs text-muted-foreground">
+                        <td className="py-3.5 px-4 text-xs text-muted-foreground font-medium">
                           {new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold neu-inset-sm ${
                             o.status === 'Paid' || o.status === 'Delivered'
-                              ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                              ? 'text-emerald-600'
+                              : 'text-amber-600'
                           }`}>
                             {o.status}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-center font-medium">
+                        <td className="py-3.5 px-4 text-center font-bold">
                           {o.items_count}
                         </td>
                         <td className="py-3.5 px-5 text-right font-extrabold text-foreground">
@@ -276,23 +283,29 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         <div className="space-y-6">
           
           {/* Contact Details Card */}
-          <div className="bg-card border border-border p-5 rounded-xl shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border pb-3">
+          <div className="bg-card neu-extruded p-6 rounded-3xl border-0 space-y-4">
+            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-3">
               Contact Overview
             </h3>
 
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3.5 text-sm">
               <div className="flex items-center gap-3">
-                <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="font-medium text-foreground truncate">{customer.email}</span>
+                <div className="p-2 rounded-xl neu-inset-sm text-muted-foreground shrink-0">
+                  <Mail className="w-3.5 h-3.5" />
+                </div>
+                <span className="font-semibold text-foreground truncate text-xs">{customer.email}</span>
               </div>
               <div className="flex items-center gap-3">
-                <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="font-medium text-foreground">{customer.phone}</span>
+                <div className="p-2 rounded-xl neu-inset-sm text-muted-foreground shrink-0">
+                  <Phone className="w-3.5 h-3.5" />
+                </div>
+                <span className="font-semibold text-foreground text-xs">{customer.phone}</span>
               </div>
               <div className="flex items-center gap-3">
-                <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground">
+                <div className="p-2 rounded-xl neu-inset-sm text-muted-foreground shrink-0">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs text-muted-foreground font-medium">
                   Joined {new Date(customer.date_joined).toLocaleDateString()}
                 </span>
               </div>
@@ -300,28 +313,28 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
           {/* Primary Shipping Address Card */}
-          <div className="bg-card border border-border p-5 rounded-xl shadow-sm space-y-3">
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border pb-3 flex items-center gap-2">
+          <div className="bg-card neu-extruded p-6 rounded-3xl border-0 space-y-3">
+            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-3 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
               Recent Shipping Address
             </h3>
 
             {addr.first_name || addr.address1 ? (
-              <div className="text-xs space-y-1 text-muted-foreground leading-relaxed">
+              <div className="text-xs space-y-1 text-muted-foreground leading-relaxed font-medium">
                 <p className="font-bold text-foreground text-sm">{addr.first_name} {addr.last_name}</p>
                 <p>{addr.address1}</p>
                 {addr.address2 && <p>{addr.address2}</p>}
                 <p>{addr.city}, {addr.state} — {addr.pincode || addr.zip}</p>
-                <p className="font-medium text-foreground">{addr.country || 'India'}</p>
+                <p className="font-bold text-foreground">{addr.country || 'India'}</p>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground italic">No shipping address recorded yet.</p>
+              <p className="text-xs text-muted-foreground italic font-medium">No shipping address recorded yet.</p>
             )}
           </div>
 
           {/* Tags & Staff Notes Panel */}
-          <div className="bg-card border border-border p-5 rounded-xl shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border pb-3 flex items-center justify-between">
+          <div className="bg-card neu-extruded p-6 rounded-3xl border-0 space-y-4">
+            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-3 flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-primary" />
                 Tags & Notes
@@ -329,36 +342,36 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               <button
                 onClick={handleSaveNotesAndTags}
                 disabled={saving}
-                className="flex items-center gap-1 px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 neu-btn-primary text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                 Save
               </button>
             </h3>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Customer Tags</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1.5">Customer Tags</label>
                 <div className="relative">
-                  <Tag className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                  <Tag className="w-3.5 h-3.5 absolute left-3.5 top-3.5 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="VIP, Collector, High Value"
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs neu-input rounded-2xl font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Internal Staff Notes</label>
+                <label className="block text-xs font-bold text-muted-foreground mb-1.5">Internal Staff Notes</label>
                 <textarea
                   rows={4}
                   placeholder="Add private staff notes regarding preferences or customer service requests..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full p-3 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3.5 text-xs neu-input rounded-2xl font-medium resize-none"
                 />
               </div>
             </div>

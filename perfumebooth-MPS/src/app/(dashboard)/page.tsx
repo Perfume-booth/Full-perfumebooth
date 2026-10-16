@@ -192,20 +192,20 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       {/* Page Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Overview</h1>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Overview</h1>
           <p className="text-muted-foreground text-sm mt-1">Real-time store metrics and operations summary</p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Date-Range Selector */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-secondary/50 border border-border rounded-xl">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 px-3.5 py-2 neu-inset-sm border border-border/20 rounded-2xl">
+            <Calendar className="w-4 h-4 text-primary" />
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-bold text-foreground focus:outline-none cursor-pointer"
             >
               <option value="today" className="bg-card text-foreground">Today</option>
               <option value="7d" className="bg-card text-foreground">Last 7 Days</option>
@@ -214,12 +214,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Live Visitors Counter */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-            <span className="relative flex h-2 w-2">
+          <div className="flex items-center gap-2.5 px-4 py-2 neu-inset-sm border border-emerald-500/30 rounded-2xl">
+            <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-xs font-semibold text-emerald-400">
+            <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
               {liveVisitors} Live Shoppers
             </span>
           </div>
@@ -227,41 +227,41 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick-Action Shortcuts Card */}
-      <div className="glass-card p-5 rounded-2xl flex flex-col gap-4">
+      <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <a
             href="/products"
-            className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-primary/50 bg-secondary/20 hover:bg-primary/5 transition text-foreground font-semibold text-xs"
+            className="flex items-center gap-3 p-3.5 rounded-2xl neu-btn font-semibold text-xs text-foreground group"
           >
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <div className="w-9 h-9 rounded-xl neu-inset-sm bg-primary/10 flex items-center justify-center text-primary dark:text-purple-400 border border-primary/20 shrink-0 group-hover:scale-105 transition-transform">
               <Plus className="w-4 h-4" />
             </div>
             <span>Add New Product</span>
           </a>
           <a
             href="/collections"
-            className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-primary/50 bg-secondary/20 hover:bg-primary/5 transition text-foreground font-semibold text-xs"
+            className="flex items-center gap-3 p-3.5 rounded-2xl neu-btn font-semibold text-xs text-foreground group"
           >
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
+            <div className="w-9 h-9 rounded-xl neu-inset-sm bg-indigo-500/10 flex items-center justify-center text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 shrink-0 group-hover:scale-105 transition-transform">
               <FolderPlus className="w-4 h-4" />
             </div>
             <span>Create Collection</span>
           </a>
           <a
             href="/products"
-            className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-primary/50 bg-secondary/20 hover:bg-primary/5 transition text-foreground font-semibold text-xs"
+            className="flex items-center gap-3 p-3.5 rounded-2xl neu-btn font-semibold text-xs text-foreground group"
           >
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
+            <div className="w-9 h-9 rounded-xl neu-inset-sm bg-amber-500/10 flex items-center justify-center text-amber-500 dark:text-amber-400 border border-amber-500/20 shrink-0 group-hover:scale-105 transition-transform">
               <AlertTriangle className="w-4 h-4" />
             </div>
             <span>View Low Stock</span>
           </a>
           <a
             href="/inventory"
-            className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-primary/50 bg-secondary/20 hover:bg-primary/5 transition text-foreground font-semibold text-xs"
+            className="flex items-center gap-3 p-3.5 rounded-2xl neu-btn font-semibold text-xs text-foreground group"
           >
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+            <div className="w-9 h-9 rounded-xl neu-inset-sm bg-emerald-500/10 flex items-center justify-center text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 shrink-0 group-hover:scale-105 transition-transform">
               <TrendingUp className="w-4 h-4" />
             </div>
             <span>Update Inventory</span>
@@ -274,22 +274,22 @@ export default function DashboardPage() {
         {kpis.map((kpi) => {
           const Icon = getIcon(kpi.title);
           return (
-            <div key={kpi.title} className="glass-card p-6 rounded-2xl flex flex-col gap-4">
+            <div key={kpi.title} className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-muted-foreground">{kpi.title}</span>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{kpi.title}</span>
+                <div className="w-11 h-11 rounded-2xl neu-inset-sm flex items-center justify-center text-primary">
                   <Icon className="w-5 h-5" />
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-2xl font-bold text-foreground">{kpi.value}</span>
+                <span className="text-2xl font-extrabold text-foreground tracking-tight">{kpi.value}</span>
                 <div className="flex items-center gap-1.5 mt-1">
                   {kpi.isPositive ? (
-                    <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+                    <ArrowUpRight className="w-4 h-4 text-emerald-500" />
                   ) : (
-                    <ArrowDownRight className="w-4 h-4 text-red-400" />
+                    <ArrowDownRight className="w-4 h-4 text-red-500" />
                   )}
-                  <span className={`text-xs font-semibold ${kpi.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-xs font-bold ${kpi.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
                     {kpi.change}
                   </span>
                   <span className="text-xs text-muted-foreground">vs last month</span>
@@ -303,37 +303,37 @@ export default function DashboardPage() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Sales & Profit Line Chart */}
-        <div className="glass-card p-6 rounded-2xl lg:col-span-2 flex flex-col gap-6">
+        <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 lg:col-span-2 flex flex-col gap-6">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-foreground">Sales Performance</h3>
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <h3 className="font-extrabold text-foreground tracking-tight">Sales Performance</h3>
+            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
               <TrendingUp className="w-4 h-4 text-primary" /> Daily revenue trend (Last 7 Days)
             </span>
           </div>
-          <div className="h-80 w-full">
+          <div className="h-80 w-full neu-inset p-4 rounded-2xl border border-border/20">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={salesTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="name" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px' }}
-                  labelStyle={{ color: '#a1a1aa', fontWeight: 'bold' }}
+                  contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'rgba(163, 177, 198, 0.4)', borderRadius: '16px', boxShadow: 'var(--neu-shadow-extruded-sm)' }}
+                  labelStyle={{ color: 'var(--foreground)', fontWeight: 'bold' }}
                 />
-                <Area type="monotone" dataKey="sales" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
+                <Area type="monotone" dataKey="sales" stroke="#7c3aed" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Category Share Pie Chart */}
-        <div className="glass-card p-6 rounded-2xl flex flex-col gap-6">
-          <h3 className="font-bold text-foreground">Fragrance Categories</h3>
+        <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 flex flex-col gap-6">
+          <h3 className="font-extrabold text-foreground tracking-tight">Fragrance Categories</h3>
           <div className="h-60 w-full flex justify-center items-center">
             {categoryData.length === 0 ? (
               <span className="text-xs text-muted-foreground">No category data available</span>
@@ -354,7 +354,7 @@ export default function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px' }}
+                    contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'rgba(163, 177, 198, 0.4)', borderRadius: '16px', boxShadow: 'var(--neu-shadow-extruded-sm)' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -363,9 +363,9 @@ export default function DashboardPage() {
           {/* Legend list */}
           <div className="flex justify-around items-center mt-2 flex-wrap gap-2">
             {categoryData.map((item) => (
-              <div key={item.name} className="flex items-center gap-2">
+              <div key={item.name} className="flex items-center gap-2 neu-inset-sm px-2.5 py-1 rounded-xl">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
-                <span className="text-xs text-muted-foreground">{item.name}</span>
+                <span className="text-xs font-semibold text-foreground">{item.name}</span>
               </div>
             ))}
           </div>
@@ -373,96 +373,94 @@ export default function DashboardPage() {
       </div>
 
       {/* Operational Widgets (Recent Orders) */}
-      <div className="glass-card p-6 rounded-2xl w-full">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-foreground">Recent Orders</h3>
-            <a
-              href="/orders"
-              className="text-xs font-semibold text-primary hover:underline transition"
-            >
-              See All Orders →
-            </a>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground font-semibold">
-                  <th className="pb-3">Order Number</th>
-                  <th className="pb-3">Customer</th>
-                  <th className="pb-3">Total Amount</th>
-                  <th className="pb-3">Status</th>
-                  <th className="pb-3 text-right">Date</th>
+      <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 w-full">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="font-extrabold text-foreground tracking-tight">Recent Orders</h3>
+          <a
+            href="/orders"
+            className="text-xs font-bold text-primary neu-btn px-3.5 py-1.5 rounded-xl transition"
+          >
+            See All Orders →
+          </a>
+        </div>
+        <div className="overflow-x-auto neu-inset p-3 rounded-2xl border border-border/20">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border/40 text-muted-foreground font-bold text-xs uppercase tracking-wider">
+                <th className="p-3">Order Number</th>
+                <th className="p-3">Customer</th>
+                <th className="p-3">Total Amount</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/20">
+              {recentOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-6 text-center text-muted-foreground font-medium">
+                    No orders logged in store database yet.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center text-muted-foreground">
-                      No orders logged in store database yet.
+              ) : (
+                recentOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-primary/[0.04] transition duration-150">
+                    <td className="p-3 font-bold text-foreground font-mono text-xs">{order.orderNo}</td>
+                    <td className="p-3 text-muted-foreground font-medium">{order.customer}</td>
+                    <td className="p-3 text-foreground font-bold">{order.total}</td>
+                    <td className="p-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold neu-inset-sm ${
+                        order.status === 'Paid' ? 'text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10' :
+                        order.status === 'Processing' ? 'text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 bg-indigo-500/10' :
+                        order.status === 'Shipped' ? 'text-purple-600 dark:text-purple-300 border border-purple-500/30 bg-purple-500/10' :
+                        order.status === 'Delivered' ? 'text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10' :
+                        'text-amber-800 dark:text-amber-300 border border-amber-500/30 bg-amber-500/10'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right text-muted-foreground text-xs font-medium">
+                      {new Date(order.date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short'
+                      })}
                     </td>
                   </tr>
-                ) : (
-                  recentOrders.map((order) => (
-                    <tr key={order.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
-                      <td className="py-4 font-semibold text-foreground">{order.orderNo}</td>
-                      <td className="py-4 text-muted-foreground">{order.customer}</td>
-                      <td className="py-4 text-foreground">{order.total}</td>
-                      <td className="py-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          order.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-400' :
-                          order.status === 'Processing' ? 'bg-indigo-500/10 text-indigo-400' :
-                          order.status === 'Shipped' ? 'bg-purple-500/10 text-purple-400' :
-                          order.status === 'Delivered' ? 'bg-emerald-500/20 text-emerald-400' :
-                          'bg-amber-500/10 text-amber-400'
-                        }`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="py-4 text-right text-muted-foreground">
-                        {new Date(order.date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short'
-                        })}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
 
-
-      
       {/* Top Sellers + Low Stock Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Top Selling Products Leaderboard */}
-        <div className="glass-card p-6 rounded-2xl flex flex-col gap-6">
+        <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 flex flex-col gap-6">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-foreground flex items-center gap-2">
+            <h3 className="font-extrabold text-foreground tracking-tight flex items-center gap-2">
               <Crown className="w-5 h-5 text-amber-500" />
               <span>Top Selling Perfumes</span>
             </h3>
             <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">This Month</span>
           </div>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {defaultTopProducts.map((p, idx) => (
-              <div key={p.id} className="p-4 bg-background/50 border border-border/50 rounded-xl flex items-center justify-between hover:border-primary/30 transition duration-200">
+              <div key={p.id} className="p-4 neu-inset rounded-2xl border border-border/20 flex items-center justify-between hover:border-primary/40 transition duration-200">
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                    idx === 0 ? 'bg-amber-500/20 text-amber-400' :
-                    idx === 1 ? 'bg-zinc-400/20 text-zinc-400' :
-                    'bg-amber-700/20 text-amber-600'
+                  <div className={`w-8 h-8 rounded-xl neu-extruded-sm flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                    idx === 0 ? 'text-amber-500' :
+                    idx === 1 ? 'text-zinc-400' :
+                    'text-amber-700'
                   }`}>
                     #{idx + 1}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-semibold text-foreground truncate">{p.title}</span>
+                    <span className="text-sm font-bold text-foreground truncate">{p.title}</span>
                     <span className="text-xs text-muted-foreground">{p.salesCount} bottles sold</span>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <span className="text-sm font-bold text-emerald-400">{p.revenue}</span>
+                  <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{p.revenue}</span>
                 </div>
               </div>
             ))}
@@ -470,28 +468,28 @@ export default function DashboardPage() {
         </div>
 
         {/* Low Stock Alerts */}
-        <div className="glass-card p-6 rounded-2xl flex flex-col gap-6">
+        <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 flex flex-col gap-6">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-foreground flex items-center gap-2">
+            <h3 className="font-extrabold text-foreground tracking-tight flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
               <span>Low Stock Alerts</span>
             </h3>
             <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Action Needed</span>
           </div>
-          <div className="flex flex-col gap-4 overflow-y-auto max-h-80 pr-1">
+          <div className="flex flex-col gap-3 overflow-y-auto max-h-80 pr-1">
             {lowStock.length === 0 ? (
-              <div className="h-40 flex items-center justify-center text-center text-xs text-muted-foreground">
+              <div className="h-40 flex items-center justify-center text-center text-xs text-muted-foreground font-medium">
                 All catalog items are healthy and fully stocked!
               </div>
             ) : (
               lowStock.map((item) => (
-                <div key={item.id} className="p-4 bg-background/50 border border-border/50 rounded-xl flex justify-between items-center gap-4 hover:border-red-500/20 transition duration-200">
+                <div key={item.id} className="p-4 neu-inset rounded-2xl border border-border/20 flex justify-between items-center gap-4 hover:border-red-500/30 transition duration-200">
                   <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-sm font-semibold text-foreground truncate">{item.title}</span>
-                    <span className="text-xs text-muted-foreground truncate">SKU: {item.sku}</span>
+                    <span className="text-sm font-bold text-foreground truncate">{item.title}</span>
+                    <span className="text-xs text-muted-foreground font-mono truncate">SKU: {item.sku}</span>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                    <span className="text-xs font-bold px-3 py-1 rounded-full neu-inset-sm text-red-500 border border-red-500/20">
                       {item.stock} left
                     </span>
                   </div>

@@ -296,6 +296,23 @@ export default function CheckoutClient({ customer }: Props) {
     }
   };
 
+  const checkoutRetryKey = () => {
+    const fingerprint = JSON.stringify({
+      items: items.map(item => [item.id, item.selectedVariantId, item.cartQuantity]),
+      form, couponCode, paymentMethod,
+    });
+    const stored = sessionStorage.getItem('pb_checkout_retry');
+    if (stored) {
+      try {
+        const previous = JSON.parse(stored);
+        if (previous.fingerprint === fingerprint && previous.key) return previous.key;
+      } catch { /* Replace invalid local state. */ }
+    }
+    const key = crypto.randomUUID();
+    sessionStorage.setItem('pb_checkout_retry', JSON.stringify({ fingerprint, key }));
+    return key;
+  };
+
   const createOrder = async (financialStatus = "PENDING", gatewayRef = "") => {
     // If we're already processing an order and this is a COD flow, bypass the return block.
     // Razorpay uses a separate verify endpoint, so this function is mainly for COD.
@@ -304,7 +321,7 @@ export default function CheckoutClient({ customer }: Props) {
     try {
       const response = await fetch('/api/checkout/cod', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': checkoutRetryKey() },
         body: JSON.stringify({
           items,
           form,
@@ -319,10 +336,12 @@ export default function CheckoutClient({ customer }: Props) {
 
       const data = await response.json();
       if (data.success) {
+        sessionStorage.removeItem('pb_checkout_retry');
+        setSuccess(true);
         sessionStorage.setItem('pb_last_order', JSON.stringify({
           orderId: data.orderName || data.orderId,
           email: form.email,
-          total: finalTotal,
+          total: data.total,
           items: items,
           coupon: couponCode || undefined
         }));
@@ -355,6 +374,30 @@ export default function CheckoutClient({ customer }: Props) {
 
   const totalItems = items.reduce((s, i) => s + i.cartQuantity, 0);
 
+  const confirmPayment = async (proof: {
+    razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string;
+  }) => {
+    // Retain only the gateway proof so refresh/network errors can resume verification.
+    sessionStorage.setItem('pb_pending_payment', JSON.stringify(proof));
+    const response = await fetch('/api/checkout/razorpay/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(proof),
+    });
+    const result = await response.json();
+    if (!result.success) {
+      toast.error(result.message || 'Payment confirmation is pending. Click Complete Purchase to check again; no new payment will be started.');
+      return;
+    }
+    sessionStorage.setItem('pb_last_order', JSON.stringify({
+      orderId: result.orderName || result.orderId, email: form.email,
+      total: result.total, items, coupon: couponCode || undefined,
+    }));
+    sessionStorage.removeItem('pb_pending_payment');
+    sessionStorage.removeItem('pb_checkout_retry');
+    setSuccess(true);
+    if (isBuyNow) clearBuyNow(); else clearCart();
+    router.push('/order-successfully');
+  };
+
   const handlePayNow = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessingRef.current) return;
@@ -362,6 +405,16 @@ export default function CheckoutClient({ customer }: Props) {
     setIsProcessing(true);
 
     try {
+      const pendingProof = sessionStorage.getItem('pb_pending_payment');
+      if (pendingProof) {
+        try {
+          await confirmPayment(JSON.parse(pendingProof));
+        } finally {
+          isProcessingRef.current = false;
+          setIsProcessing(false);
+        }
+        return;
+      }
       if (paymentMethod === "razorpay") {
         // 1. Dynamically Load official Razorpay JS library
         const isLoaded = await loadRazorpayScript();
@@ -375,7 +428,7 @@ export default function CheckoutClient({ customer }: Props) {
         // 2. Initialize Razorpay order on Next.js serverless backend
         const res = await fetch('/api/checkout/razorpay/init', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': checkoutRetryKey() },
           body: JSON.stringify({
             items,
             form,
@@ -409,45 +462,14 @@ export default function CheckoutClient({ customer }: Props) {
             isProcessingRef.current = true;
             setIsProcessing(true);
             try {
-              // 4. Securely verify digital signature server-side
-              const verifyRes = await fetch('/api/checkout/razorpay/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  items,
-                  form,
-                  finalTotal,
-                  couponCode,
-                  discountAmount,
-                  shippingRate: selectedShippingRate
-                }),
+              await confirmPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
               });
-
-              const verifyData = await verifyRes.json();
-              
-              if (verifyData.success) {
-                sessionStorage.setItem('pb_last_order', JSON.stringify({
-                  orderId: verifyData.orderName || verifyData.orderId,
-                  email: form.email,
-                  total: finalTotal,
-                  items: items,
-                  coupon: couponCode || undefined
-                }));
-                 if (isBuyNow) {
-                  clearBuyNow();
-                } else {
-                  clearCart();
-                }
-                router.push('/order-successfully');
-              } else {
-                toast.error(verifyData.message || "Payment signature verification failed.");
-              }
             } catch (err) {
               console.error("Signature verification transaction exception:", err);
-              toast.error("Failed to verify transaction securely with database.");
+              toast.error("Confirmation interrupted. Click Complete Purchase to check again; do not pay again.");
             } finally {
               isProcessingRef.current = false;
               setIsProcessing(false);

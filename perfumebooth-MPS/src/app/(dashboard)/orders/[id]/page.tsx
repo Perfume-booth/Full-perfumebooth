@@ -107,15 +107,15 @@ function DeliveryProcessStepper({ order }: { order: OrderDetail }) {
 
   if (isCancelled) {
     return (
-      <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center justify-between">
+      <div className="p-4 rounded-2xl bg-card neu-inset-sm text-rose-500 text-xs font-semibold flex items-center justify-between border-0">
         <div className="flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <div>
-            <span className="font-bold">Order Cancelled</span>
-            <p className="text-xs text-rose-400/80 mt-0.5">This order has been cancelled and fulfillment is stopped.</p>
+            <span className="font-bold text-sm">Order Cancelled</span>
+            <p className="text-xs text-rose-500/80 mt-0.5">This order has been cancelled and fulfillment is stopped.</p>
           </div>
         </div>
-        <span className="text-xs bg-rose-500/20 px-2.5 py-1 rounded-full font-semibold uppercase">Cancelled</span>
+        <span className="text-xs neu-inset-sm px-3 py-1 rounded-full font-bold uppercase text-rose-500">Cancelled</span>
       </div>
     );
   }
@@ -129,16 +129,16 @@ function DeliveryProcessStepper({ order }: { order: OrderDetail }) {
           return (
             <div key={i} className="flex flex-col items-center sm:items-start gap-2 relative">
               <div className="flex items-center gap-2 w-full">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold transition-all ${
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 font-bold transition-all ${
                   step.active 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
-                    : 'bg-muted/40 text-muted-foreground border border-border'
+                    ? 'neu-btn-primary' 
+                    : 'bg-card neu-inset-sm text-muted-foreground'
                 }`}>
                   <StepIcon className="w-4 h-4" />
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={`hidden sm:block flex-1 h-1 rounded-full ${
-                    steps[i + 1].active ? 'bg-primary' : 'bg-border/60'
+                  <div className={`hidden sm:block flex-1 h-1.5 rounded-full ${
+                    steps[i + 1].active ? 'bg-primary' : 'bg-muted'
                   }`} />
                 )}
               </div>
@@ -146,7 +146,7 @@ function DeliveryProcessStepper({ order }: { order: OrderDetail }) {
                 <h4 className={`text-xs font-bold ${step.active ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {step.label}
                 </h4>
-                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 font-medium">
                   {step.desc}
                 </p>
               </div>
@@ -249,42 +249,52 @@ export default function OrderDetailPage() {
   const shippingAddr = orderDetail.shipping_address || {};
 
   return (
-    <div className="flex flex-col gap-8 pb-12">
+    <div className="flex flex-col gap-8 pb-12 max-w-7xl mx-auto">
       {/* Back Link & Header */}
       <div className="flex flex-col gap-4">
         <Link 
           href="/orders"
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground font-medium w-fit transition duration-150"
+          className="flex items-center gap-2 p-2.5 neu-btn rounded-2xl text-muted-foreground hover:text-foreground text-xs font-bold w-fit transition duration-150"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Orders
+          <span>Back to Orders</span>
         </Link>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
               Order #{orderDetail.order_number}
             </h1>
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-              orderDetail.status === 'Delivered' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' :
-              orderDetail.status === 'Shipped' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-              orderDetail.status === 'Processing' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-              orderDetail.status === 'Cancelled' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-              'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-            }`}>
-              {orderDetail.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground">Delivery Status:</span>
+              <span className={`px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider neu-inset-sm flex items-center gap-1.5 ${
+                orderDetail.status === 'Delivered' ? 'text-teal-600 dark:text-teal-300 border border-teal-500/30 bg-teal-500/5' :
+                orderDetail.status === 'Shipped' ? 'text-purple-600 dark:text-purple-300 border border-purple-500/30 bg-purple-500/5' :
+                orderDetail.status === 'Processing' ? 'text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 bg-indigo-500/5' :
+                orderDetail.status === 'Cancelled' ? 'text-rose-600 dark:text-rose-300 border border-rose-500/30 bg-rose-500/5' :
+                'text-amber-600 dark:text-amber-300 border border-amber-500/30 bg-amber-500/5'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  orderDetail.status === 'Delivered' ? 'bg-teal-500' :
+                  orderDetail.status === 'Shipped' ? 'bg-purple-500' :
+                  orderDetail.status === 'Processing' ? 'bg-indigo-500' :
+                  orderDetail.status === 'Cancelled' ? 'bg-rose-500' :
+                  'bg-amber-500'
+                }`} />
+                {orderDetail.status}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
             <button 
               onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground text-xs font-semibold rounded-xl border border-border transition cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 neu-btn text-foreground text-xs font-bold rounded-2xl transition cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Order</span>
             </button>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground font-medium">
               Created on {new Date(orderDetail.created_at).toLocaleString('en-IN', {
                 day: 'numeric',
                 month: 'long',
@@ -298,7 +308,7 @@ export default function OrderDetailPage() {
       </div>
 
       {successMsg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-center gap-2">
+        <div className="p-4 rounded-2xl bg-card neu-inset-sm text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 border-0">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {successMsg}
         </div>
@@ -311,17 +321,17 @@ export default function OrderDetailPage() {
         <div className="lg:col-span-2 flex flex-col gap-8">
           
           {/* Delivery Process Journey Card */}
-          <div className="glass-card rounded-2xl p-6 flex flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+          <div className="bg-card neu-extruded rounded-3xl p-6 sm:p-7 flex flex-col gap-6 border-0">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-4">
               <div>
-                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                   <Truck className="w-5 h-5 text-primary" /> Delivery Process Journey
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Real-time status based on fulfillment & carrier tracking</p>
+                <p className="text-xs text-muted-foreground mt-0.5 font-medium">Real-time status based on fulfillment & carrier tracking</p>
               </div>
 
               {orderDetail.shipping_address?.tracking_number && (
-                <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-3 py-1.5 rounded-xl text-xs font-semibold">
+                <div className="flex items-center gap-2 neu-inset-sm text-primary px-3 py-1.5 rounded-xl text-xs font-bold">
                   <span>Carrier: {orderDetail.shipping_address?.shipping_carrier || 'Shiprocket'}</span>
                   <span>•</span>
                   <span className="font-mono">ID: {orderDetail.shipping_address?.tracking_number}</span>
@@ -334,8 +344,8 @@ export default function OrderDetailPage() {
           </div>
           
           {/* Purchase Items Card (Products Table) */}
-          <div className="glass-card rounded-2xl p-6 flex flex-col gap-6">
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2 border-b border-border pb-4">
+          <div className="bg-card neu-extruded rounded-3xl p-6 sm:p-7 flex flex-col gap-6 border-0">
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border/50 pb-4">
               <ShoppingBag className="w-5 h-5 text-primary" /> Purchase Items ({orderDetail.items.length})
             </h2>
 
@@ -354,7 +364,7 @@ export default function OrderDetailPage() {
                       target="_blank" 
                       rel="noopener noreferrer" 
                       title="View product in Storefront"
-                      className="relative w-16 h-16 bg-muted/20 border border-border rounded-xl flex items-center justify-center overflow-hidden shrink-0 group cursor-pointer"
+                      className="relative w-16 h-16 bg-card neu-inset-sm rounded-2xl flex items-center justify-center overflow-hidden shrink-0 group cursor-pointer"
                     >
                       {item.product_image ? (
                         <Image
@@ -379,12 +389,12 @@ export default function OrderDetailPage() {
                         <span className="truncate">{item.product_title}</span>
                         <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition duration-150 shrink-0 text-primary" />
                       </a>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>SKU: <span className="font-mono text-foreground font-medium">{item.sku || 'N/A'}</span></span>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+                        <span>SKU: <span className="font-mono text-foreground font-semibold">{item.sku || 'N/A'}</span></span>
                         <span>•</span>
                         <Link 
                           href={mpsCatalogUrl}
-                          className="text-primary hover:underline text-[11px] font-medium"
+                          className="text-primary hover:underline text-[11px] font-bold"
                         >
                           Manage in MPS Catalog →
                         </Link>
@@ -393,10 +403,10 @@ export default function OrderDetailPage() {
 
                     {/* Quantity & Pricing */}
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-bold text-foreground">
+                      <div className="text-sm font-extrabold text-foreground">
                         ₹{parseFloat(item.line_total).toLocaleString('en-IN')}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
+                      <div className="text-xs text-muted-foreground mt-0.5 font-medium">
                         ₹{parseFloat(item.unit_price).toLocaleString('en-IN')} × {item.quantity}
                       </div>
                     </div>
@@ -407,21 +417,21 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Fulfillment & Logistics Card */}
-          <form onSubmit={handleSaveOrder} className="glass-card rounded-2xl p-6 flex flex-col gap-6 border border-primary/20">
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2 border-b border-border pb-4">
+          <form onSubmit={handleSaveOrder} className="bg-card neu-extruded rounded-3xl p-6 sm:p-7 flex flex-col gap-6 border-0">
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border/50 pb-4">
               <Truck className="w-5 h-5 text-primary" /> Fulfillment Status & Logistics (Shiprocket)
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Order Status */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Fulfillment Status
                 </label>
                 <select
                   value={orderStatus}
                   onChange={(e) => setOrderStatus(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-3 neu-input rounded-2xl text-xs font-semibold text-foreground cursor-pointer"
                 >
                   <option value="Pending">Pending</option>
                   <option value="Paid">Paid</option>
@@ -434,7 +444,7 @@ export default function OrderDetailPage() {
 
               {/* Shipping Carrier */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Shipping Carrier
                 </label>
                 <input
@@ -442,13 +452,13 @@ export default function OrderDetailPage() {
                   value={carrier}
                   onChange={(e) => setCarrier(e.target.value)}
                   placeholder="e.g. Shiprocket / Delhivery"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-3 neu-input rounded-2xl text-xs font-medium text-foreground"
                 />
               </div>
 
               {/* Tracking Number */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Tracking ID
                 </label>
                 <input
@@ -456,7 +466,7 @@ export default function OrderDetailPage() {
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
                   placeholder="e.g. SR1029384821"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-3 neu-input rounded-2xl text-xs font-medium text-foreground"
                 />
               </div>
             </div>
@@ -465,7 +475,7 @@ export default function OrderDetailPage() {
               <button
                 type="submit"
                 disabled={saveLoading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-6 py-3 neu-btn-primary font-bold rounded-2xl text-xs cursor-pointer transition duration-200"
               >
                 {saveLoading ? (
                   <>
@@ -484,16 +494,16 @@ export default function OrderDetailPage() {
         <div className="flex flex-col gap-8">
           
           {/* Customer Info Card */}
-          <div className="glass-card rounded-2xl p-6 flex flex-col gap-4">
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+          <div className="bg-card neu-extruded rounded-3xl p-6 border-0 flex flex-col gap-4">
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2 border-b border-border/50 pb-3">
               <User className="w-4 h-4 text-primary" /> Customer Details
             </h2>
 
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{orderDetail.customer_name}</span>
+              <span className="font-bold text-foreground text-sm">{orderDetail.customer_name}</span>
               <a 
                 href={`mailto:${orderDetail.customer_email}`} 
-                className="flex items-center gap-2 text-primary hover:underline text-xs"
+                className="flex items-center gap-2 text-primary hover:underline text-xs font-medium"
               >
                 <Mail className="w-3.5 h-3.5" />
                 <span>{orderDetail.customer_email}</span>
@@ -502,24 +512,24 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Shipping Address Card */}
-          <div className="glass-card rounded-2xl p-6 flex flex-col gap-4">
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+          <div className="bg-card neu-extruded rounded-3xl p-6 border-0 flex flex-col gap-4">
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2 border-b border-border/50 pb-3">
               <MapPin className="w-4 h-4 text-primary" /> Shipping Address
             </h2>
 
-            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{orderDetail.customer_name}</span>
+            <div className="flex flex-col gap-1.5 text-xs text-muted-foreground font-medium leading-relaxed">
+              <span className="font-bold text-foreground text-sm">{orderDetail.customer_name}</span>
               <span>{shippingAddr.street_address || shippingAddr.address1 || 'N/A'}</span>
               {shippingAddr.address2 && <span>{shippingAddr.address2}</span>}
               <span>
                 {[shippingAddr.city, shippingAddr.state].filter(Boolean).join(', ')} 
                 {shippingAddr.postal_code || shippingAddr.zip ? ` - ${shippingAddr.postal_code || shippingAddr.zip}` : ''}
               </span>
-              {shippingAddr.country && <span>{shippingAddr.country}</span>}
+              {shippingAddr.country && <span className="font-semibold text-foreground">{shippingAddr.country}</span>}
               {shippingAddr.phone && (
                 <a 
                   href={`tel:${shippingAddr.phone}`} 
-                  className="flex items-center gap-2 pt-2 text-primary hover:underline font-medium text-xs"
+                  className="flex items-center gap-2 pt-2 text-primary hover:underline font-bold text-xs"
                 >
                   <Phone className="w-3.5 h-3.5" />
                   <span>Phone: {shippingAddr.phone}</span>
@@ -529,36 +539,46 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Payment & Financial Summary Card */}
-          <div className="glass-card rounded-2xl p-6 flex flex-col gap-4">
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+          <div className="bg-card neu-extruded rounded-3xl p-6 border-0 flex flex-col gap-4">
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2 border-b border-border/50 pb-3">
               <CreditCard className="w-4 h-4 text-primary" /> Financial Summary
             </h2>
 
-            <div className="flex flex-col gap-3 text-sm">
-              <div className="flex justify-between text-muted-foreground">
+            <div className="flex flex-col gap-3 text-xs">
+              <div className="flex justify-between items-center text-muted-foreground font-medium">
                 <span>Payment Method</span>
-                <span className="font-semibold uppercase text-xs px-2 py-0.5 bg-muted rounded text-foreground">
+                <span className="font-bold uppercase text-[11px] px-2.5 py-1 neu-inset-sm rounded-md text-foreground">
                   {shippingAddr.payment_method || 'COD'}
                 </span>
               </div>
-              <div className="flex justify-between text-muted-foreground">
+              <div className="flex justify-between items-center text-muted-foreground font-medium">
+                <span>Payment Status</span>
+                <span className={`font-bold uppercase text-[11px] px-2.5 py-1 neu-inset-sm rounded-full ${
+                  orderDetail.status === 'Paid'
+                    ? 'text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10'
+                    : 'text-amber-800 dark:text-amber-300 border border-amber-500/30 bg-amber-500/10'
+                }`}>
+                  {orderDetail.status === 'Paid' ? 'Paid' : 'Pending'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-muted-foreground font-medium">
                 <span>Delivery Method</span>
-                <span className="text-foreground text-xs font-medium">
+                <span className="text-foreground text-xs font-bold">
                   {shippingAddr.shipping_carrier || 'Standard Shipping'}
                 </span>
               </div>
-              <div className="flex justify-between text-muted-foreground border-t border-border/50 pt-2">
+              <div className="flex justify-between text-muted-foreground border-t border-border/50 pt-2 font-medium">
                 <span>Subtotal</span>
-                <span className="text-foreground">₹{parseFloat(orderDetail.subtotal || '0').toLocaleString('en-IN')}</span>
+                <span className="text-foreground font-bold">₹{parseFloat(orderDetail.subtotal || '0').toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between text-muted-foreground">
+              <div className="flex justify-between text-muted-foreground font-medium">
                 <span>Tax / GST</span>
-                <span className="text-foreground">₹{parseFloat(orderDetail.tax || '0').toLocaleString('en-IN')}</span>
+                <span className="text-foreground font-bold">₹{parseFloat(orderDetail.tax || '0').toLocaleString('en-IN')}</span>
               </div>
               
-              <div className="flex justify-between font-bold text-base border-t border-border pt-3 text-foreground">
-                <span>Total Amount</span>
-                <span className="text-primary">₹{parseFloat(orderDetail.total || '0').toLocaleString('en-IN')}</span>
+              <div className="flex justify-between font-bold text-sm border-t border-border/50 pt-3 text-foreground">
+                <span className="font-extrabold">Total Amount</span>
+                <span className="text-primary text-base font-extrabold">₹{parseFloat(orderDetail.total || '0').toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>

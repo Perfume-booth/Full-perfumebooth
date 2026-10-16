@@ -1,15 +1,38 @@
 import { useAuthStore } from '@/store/useAuthStore';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
+  }
+  return 'http://localhost:8000/api';
+}
+
+export function formatProductImageUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/media/')) return `http://localhost:8000${url}`;
+  if (url.startsWith('media/')) return `http://localhost:8000/${url}`;
+  if (url.startsWith('products/') || url.startsWith('variants/')) {
+    return `http://localhost:8000/media/${url}`;
+  }
+  if (url.startsWith('/products/') || url.startsWith('/variants/')) {
+    return `http://localhost:8000/media${url}`;
+  }
+  return url;
+}
 
 function apiUrl(path: string): string {
-  return `${BASE_URL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  return `${getApiBaseUrl().replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 }
 
 function connectionError(error: unknown): Error {
+  const baseUrl = getApiBaseUrl();
   const detail = error instanceof Error ? ` (${error.message})` : '';
   return new Error(
-    `Cannot connect to the API at ${BASE_URL}. Make sure the Django service is running and reachable${detail}`
+    `Cannot connect to the API at ${baseUrl}. Make sure the Django service is running and reachable${detail}`
   );
 }
 
@@ -65,8 +88,8 @@ export async function apiFetch<T = any>(
     throw connectionError(error);
   }
 
-  if (response.status === 401 || response.status === 403) {
-    // Session expired or CSRF failed
+  if (response.status === 401) {
+    // Session expired or unauthenticated
     useAuthStore.getState().clearAuth();
     if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
       window.location.href = '/login';

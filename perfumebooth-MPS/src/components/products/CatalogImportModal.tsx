@@ -27,7 +27,7 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
   const [mode, setMode] = useState<ImportMode>('UPDATE_ONLY');
   const [draftDefault, setDraftDefault] = useState(true);
   useEffect(() => {
-    if (!isOpen || preview) return;
+    if (!isOpen) return;
     const jobId = window.localStorage.getItem(PENDING_JOB_KEY);
     if (!jobId) return;
     let cancelled = false;
@@ -44,15 +44,15 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
           }
           await sleep(1000);
         }
-      } catch {
-        window.localStorage.removeItem(PENDING_JOB_KEY);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not check the import. Reopen this window to reconnect.');
       } finally {
         if (!cancelled) setBusy(false);
       }
     };
     void resume();
     return () => { cancelled = true; };
-  }, [isOpen, preview]);
+  }, [isOpen]);
   if (!isOpen) return null;
 
   const pollJob = async (jobId: string, terminalStatuses: string[]) => {
@@ -61,12 +61,13 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
       setPreview(current);
       if (terminalStatuses.includes(current.status)) return current;
       if (current.status === 'failed') throw new Error(current.error_message || 'The background import failed.');
+      if (current.status === 'cancelled') throw new Error('The import was cancelled.');
       await sleep(1000);
     }
     throw new Error('The import is still running. Close this window and check the job again shortly.');
   };
   const chooseFile = (selected?: File) => {
-    if (!selected) return;
+    if (!selected || busy) return;
     if (!/\.(csv|xlsx)$/i.test(selected.name)) { setError('Choose a .csv or .xlsx file.'); return; }
     window.localStorage.removeItem(PENDING_JOB_KEY);
     setFile(selected); setPreview(null); setError(null); setSuccess(null);
@@ -88,6 +89,8 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
     setBusy(true); setError(null);
     try {
       const queued = await apiFetch<Preview>(`/shop/products/excel-import/${preview.job_id}/apply/`, { method: 'POST' });
+      window.localStorage.setItem(PENDING_JOB_KEY, queued.job_id);
+      setPreview(queued);
       const applied = await pollJob(queued.job_id, ['applied']);
       const variantTotal = preview.summary.variants_to_add + preview.summary.variants_to_update + preview.summary.variants_to_delete;
       const imageTotal = preview.summary.images_to_add + preview.summary.images_to_replace + preview.summary.images_to_delete;
@@ -124,7 +127,7 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
     try {
       const blob = await apiDownload(`/shop/products/excel-import/template/?mode=${mode}`);
       const url = URL.createObjectURL(blob); const anchor = document.createElement('a');
-      anchor.href = url; anchor.download = `perfumebooth-products-${mode.toLowerCase()}-template-v7.xlsx`; anchor.click(); URL.revokeObjectURL(url);
+      anchor.href = url; anchor.download = `perfumebooth-products-${mode.toLowerCase()}-template.xlsx`; anchor.click(); URL.revokeObjectURL(url);
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not download the template.'); }
   };
 

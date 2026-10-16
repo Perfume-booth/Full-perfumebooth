@@ -21,7 +21,10 @@ from .customer_views import (
     CustomerMeView,
     CustomerAddressListView,
     CustomerAddressDetailView,
-    CustomerAddressSetDefaultView
+    CustomerAddressSetDefaultView,
+    CustomerPasswordResetRequestView,
+    CustomerPasswordResetConfirmView,
+    CustomerChangePasswordView
 )
 from .customer_management_views import (
     MerchantCustomerListView,
@@ -49,6 +52,9 @@ urlpatterns = [
     path('customer/otp/verify/', CustomerVerifyOTPView.as_view(), name='customer-otp-verify'),
     path('customer/social/', CustomerSocialAuthView.as_view(), name='customer-social-auth'),
     path('customer/me/', CustomerMeView.as_view(), name='customer-me'),
+    path('customer/change-password/', CustomerChangePasswordView.as_view(), name='customer-change-password'),
+    path('customer/password-reset/', CustomerPasswordResetRequestView.as_view(), name='customer-password-reset'),
+    path('customer/password-reset-confirm/', CustomerPasswordResetConfirmView.as_view(), name='customer-password-reset-confirm'),
     path('customer/addresses/', CustomerAddressListView.as_view(), name='customer-address-list'),
     path('customer/addresses/<uuid:pk>/', CustomerAddressDetailView.as_view(), name='customer-address-detail'),
     path('customer/addresses/<uuid:pk>/set-default/', CustomerAddressSetDefaultView.as_view(), name='customer-address-set-default'),

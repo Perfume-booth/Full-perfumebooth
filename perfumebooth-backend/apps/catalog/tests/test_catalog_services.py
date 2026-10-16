@@ -302,6 +302,13 @@ class BrandServiceTests(TestCase):
         updated_brands = BrandService.save_brand(test_brand)
         self.assertIn(test_brand, updated_brands)
 
+        # Test brand update/rename
+        BrandService.save_brand("Original Brand")
+        renamed_brands = BrandService.update_brand("Original Brand", "Renamed Brand")
+        self.assertIn("Renamed Brand", renamed_brands)
+        self.assertNotIn("Original Brand", renamed_brands)
+        BrandService.delete_brand("Renamed Brand")
+
         # Clean up
         cleaned = BrandService.delete_brand(test_brand)
         self.assertNotIn(test_brand, cleaned)

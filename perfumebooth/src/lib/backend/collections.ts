@@ -368,8 +368,8 @@ export async function getBanner(slug: string): Promise<any | null> {
     if (res.ok) {
       const rawData = await res.json();
       const data = unwrapApiData(rawData);
-      // Use absolute URLs for Next.js Image component optimization
-      if (data && data.images && isServer) {
+      // Keep local uploads same-origin on both server and client fetches.
+      if (data && data.images) {
         data.images = data.images.map((img: any) => ({
           ...img,
           image_url: cleanImageUrl(img.image_url) || null,

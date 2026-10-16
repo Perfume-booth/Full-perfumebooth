@@ -76,6 +76,7 @@ class Order(models.Model):
     shipping_address = models.JSONField(default=dict)
     customer_email = models.EmailField(blank=True, default='', db_index=True)
     customer_phone = models.CharField(max_length=30, blank=True, default='')
+    coupon_code = models.CharField(max_length=50, blank=True, default='', db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -93,6 +94,44 @@ class Order(models.Model):
 
     def __str__(self) -> str:
         return f'Order #{self.order_number} — {self.status}'
+
+
+class CheckoutRequest(models.Model):
+    """Durable retry key; the same key must describe the same checkout."""
+    key = models.CharField(max_length=64, primary_key=True)
+    fingerprint = models.CharField(max_length=64)
+    response = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PaymentAttempt(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name='payment_attempt')
+    gateway_order_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    status = models.CharField(max_length=30, default='new', db_index=True)
+    # new -> creating -> ready -> paid; ambiguous creates are never blindly retried.
+    last_error = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PaymentEvent(models.Model):
+    event_id = models.CharField(max_length=255, unique=True)
+    fingerprint = models.CharField(max_length=64)
+    payment_id = models.CharField(max_length=100, db_index=True)
+    order = models.ForeignKey(Order, on_delete=models.PROTECT)
+    outcome = models.CharField(max_length=40)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PaymentOutbox(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.PROTECT)
+    kind = models.CharField(max_length=20)
+    status = models.CharField(max_length=20, default='pending', db_index=True)
+    last_error = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['order', 'kind'], name='unique_paid_order_effect')]
 
 
 class Shipment(models.Model):
@@ -202,4 +241,53 @@ class AbandonedCart(models.Model):
 
     def __str__(self) -> str:
         return f"AbandonedCart ({self.email}) - {'Recovered' if self.recovered else 'Pending'}"
+
+
+class Coupon(models.Model):
+    """
+    Promotions & Discounts Coupon Model
+    """
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'percentage', 'Percentage'
+        FIXED = 'fixed', 'Fixed Amount'
+        FREE_SHIPPING = 'free_shipping', 'Free Shipping'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=50, unique=True, db_index=True)
+    description = models.CharField(max_length=255, blank=True, default='')
+    discount_type = models.CharField(
+        max_length=20, choices=DiscountType.choices, default=DiscountType.PERCENTAGE
+    )
+    discount_value = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Percentage value (e.g. 15 for 15%) or Fixed amount (e.g. 200)'
+    )
+    min_order_value = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text='Minimum subtotal required to apply this coupon'
+    )
+    max_discount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text='Maximum discount cap for percentage discounts'
+    )
+    start_date = models.DateTimeField(null=True, blank=True)
+    end_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    usage_limit = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Global max redemptions allowed (null for unlimited)'
+    )
+    times_used = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+    first_order_only = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'orders_coupon'
+        ordering = ['-created_at']
+        verbose_name = 'Coupon'
+        verbose_name_plural = 'Coupons'
+
+    def __str__(self) -> str:
+        return f"{self.code} ({self.discount_type}: {self.discount_value})"
 

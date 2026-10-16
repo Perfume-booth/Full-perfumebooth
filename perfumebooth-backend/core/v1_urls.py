@@ -23,6 +23,7 @@ from apps.shop.views import (
     ProductReviewAPIView,
     ProductExcelExportView, ProductExcelImportView, ProductExcelImportApplyView,
     ProductExcelImportErrorsView, ProductExcelImportTemplateView,
+    ProductExcelImportStatusView, ProductExcelImportRetryView,
     AnalyticsAPIView, DashboardAnalyticsView
 )
 
@@ -30,7 +31,7 @@ from apps.shop.views import (
 from apps.orders.views import (
     OrderListView, OrderDetailView, CouponValidationView,
     ShippingRatesAPIView, RazorpayWebhookView, ShiprocketWebhookView,
-    AbandonedCartAPIView, AbandonedCartRecoverView
+    AbandonedCartAPIView, AbandonedCartRecoverView, PaymentInitializeView, PaymentVerifyView
 )
 
 # Checkout Views
@@ -69,6 +70,8 @@ cart_patterns = [
 ]
 
 checkout_patterns = [
+    path('payments/initialize/', PaymentInitializeView.as_view(), name='payment-initialize'),
+    path('payments/verify/', PaymentVerifyView.as_view(), name='payment-verify'),
     path('', CheckoutView.as_view(), name='v1-checkout-order-create'),
     path('shipping-rates/', ShippingRatesAPIView.as_view(), name='v1-checkout-shipping-rates'),
     path('webhooks/razorpay/', RazorpayWebhookView.as_view(), name='v1-checkout-razorpay-webhook'),
@@ -86,6 +89,8 @@ admin_patterns = [
     path('products/excel-import/', ProductExcelImportView.as_view(), name='v1-admin-products-excel-import'),
     path('products/excel-import/template/', ProductExcelImportTemplateView.as_view(), name='v1-admin-products-excel-import-template'),
     path('products/excel-import/<uuid:job_id>/apply/', ProductExcelImportApplyView.as_view(), name='v1-admin-products-excel-import-apply'),
+    path('products/excel-import/<uuid:job_id>/', ProductExcelImportStatusView.as_view(), name='v1-admin-products-excel-import-status'),
+    path('products/excel-import/<uuid:job_id>/retry/', ProductExcelImportRetryView.as_view(), name='v1-admin-products-excel-import-retry'),
     path('products/excel-import/<uuid:job_id>/errors/', ProductExcelImportErrorsView.as_view(), name='v1-admin-products-excel-import-errors'),
     path('products/<slug:slug>/', ProductDetailView.as_view(), name='v1-admin-product-detail'),
     path('collections/', CollectionListCreateView.as_view(), name='v1-admin-collections'),

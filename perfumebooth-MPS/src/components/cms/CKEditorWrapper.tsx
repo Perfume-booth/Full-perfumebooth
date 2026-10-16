@@ -19,11 +19,12 @@ const CompatibleClassicEditor = ClassicEditor as unknown as React.ComponentProps
 
 export default function CKEditorWrapper({ value, onChange, placeholder }: CKEditorWrapperProps) {
   return (
-    <div className="border border-border rounded-xl overflow-hidden bg-background text-foreground text-sm">
+    <div className="neu-inset rounded-2xl overflow-hidden p-1 text-foreground text-sm">
       <CKEditor
         editor={CompatibleClassicEditor}
         data={value || ''}
         config={{
+          licenseKey: process.env.NEXT_PUBLIC_CKEDITOR_LICENSE_KEY || 'GPL',
           placeholder: placeholder || 'Type your content here...',
           toolbar: [
             'heading',

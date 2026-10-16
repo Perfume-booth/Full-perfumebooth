@@ -51,8 +51,8 @@ function ResponsiveHeroImage({ slide, current }: { slide: HeroSlide, current: nu
 
   return (
       <picture className="absolute inset-0 w-full h-full">
-      <source media="(min-width: 1024px)" srcSet={desktop.srcSet} />
-      <source media="(max-width: 1023px)" srcSet={mobile.srcSet} />
+      <source media="(min-width: 1024px)" srcSet={desktop.srcSet || desktop.src} />
+      <source media="(max-width: 1023px)" srcSet={mobile.srcSet || mobile.src} />
       {/* eslint-disable-next-line jsx-a11y/alt-text */}
       <img 
         {...desktop} 

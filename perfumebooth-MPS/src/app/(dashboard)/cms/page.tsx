@@ -139,17 +139,17 @@ export default function CMSBuilderPage() {
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-140px)] max-w-7xl mx-auto w-full">
       {/* Top Navigation Sub-Tabs */}
-      <div className="flex border-b border-border gap-2">
+      <div className="flex gap-3">
         <button
           onClick={() => router.push('/cms')}
-          className="px-5 py-2.5 font-semibold text-sm border-b-2 border-primary text-primary flex items-center gap-2 bg-muted/40 rounded-t-xl"
+          className="px-5 py-2.5 font-bold text-xs neu-inset-sm text-primary flex items-center gap-2 rounded-2xl"
         >
           <Layout className="w-4 h-4" />
           <span>Info Pages Content Editor</span>
         </button>
         <button
           onClick={() => router.push('/cms/banners')}
-          className="px-5 py-2.5 font-semibold text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-t-xl transition-colors cursor-pointer"
+          className="px-5 py-2.5 font-bold text-xs text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-2xl neu-btn transition-colors cursor-pointer"
         >
           <ImageIcon className="w-4 h-4" />
           <span>Header Banners & Slideshows</span>
@@ -157,19 +157,19 @@ export default function CMSBuilderPage() {
       </div>
 
       {/* Top Header Bar Controls */}
-      <div className="flex justify-between items-center bg-card p-4 rounded-2xl border border-border">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 bg-card neu-extruded p-6 rounded-3xl border border-border/10">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Page Text Editor</h1>
+          <h1 className="text-xl font-extrabold text-foreground">Page Text Editor</h1>
           <p className="text-muted-foreground text-xs mt-0.5">Select any info page to edit its text, policy paragraphs, and details directly</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-col">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Select Page to Edit</span>
+            <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider mb-1">Select Page to Edit</span>
             <select 
               value={selectedSlug} 
               onChange={(e) => handleLoadPage(e.target.value)}
-              className="px-4 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-xs font-semibold text-foreground cursor-pointer min-w-[280px]"
+              className="px-4 py-2.5 neu-input rounded-2xl text-xs font-bold text-foreground cursor-pointer min-w-[280px]"
             >
               <optgroup label="Information & Pages">
                 <option value="info/about-us">About Us (/info/about-us)</option>
@@ -190,7 +190,7 @@ export default function CMSBuilderPage() {
             href={`http://localhost:3000/${selectedSlug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-muted/60 hover:bg-muted text-foreground border border-border font-semibold rounded-xl text-xs transition duration-200 mt-4 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2.5 neu-btn text-foreground font-bold rounded-2xl text-xs transition duration-200 mt-auto cursor-pointer"
             title="Open live storefront page in a new tab"
           >
             <span>View Live</span>
@@ -200,7 +200,7 @@ export default function CMSBuilderPage() {
           <button
             onClick={handleSaveLayout}
             disabled={saveLoading}
-            className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-xs disabled:opacity-50 mt-4"
+            className="flex items-center gap-2 px-6 py-2.5 neu-btn-primary font-bold rounded-2xl transition duration-200 cursor-pointer text-xs disabled:opacity-50 mt-auto"
           >
             {saveLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -217,14 +217,14 @@ export default function CMSBuilderPage() {
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       ) : (
-        <div className="flex-1 glass-card p-6 rounded-2xl border border-border overflow-y-auto flex flex-col gap-6">
+        <div className="flex-1 bg-card neu-extruded p-7 rounded-3xl border border-border/10 overflow-y-auto flex flex-col gap-6">
           {mainSec && (
             <>
               {/* ARTICLE / POLICY / BLOG EDITOR */}
               {selectedSlug !== 'info/faq' && selectedSlug !== 'info/contact-us' && (
                 <div className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Page Headline / Article Title</label>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Page Headline / Article Title</label>
                     <input
                       type="text"
                       value={mainSec.content.title || pageTitle || ''}
@@ -233,16 +233,18 @@ export default function CMSBuilderPage() {
                         handleUpdateContent('title', e.target.value);
                       }}
                       placeholder="e.g. Privacy Policy & Terms of Use"
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm font-semibold text-foreground"
+                      className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-bold text-foreground"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Rich Text Editor (CKEditor)</label>
-                    <CKEditorWrapper
-                      value={mainSec.content.body || ''}
-                      onChange={(data) => handleUpdateContent('body', data)}
-                      placeholder="Write policy details, paragraphs, lists, or story content..."
-                    />
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Rich Text Editor (CKEditor)</label>
+                    <div className="neu-inset rounded-2xl p-2 overflow-hidden">
+                      <CKEditorWrapper
+                        value={mainSec.content.body || ''}
+                        onChange={(data) => handleUpdateContent('body', data)}
+                        placeholder="Write policy details, paragraphs, lists, or story content..."
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -251,47 +253,47 @@ export default function CMSBuilderPage() {
               {selectedSlug === 'info/contact-us' && (
                 <div className="flex flex-col gap-5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Support Email Address</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Support Email Address</label>
                       <input
                         type="text"
                         value={mainSec.content.email || ''}
                         onChange={(e) => handleUpdateContent('email', e.target.value)}
                         placeholder="e.g. admin@perfumebooth.com"
-                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
                       />
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Contact Phone Numbers</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Contact Phone Numbers</label>
                       <input
                         type="text"
                         value={mainSec.content.phone || ''}
                         onChange={(e) => handleUpdateContent('phone', e.target.value)}
                         placeholder="e.g. +91 9266030909 / 011-46604937"
-                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Support Business Hours</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Support Business Hours</label>
                       <input
                         type="text"
                         value={mainSec.content.hours || ''}
                         onChange={(e) => handleUpdateContent('hours', e.target.value)}
                         placeholder="e.g. Mon to Sat, 10am to 6pm"
-                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
                       />
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Head Office Postal Address</label>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Head Office Postal Address</label>
                       <input
                         type="text"
                         value={mainSec.content.address || ''}
                         onChange={(e) => handleUpdateContent('address', e.target.value)}
                         placeholder="e.g. 70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015"
-                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
                       />
                     </div>
                   </div>
@@ -301,23 +303,23 @@ export default function CMSBuilderPage() {
               {/* FAQ EDITOR */}
               {selectedSlug === 'info/faq' && (
                 <div className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">FAQ Section Headline</label>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">FAQ Section Headline</label>
                     <input
                       type="text"
                       value={mainSec.content.title || 'Frequently Asked Questions'}
                       onChange={(e) => handleUpdateContent('title', e.target.value)}
                       placeholder="e.g. Frequently Asked Questions"
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm font-semibold"
+                      className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-bold text-foreground"
                     />
                   </div>
                   <div className="flex flex-col gap-3 mt-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Questions & Answers Dataset</label>
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Questions & Answers Dataset</label>
                     <div className="flex flex-col gap-4">
                       {(mainSec.content.faqs || []).map((faqItem: any, fIdx: number) => (
-                        <div key={fIdx} className="p-4 bg-muted/30 border border-border rounded-xl flex flex-col gap-3 relative group">
+                        <div key={fIdx} className="p-5 neu-inset rounded-2xl flex flex-col gap-3.5 relative group">
                           <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-primary uppercase">Question #{fIdx + 1}</span>
+                            <span className="text-xs font-extrabold text-primary uppercase tracking-wider">Question #{fIdx + 1}</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -325,7 +327,7 @@ export default function CMSBuilderPage() {
                                 list.splice(fIdx, 1);
                                 handleUpdateContent('faqs', list);
                               }}
-                              className="text-red-400 hover:text-red-300 text-xs p-1"
+                              className="neu-btn p-1.5 rounded-xl text-muted-foreground hover:text-red-500 transition cursor-pointer"
                               title="Delete Question"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -340,7 +342,7 @@ export default function CMSBuilderPage() {
                               list[fIdx].q = e.target.value;
                               handleUpdateContent('faqs', list);
                             }}
-                            className="px-3.5 py-2 bg-background border border-border rounded-lg text-xs font-semibold"
+                            className="px-4 py-2.5 neu-input rounded-xl text-xs font-bold"
                           />
                           <textarea
                             placeholder="Enter detailed answer..."
@@ -351,7 +353,7 @@ export default function CMSBuilderPage() {
                               handleUpdateContent('faqs', list);
                             }}
                             rows={3}
-                            className="px-3.5 py-2 bg-background border border-border rounded-lg text-xs"
+                            className="px-4 py-2.5 neu-input rounded-xl text-xs font-medium resize-none"
                           />
                         </div>
                       ))}
@@ -362,7 +364,7 @@ export default function CMSBuilderPage() {
                           list.push({ q: 'New Question?', a: 'Detailed answer response here.' });
                           handleUpdateContent('faqs', list);
                         }}
-                        className="flex items-center justify-center gap-2 py-3 border border-dashed border-border hover:border-primary text-xs font-semibold rounded-xl text-muted-foreground hover:text-foreground transition duration-150 cursor-pointer"
+                        className="flex items-center justify-center gap-2 py-3.5 neu-btn text-xs font-bold rounded-2xl text-muted-foreground hover:text-foreground transition duration-150 cursor-pointer"
                       >
                         <PlusCircle className="w-4 h-4 text-primary" />
                         <span>Add New Question & Answer</span>

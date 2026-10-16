@@ -76,13 +76,66 @@ class PricingService:
         return calculated
 
     @classmethod
-    def validate_and_calculate_coupon(cls, coupon_code: str, subtotal: Decimal) -> Dict[str, Any]:
+    def validate_and_calculate_coupon(cls, coupon_code: str, subtotal: Decimal, user=None) -> Dict[str, Any]:
         """
         Validate coupon code and compute discount amount.
+        Checks database-backed Coupon table first, falls back to static dictionary.
         Raises InvalidCouponException if a non-empty coupon code is invalid.
         """
+        from django.utils import timezone
+        from apps.orders.models import Coupon
+
         normalized = (coupon_code or '').strip().upper()
         if not normalized:
+            return {
+                'valid': True,
+                'code': '',
+                'discount_amount': Decimal('0.00'),
+                'free_shipping': False
+            }
+
+        # 1. Check database-backed Coupon
+        coupon = Coupon.objects.filter(code=normalized, is_active=True).first()
+        if coupon:
+            now = timezone.now()
+            if coupon.start_date and now < coupon.start_date:
+                raise InvalidCouponException(code=normalized, message="This coupon promotion has not started yet.")
+            if coupon.end_date and now > coupon.end_date:
+                raise InvalidCouponException(code=normalized, message="This coupon has expired.")
+            if coupon.min_order_value and subtotal < coupon.min_order_value:
+                raise InvalidCouponException(code=normalized, message=f"Minimum order of ₹{coupon.min_order_value} required for this coupon.")
+            if coupon.usage_limit is not None and coupon.times_used >= coupon.usage_limit:
+                raise InvalidCouponException(code=normalized, message="Coupon usage limit has been reached.")
+            if coupon.first_order_only and user and user.is_authenticated:
+                from apps.orders.models import Order
+                if Order.objects.filter(user=user).exclude(status=Order.Status.CANCELLED).exists():
+                    raise InvalidCouponException(code=normalized, message="This coupon is only valid for your first order.")
+
+            if coupon.discount_type == Coupon.DiscountType.FREE_SHIPPING:
+                return {
+                    'valid': True,
+                    'code': normalized,
+                    'discount_amount': Decimal('0.00'),
+                    'free_shipping': True
+                }
+            elif coupon.discount_type == Coupon.DiscountType.PERCENTAGE:
+                amount = ((subtotal * coupon.discount_value) / Decimal('100')).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+                if coupon.max_discount:
+                    amount = min(amount, coupon.max_discount)
+                return {
+                    'valid': True,
+                    'code': normalized,
+                    'discount_amount': amount,
+                    'free_shipping': False
+                }
+            elif coupon.discount_type == Coupon.DiscountType.FIXED:
+                amount = min(coupon.discount_value, subtotal).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+                return {
+                    'valid': True,
+                    'code': normalized,
+                    'discount_amount': amount,
+                    'free_shipping': False
+                }
             return {
                 'valid': True,
                 'code': '',

@@ -15,16 +15,30 @@ CONSTANTS_PATH = '/app/constants.ts'
 
 
 class BrandService:
-    """Provides methods to load, save, and delete brands from the catalog."""
+    """Provides methods to load, save, update, and delete brands from the catalog."""
 
     CACHE_KEY = 'catalog:brands'
 
     @classmethod
+    def get_constants_path(cls) -> str | None:
+        """Resolve path to constants.ts across container and local environments."""
+        env_path = os.environ.get('CONSTANTS_PATH')
+        if env_path and os.path.exists(env_path):
+            return env_path
+        if os.path.exists(CONSTANTS_PATH):
+            return CONSTANTS_PATH
+        local_path = os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'perfumebooth', 'src', 'lib', 'constants.ts'))
+        if os.path.exists(local_path):
+            return local_path
+        return None
+
+    @classmethod
     def load_brands(cls) -> list:
         # 1. Try to read from constants.ts first
-        if os.path.exists(CONSTANTS_PATH):
+        constants_file = cls.get_constants_path()
+        if constants_file:
             try:
-                with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
+                with open(constants_file, 'r', encoding='utf-8') as f:
                     content = f.read()
                 match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)\]', content, re.DOTALL)
                 if match:
@@ -64,85 +78,96 @@ class BrandService:
         return brands
 
     @classmethod
+    def _write_constants_file(cls, brands: list) -> None:
+        constants_file = cls.get_constants_path()
+        if not constants_file or not os.path.exists(constants_file):
+            return
+        try:
+            with open(constants_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            formatted = "\n  " + ",\n  ".join([f'"{b}"' for b in brands]) + "\n"
+            new_content = re.sub(
+                r'export\s+const\s+TOP_BRANDS\s*=\s*\[.*?\];',
+                f'export const TOP_BRANDS = [{formatted}];',
+                content,
+                flags=re.DOTALL
+            )
+            with open(constants_file, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+        except Exception as e:
+            logger.warning("Error writing constants.ts: %s", e)
+
+    @classmethod
+    def _write_brands_json(cls, brands: list) -> None:
+        try:
+            with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(brands, f, indent=2)
+        except Exception as e:
+            logger.warning("Error saving brands to brands.json: %s", e)
+
+    @classmethod
     def save_brand(cls, brand_name: str) -> list:
-        if not brand_name:
+        if not brand_name or not brand_name.strip():
             return cls.load_brands()
         brand_name = brand_name.strip()
-        if not brand_name:
-            return cls.load_brands()
 
-        # 1. If constants.ts exists, update constants.ts
-        if os.path.exists(CONSTANTS_PATH):
-            try:
-                with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
-                    content = f.read()
-
-                match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)(,\s*)?\]', content, re.DOTALL)
-                if match:
-                    brands_block = match.group(1)
-                    existing_brands = re.findall(r'["\'](.*?)["\']', brands_block)
-                    if not any(b.lower() == brand_name.lower() for b in existing_brands):
-                        clean_block = brands_block.rstrip()
-                        if clean_block and not clean_block.endswith(','):
-                            new_block = clean_block + f',\n  "{brand_name}"'
-                        else:
-                            new_block = clean_block + f'\n  "{brand_name}"'
-
-                        new_content = content.replace(brands_block, new_block)
-                        with open(CONSTANTS_PATH, 'w', encoding='utf-8') as f:
-                            f.write(new_content)
-            except Exception as e:
-                logger.warning("Error saving brand to constants.ts: %s", e)
-
-        # 2. Sync brands.json
         brands = cls.load_brands()
         if not any(b.lower() == brand_name.lower() for b in brands):
             brands.append(brand_name)
-            try:
-                with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(brands, f, indent=2)
-            except Exception as e:
-                logger.warning("Error saving brand to brands.json: %s", e)
+            cls._write_constants_file(brands)
+            cls._write_brands_json(brands)
 
         cache.delete(cls.CACHE_KEY)
         cache.clear()
         return brands
 
     @classmethod
-    def delete_brand(cls, brand_name: str) -> list:
-        if not brand_name:
+    def update_brand(cls, old_name: str, new_name: str) -> list:
+        """Rename an existing brand across constants, JSON, and products in DB."""
+        if not old_name or not new_name:
             return cls.load_brands()
-        brand_name = brand_name.strip()
+        old_name = old_name.strip()
+        new_name = new_name.strip()
+        if not old_name or not new_name or old_name == new_name:
+            return cls.load_brands()
 
-        # 1. Update constants.ts if it exists
-        if os.path.exists(CONSTANTS_PATH):
-            try:
-                with open(CONSTANTS_PATH, 'r', encoding='utf-8') as f:
-                    content = f.read()
+        brands = cls.load_brands()
+        updated_brands = [new_name if b.lower() == old_name.lower() else b for b in brands]
+        if not any(b.lower() == new_name.lower() for b in updated_brands):
+            updated_brands.append(new_name)
 
-                match = re.search(r'export\s+const\s+TOP_BRANDS\s*=\s*\[(.*?)(,\s*)?\]', content, re.DOTALL)
-                if match:
-                    brands_block = match.group(1)
-                    existing_brands = re.findall(r'["\'](.*?)["\']', brands_block)
-                    new_brands = [b for b in existing_brands if b.lower() != brand_name.lower()]
-                    new_block = "\n  " + ",\n  ".join([f'"{b}"' for b in new_brands]) + ",\n"
-                    new_content = content.replace(brands_block, new_block)
-                    with open(CONSTANTS_PATH, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
-            except Exception as e:
-                logger.warning("Error deleting brand from constants.ts: %s", e)
+        cls._write_constants_file(updated_brands)
+        cls._write_brands_json(updated_brands)
 
-        # 2. Fallback / Sync brands.json
-        if os.path.exists(BRANDS_FILE_PATH):
-            try:
-                with open(BRANDS_FILE_PATH, 'r', encoding='utf-8') as f:
-                    brands = json.load(f)
-                brands = [b for b in brands if b.lower() != brand_name.lower()]
-                with open(BRANDS_FILE_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(brands, f, indent=2)
-            except Exception:
-                pass
+        # Cascade to database products
+        try:
+            from apps.shop.models import Product
+            products = list(Product.objects.filter(attributes__brand__iexact=old_name))
+            if products:
+                for p in products:
+                    attrs = dict(p.attributes or {})
+                    attrs['brand'] = new_name
+                    p.attributes = attrs
+                Product.objects.bulk_update(products, ['attributes'], batch_size=200)
+                logger.info("Updated %d products from brand '%s' to '%s'", len(products), old_name, new_name)
+        except Exception as e:
+            logger.warning("Error cascading brand rename on products: %s", e)
 
         cache.delete(cls.CACHE_KEY)
         cache.clear()
-        return cls.load_brands()
+        return updated_brands
+
+    @classmethod
+    def delete_brand(cls, brand_name: str) -> list:
+        if not brand_name or not brand_name.strip():
+            return cls.load_brands()
+        brand_name = brand_name.strip()
+
+        brands = cls.load_brands()
+        filtered = [b for b in brands if b.lower() != brand_name.lower()]
+        cls._write_constants_file(filtered)
+        cls._write_brands_json(filtered)
+
+        cache.delete(cls.CACHE_KEY)
+        cache.clear()
+        return filtered

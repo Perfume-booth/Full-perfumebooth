@@ -77,9 +77,9 @@ const PerfumeLogo: React.FC = () => {
 
                             {/* circles o */}
                             <g style={{ isolation: "isolate" }}>
-                                <circle className="logo-circle logo-c1" cx="300" cy="65" r="18" fill="rgba(240, 160, 210, 0.7)" style={{ mixBlendMode: "multiply", transformOrigin: "300px 65px" }} />
-                                <circle className="logo-circle logo-c2" cx="330" cy="65" r="18" fill="rgba(110, 200, 240, 0.7)" style={{ mixBlendMode: "multiply", transformOrigin: "330px 65px" }} />
-                                <circle className="logo-circle logo-c3" cx="315" cy="82" r="18" fill="rgba(250, 220, 90, 0.8)" style={{ mixBlendMode: "multiply", transformOrigin: "315px 82px" }} />
+                                <circle className="logo-circle logo-c1 mix-blend-multiply dark:mix-blend-screen" cx="300" cy="65" r="18" fill="rgba(240, 160, 210, 0.85)" style={{ transformOrigin: "300px 65px" }} />
+                                <circle className="logo-circle logo-c2 mix-blend-multiply dark:mix-blend-screen" cx="330" cy="65" r="18" fill="rgba(110, 200, 240, 0.85)" style={{ transformOrigin: "330px 65px" }} />
+                                <circle className="logo-circle logo-c3 mix-blend-multiply dark:mix-blend-screen" cx="315" cy="82" r="18" fill="rgba(250, 220, 90, 0.9)" style={{ transformOrigin: "315px 82px" }} />
                             </g>
 
                             {/* th */}

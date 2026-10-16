@@ -63,6 +63,7 @@ VARIANT_HEADER_MAP = {
     'product handle': 'product_handle', 'handle': 'product_handle',
     'action': 'action', 'variant sku': 'sku', 'sku': 'sku',
     'title': 'title', 'variant title': 'title',
+    'barcode': 'barcode', 'variant barcode': 'barcode',
     'option1 name': 'option1_name', 'option1 value': 'option1_value',
     'option2 name': 'option2_name', 'option2 value': 'option2_value',
     'price': 'price', 'variant price': 'price',
@@ -71,9 +72,9 @@ VARIANT_HEADER_MAP = {
 }
 VARIANT_EDITABLE = {
     'title', 'option1_name', 'option1_value', 'option2_name', 'option2_value',
-    'price', 'compare_at_price', 'stock', 'is_active',
+    'price', 'compare_at_price', 'barcode', 'stock', 'is_active',
 }
-VARIANT_CLEARABLE = {'compare_at_price', 'option2_name', 'option2_value'}
+VARIANT_CLEARABLE = {'compare_at_price', 'barcode', 'option2_name', 'option2_value'}
 IMAGE_HEADER_MAP = {
     'product handle': 'product_handle', 'handle': 'product_handle',
     'variant sku': 'variant_sku', 'action': 'action', 'image url': 'url',
@@ -740,6 +741,8 @@ def apply_preview(job_id, user, progress_callback=None):
         if operation['action'] in {'ADD', 'REPLACE'}
     ]
     total_downloads = len(pending_downloads)
+    if progress_callback:
+        progress_callback(0, total_downloads + 5)
     downloaded_images = {}
     if total_downloads > 0:
         session = requests.Session()
@@ -767,7 +770,7 @@ def apply_preview(job_id, user, progress_callback=None):
                         'column': 'Image URL', 'message': str(exc),
                     })
                 if progress_callback and (completed_count % 20 == 0 or completed_count == total_downloads):
-                    progress_callback(completed_count, total_downloads)
+                    progress_callback(completed_count, total_downloads + 5)
 
     return _apply_preview_records(job_id, user, downloaded_images, total_downloads, failed_images=failed_images if total_downloads else None, progress_callback=progress_callback)
 
@@ -829,8 +832,8 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
         if not target or _bulk_current(operation, target) != operation['old_value']:
             raise ValueError(f"Bulk action target {operation['identifier']} changed after preview. Preview again.")
 
-    if progress_callback and total_downloads:
-        progress_callback(total_downloads, total_downloads)
+    if progress_callback:
+        progress_callback(total_downloads + 1, total_downloads + 5)
 
     created_products = {}
     for payload in job.creates:
@@ -885,6 +888,8 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
             else:
                 attributes[key] = value
             product.attributes = attributes
+            if field == 'barcode':
+                product.barcode = value or ''
         elif field in {'price', 'compare_at_price', 'cost_per_item'}:
             setattr(product, field, Decimal(value) if value is not None else None)
         else:
@@ -896,7 +901,7 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
         product.save()
         CollectionSyncService.syncProductCollections(product)
     if progress_callback:
-        progress_callback(2, 6)
+        progress_callback(total_downloads + 2, total_downloads + 5)
     existing_handles = {item['product_handle'] for item in job.variant_operations} - set(created_products)
     parent_products = {p.slug: p for p in Product.objects.filter(slug__in=existing_handles)}
     parent_products.update(created_products)
@@ -909,6 +914,7 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
                 raise ValueError(f"Product {operation['product_handle']} no longer exists. Preview the file again.")
             variant = ProductVariant.objects.create(
                 product=product, sku=operation['sku'], title=operation['title'],
+                barcode=operation.get('barcode') or '',
                 option1_name=operation['option1_name'], option1_value=operation['option1_value'],
                 option2_name=operation.get('option2_name') or '', option2_value=operation.get('option2_value') or '',
                 price=Decimal(operation['price']),
@@ -941,7 +947,7 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
             variants[operation['variant_id']].delete()
             variant_by_sku.pop(operation['sku'], None)
     if progress_callback:
-        progress_callback(3, 6)
+        progress_callback(total_downloads + 3, total_downloads + 5)
     image_handles = {item['product_handle'] for item in job.image_operations}
     image_products = {p.slug: p for p in Product.objects.select_for_update().filter(slug__in=image_handles)}
     image_products.update(created_products)
@@ -995,7 +1001,7 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
             product.image.save(filename, ContentFile(content), save=False)
             product.save(update_fields=['image', 'updated_at'])
     if progress_callback:
-        progress_callback(4, 6)
+        progress_callback(total_downloads + 4, total_downloads + 5)
     for operation in job.bulk_operations:
         target = (bulk_products if operation['target_type'] == 'PRODUCT' else bulk_variants)[operation['target_id']]
         field, new_value = operation['field'], operation['new_value']
@@ -1043,8 +1049,8 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
     job.status = ProductImportJob.Status.APPLIED
     job.applied_at = timezone.now()
     job.finished_at = job.applied_at
-    job.progress_current = total_downloads if total_downloads > 0 else 1
-    job.progress_total = total_downloads if total_downloads > 0 else 1
+    job.progress_current = total_downloads + 5
+    job.progress_total = total_downloads + 5
     job.save(update_fields=fields_to_update)
     if progress_callback:
         progress_callback(job.progress_total, job.progress_total)

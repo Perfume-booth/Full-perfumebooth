@@ -24,7 +24,29 @@ if DEBUG or IS_TESTING:
 else:
     # A production deployment must never start with a known signing key.
     SECRET_KEY = config('DJANGO_SECRET_KEY')
-ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,django,127.0.0.1', cast=Csv())
+ALLOWED_HOSTS = ['*'] if DEBUG else config('ALLOWED_HOSTS', default=config('DJANGO_ALLOWED_HOSTS', default='localhost,django,127.0.0.1'), cast=Csv())
+
+# CORS settings for storefront and admin portal communication
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Trusted Origins for local network and dev servers
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://192.168.31.168:3000',
+    'http://192.168.31.168:3001',
+]
+
+if DEBUG:
+    for i in range(1, 255):
+        CSRF_TRUSTED_ORIGINS.extend([
+            f'http://192.168.31.{i}:3000',
+            f'http://192.168.31.{i}:3001',
+        ])
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Installed Applications
@@ -105,7 +127,7 @@ ASGI_APPLICATION = 'core.asgi.application'
 # ─────────────────────────────────────────────────────────────────────────────
 # Database — PostgreSQL with pgvector (SQLite in-memory for testing)
 # ─────────────────────────────────────────────────────────────────────────────
-if 'test' in sys.argv:
+if 'test' in sys.argv and not config('TEST_POSTGRES', default=False, cast=bool):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -147,6 +169,7 @@ else:
 # Celery — Redis DB 1 (broker) + DB 2 (results)
 # ─────────────────────────────────────────────────────────────────────────────
 if 'test' in sys.argv:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
     CELERY_BROKER_URL = 'memory://'
     CELERY_RESULT_BACKEND = 'cache+locmem://'
     CELERY_TASK_ALWAYS_EAGER = True
@@ -173,6 +196,8 @@ CELERY_TASK_ROUTES = {
 }
 
 CELERY_BEAT_SCHEDULE = {
+    'payment-outbox': {'task': 'apps.orders.tasks.process_payment_outbox', 'schedule': 15.0},
+    'payment-reconciliation': {'task': 'apps.orders.tasks.reconcile_payments', 'schedule': 60.0},
     'release-expired-inventory-reservations': {
         'task': 'apps.inventory.tasks.release_expired_inventory_reservations',
         'schedule': 60.0,
@@ -187,7 +212,7 @@ INVENTORY_RESERVATION_MINUTES = config('INVENTORY_RESERVATION_MINUTES', default=
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'core.authentication.CsrfExemptSessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -293,7 +318,7 @@ else:
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 
-# Cloudflare R2 / Local Media Storage Dynamic Configuration
+# Cloudflare R2 / Local Media Storage Dynamic Configuration (R2 active)
 USE_R2 = config('USE_R2', default=False, cast=bool)
 
 if USE_R2:

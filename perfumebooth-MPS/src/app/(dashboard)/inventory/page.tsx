@@ -127,58 +127,58 @@ export default function InventoryPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory Control</h1>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Inventory Control</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage catalog stock levels and warning thresholds</p>
         </div>
         <button
           onClick={fetchProducts}
-          className="p-2.5 bg-secondary text-foreground border border-border rounded-xl hover:bg-secondary/80 transition duration-200 cursor-pointer"
+          className="p-3 neu-btn text-foreground rounded-2xl transition cursor-pointer"
           title="Refresh Catalog Data"
         >
-          <RefreshCw className="w-5 h-5" />
+          <RefreshCw className="w-5 h-5 text-primary" />
         </button>
       </div>
 
       {/* Filters Bar */}
-      <div className="flex flex-wrap justify-between items-center gap-4 bg-card/50 border border-border p-4 rounded-2xl shadow-sm">
-        <div className="flex items-center gap-3 bg-background border border-border px-4 py-2.5 rounded-xl w-full md:max-w-md focus-within:border-primary transition duration-200">
-          <Search className="w-5 h-5 text-muted-foreground shrink-0" />
+      <div className="flex flex-wrap justify-between items-center gap-4 bg-card neu-extruded p-5 rounded-3xl border border-border/10">
+        <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search products by title or SKU..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-transparent focus:outline-none text-sm text-foreground placeholder-muted-foreground"
+            className="w-full pl-11 pr-4 py-2.5 neu-input rounded-2xl text-sm text-foreground placeholder:text-muted-foreground/60"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => handleFilterChange('all')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition duration-200 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
               stockFilter === 'all'
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground'
+                ? 'neu-btn-primary'
+                : 'neu-btn text-muted-foreground hover:text-foreground'
             }`}
           >
             All Stock
           </button>
           <button
             onClick={() => handleFilterChange('low')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition duration-200 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
               stockFilter === 'low'
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground'
+                ? 'neu-inset-sm text-amber-500 border border-amber-500/30'
+                : 'neu-btn text-muted-foreground hover:text-foreground'
             }`}
           >
             Low Stock (1-10)
           </button>
           <button
             onClick={() => handleFilterChange('out')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition duration-200 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
               stockFilter === 'out'
-                ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground'
+                ? 'neu-inset-sm text-red-500 border border-red-500/30'
+                : 'neu-btn text-muted-foreground hover:text-foreground'
             }`}
           >
             Out of Stock (0)
@@ -193,11 +193,11 @@ export default function InventoryPage() {
         </div>
       ) : (
         <>
-          <div className="glass-panel border border-border rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-card neu-extruded rounded-3xl overflow-hidden border border-border/10">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40 text-muted-foreground text-xs font-semibold uppercase">
+                  <tr className="border-b border-border/40 bg-muted/20 text-muted-foreground text-xs font-bold uppercase tracking-wider">
                     <th className="p-5 w-16">Preview</th>
                     <th className="p-5">Product Details</th>
                     <th className="p-5">SKU</th>
@@ -219,11 +219,11 @@ export default function InventoryPage() {
                       const hasChanged = currentVal !== p.stock;
 
                       return (
-                        <tr key={p.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
+                        <tr key={p.id} className="border-b border-border/20 hover:bg-muted/10 transition duration-150">
                           <td className="p-5">
-                            <div className="w-12 h-12 rounded-lg border border-border bg-black overflow-hidden flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-xl neu-inset-sm overflow-hidden flex items-center justify-center p-1">
                               {p.image ? (
-                                <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                                <img src={p.image} alt={p.title} className="w-full h-full object-cover rounded-lg" />
                               ) : (
                                 <Package className="w-5 h-5 text-muted-foreground/30" />
                               )}
@@ -236,15 +236,15 @@ export default function InventoryPage() {
                           <td className="p-5 font-mono text-xs text-muted-foreground">{p.sku}</td>
                           <td className="p-5">
                             {p.stock === 0 ? (
-                              <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-red-500/10 text-red-400">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-red-500">
                                 Out of Stock
                               </span>
                             ) : p.stock <= 10 ? (
-                              <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-amber-500/10 text-amber-400">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-amber-500">
                                 Low Stock ({p.stock})
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-400">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-emerald-500">
                                 Healthy ({p.stock})
                               </span>
                             )}
@@ -254,24 +254,24 @@ export default function InventoryPage() {
                               <button
                                 type="button"
                                 onClick={() => handleStockChange(p.id, p.stock, currentVal - 1)}
-                                className="w-8 h-8 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-secondary active:scale-95 transition text-foreground cursor-pointer"
+                                className="w-8 h-8 rounded-xl neu-btn flex items-center justify-center transition text-foreground cursor-pointer"
                               >
-                                <Minus className="w-4 h-4" />
+                                <Minus className="w-3.5 h-3.5" />
                               </button>
                               <input
                                 type="number"
                                 value={currentVal}
                                 onChange={(e) => handleStockChange(p.id, p.stock, parseInt(e.target.value) || 0)}
-                                className={`w-16 px-2.5 py-1 text-center font-bold border rounded-lg focus:outline-none text-sm text-foreground bg-background ${
-                                  hasChanged ? 'border-primary shadow-sm shadow-primary/20' : 'border-border'
+                                className={`w-16 px-2 py-1 text-center font-bold neu-input rounded-xl text-sm text-foreground ${
+                                  hasChanged ? 'border-primary ring-2 ring-primary/20' : ''
                                 }`}
                               />
                               <button
                                 type="button"
                                 onClick={() => handleStockChange(p.id, p.stock, currentVal + 1)}
-                                className="w-8 h-8 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-secondary active:scale-95 transition text-foreground cursor-pointer"
+                                className="w-8 h-8 rounded-xl neu-btn flex items-center justify-center transition text-foreground cursor-pointer"
                               >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </td>
@@ -287,7 +287,7 @@ export default function InventoryPage() {
                                       return copy;
                                     });
                                   }}
-                                  className="px-2.5 py-1.5 border border-border text-foreground hover:bg-secondary text-xs font-semibold rounded-lg transition duration-150 cursor-pointer"
+                                  className="px-3 py-1.5 neu-btn text-foreground text-xs font-bold rounded-xl transition duration-150 cursor-pointer"
                                 >
                                   Reset
                                 </button>
@@ -295,7 +295,7 @@ export default function InventoryPage() {
                                   type="button"
                                   disabled={saving === p.id}
                                   onClick={() => handleSaveItem(p)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:shadow-lg hover:shadow-primary/20 transition duration-150 cursor-pointer"
+                                  className="flex items-center gap-1.5 px-3.5 py-1.5 neu-btn-primary text-xs font-bold rounded-xl transition duration-150 cursor-pointer"
                                 >
                                   {saving === p.id ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -318,22 +318,22 @@ export default function InventoryPage() {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between bg-card/30 border border-border/80 px-6 py-4 rounded-2xl shadow-sm">
-              <span className="text-xs text-muted-foreground">
+            <div className="flex items-center justify-between bg-card neu-extruded px-6 py-4 rounded-3xl border border-border/10">
+              <span className="text-xs text-muted-foreground font-medium">
                 Showing page <strong className="text-foreground">{page}</strong> of <strong className="text-foreground">{totalPages}</strong> ({totalCount} total items)
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(p - 1, 1))}
                   disabled={page === 1}
-                  className="p-2 border border-border rounded-xl bg-card/50 hover:bg-secondary text-foreground transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-9 h-9 rounded-xl neu-btn flex items-center justify-center text-foreground transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setPage(p => Math.min(p + 1, totalPages))}
                   disabled={page === totalPages}
-                  className="p-2 border border-border rounded-xl bg-card/50 hover:bg-secondary text-foreground transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-9 h-9 rounded-xl neu-btn flex items-center justify-center text-foreground transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

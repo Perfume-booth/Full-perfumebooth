@@ -28,7 +28,7 @@ class CheckoutView(APIView):
         clean_input = validate_checkout_request(request.data)
 
         # 2. Call CheckoutService
-        result = CheckoutService.process_checkout(request.user, clean_input)
+        result = CheckoutService.idempotent_checkout(request.user, clean_input, request.headers.get('Idempotency-Key'))
 
         # 3. Serialize result and 4. Return response
         return api_success(result, status_code=status.HTTP_201_CREATED, request=request)

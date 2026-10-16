@@ -1,5 +1,36 @@
 from django.contrib import admin
-from .models import Order, OrderItem, Shipment
+from .models import Order, OrderItem, Shipment, PaymentAttempt, PaymentEvent, PaymentOutbox
+
+
+class ReadOnlyPaymentAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+
+@admin.register(PaymentAttempt)
+class PaymentAttemptAdmin(ReadOnlyPaymentAdmin):
+    list_display = ('order', 'gateway_order_id', 'status', 'last_error', 'updated_at')
+    list_filter = ('status',)
+    search_fields = ('gateway_order_id', 'order__order_number')
+
+
+@admin.register(PaymentEvent)
+class PaymentEventAdmin(ReadOnlyPaymentAdmin):
+    list_display = ('event_id', 'order', 'payment_id', 'outcome', 'created_at')
+    list_filter = ('outcome',)
+    search_fields = ('payment_id', 'order__order_number')
+
+
+@admin.register(PaymentOutbox)
+class PaymentOutboxAdmin(ReadOnlyPaymentAdmin):
+    list_display = ('order', 'kind', 'status', 'last_error', 'updated_at')
+    list_filter = ('status', 'kind')
 
 
 class OrderItemInline(admin.TabularInline):

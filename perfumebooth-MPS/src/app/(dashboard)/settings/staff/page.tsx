@@ -224,32 +224,32 @@ export default function StaffSettingsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Staff Settings</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage merchant user accounts, audit logging records, and console permissions</p>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Staff Settings</h1>
+          <p className="text-muted-foreground text-xs font-medium mt-1">Manage merchant user accounts, audit logging records, and console permissions</p>
         </div>
         {activeTab === 'accounts' && (
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+            className="flex items-center gap-2 px-5 py-3 neu-btn-primary font-bold rounded-2xl cursor-pointer text-xs transition duration-200"
           >
-            <UserPlus className="w-5 h-5" />
+            <UserPlus className="w-4 h-4" />
             <span>Add Staff Member</span>
           </button>
         )}
       </div>
 
-      {/* Tabs bar */}
-      <div className="flex border-b border-border gap-4">
+      {/* Tactile Tabs bar */}
+      <div className="flex items-center gap-2 p-1.5 neu-inset-sm rounded-2xl w-fit">
         <button
           onClick={() => setActiveTab('accounts')}
-          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm border-b-2 transition duration-200 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition duration-200 cursor-pointer ${
             activeTab === 'accounts' 
-              ? 'border-primary text-foreground' 
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+              ? 'neu-extruded-sm text-foreground' 
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -257,10 +257,10 @@ export default function StaffSettingsPage() {
         </button>
         <button
           onClick={() => setActiveTab('logs')}
-          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm border-b-2 transition duration-200 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition duration-200 cursor-pointer ${
             activeTab === 'logs' 
-              ? 'border-primary text-foreground' 
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+              ? 'neu-extruded-sm text-foreground' 
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <History className="w-4 h-4" />
@@ -268,10 +268,10 @@ export default function StaffSettingsPage() {
         </button>
         <button
           onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm border-b-2 transition duration-200 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition duration-200 cursor-pointer ${
             activeTab === 'security' 
-              ? 'border-primary text-foreground' 
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+              ? 'neu-extruded-sm text-foreground' 
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Lock className="w-4 h-4" />
@@ -286,70 +286,72 @@ export default function StaffSettingsPage() {
         </div>
       ) : activeTab === 'accounts' ? (
         /* Staff accounts tab */
-        <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="bg-card neu-extruded rounded-3xl overflow-hidden border-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="border-b border-border text-muted-foreground font-semibold">
-                  <th className="p-5">Name</th>
-                  <th className="p-5">Email Address</th>
-                  <th className="p-5">Role Assigned</th>
-                  <th className="p-5">Date Invited</th>
-                  <th className="p-5 text-right">Access Controls</th>
+                <tr className="border-b border-border/50 bg-secondary/30 text-muted-foreground font-bold text-xs uppercase tracking-wider">
+                  <th className="py-4 px-6">Name</th>
+                  <th className="py-4 px-6">Email Address</th>
+                  <th className="py-4 px-6">Role Assigned</th>
+                  <th className="py-4 px-6">Date Invited</th>
+                  <th className="py-4 px-6 text-right">Access Controls</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {staff.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="p-12 text-center text-muted-foreground text-xs font-semibold">
                       No additional staff accounts created. Invite other managers to this dashboard.
                     </td>
                   </tr>
                 ) : (
                   staff.map((user) => (
-                    <tr key={user.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
-                      <td className="p-5 font-semibold text-foreground">
+                    <tr key={user.id} className="hover:bg-muted/30 transition duration-150">
+                      <td className="py-4 px-6 font-bold text-foreground">
                         {user.first_name} {user.last_name || ''}
                       </td>
-                      <td className="p-5 text-muted-foreground">{user.email}</td>
-                      <td className="p-5">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          user.roles.includes('Admin') ? 'bg-indigo-500/10 text-indigo-400' :
-                          user.roles.includes('Content Manager') ? 'bg-purple-500/10 text-purple-400' :
-                          'bg-amber-500/10 text-amber-400'
+                      <td className="py-4 px-6 text-xs text-muted-foreground font-medium">{user.email}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold neu-inset-sm ${
+                          user.roles.includes('Admin') ? 'text-indigo-600' :
+                          user.roles.includes('Content Manager') ? 'text-purple-600' :
+                          'text-amber-600'
                         }`}>
                           {user.roles?.[0] || 'N/A'}
                         </span>
                       </td>
-                      <td className="p-5 text-muted-foreground">
+                      <td className="py-4 px-6 text-xs text-muted-foreground font-medium">
                         {new Date(user.date_joined).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric'
                         })}
                       </td>
-                      <td className="p-5 text-right flex justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenEdit(user)}
-                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition duration-200 cursor-pointer"
-                          title="Edit Profile & Role"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenResetPassword(user)}
-                          className="p-2 text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition duration-200 cursor-pointer"
-                          title="Reset Password"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(user.id, user.email)}
-                          className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition duration-200 cursor-pointer"
-                          title="Revoke dashboard access"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(user)}
+                            className="p-2 neu-btn rounded-xl text-muted-foreground hover:text-primary transition duration-200 cursor-pointer"
+                            title="Edit Profile & Role"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenResetPassword(user)}
+                            className="p-2 neu-btn rounded-xl text-muted-foreground hover:text-amber-600 transition duration-200 cursor-pointer"
+                            title="Reset Password"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(user.id, user.email)}
+                            className="p-2 neu-btn rounded-xl text-muted-foreground hover:text-rose-600 transition duration-200 cursor-pointer"
+                            title="Revoke dashboard access"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -360,33 +362,33 @@ export default function StaffSettingsPage() {
         </div>
       ) : activeTab === 'logs' ? (
         /* Activity logs tab */
-        <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="bg-card neu-extruded rounded-3xl overflow-hidden border-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="border-b border-border text-muted-foreground font-semibold">
-                  <th className="p-5">Staff Name</th>
-                  <th className="p-5">Action Performed</th>
-                  <th className="p-5">Date & Time</th>
+                <tr className="border-b border-border/50 bg-secondary/30 text-muted-foreground font-bold text-xs uppercase tracking-wider">
+                  <th className="py-4 px-6">Staff Name</th>
+                  <th className="py-4 px-6">Action Performed</th>
+                  <th className="py-4 px-6">Date & Time</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="p-10 text-center text-muted-foreground">
+                    <td colSpan={3} className="p-12 text-center text-muted-foreground text-xs font-semibold">
                       No merchant modifications logged yet. Logs will generate as products, orders, and CMS sections are edited.
                     </td>
                   </tr>
                 ) : (
                   logs.map((log) => (
-                    <tr key={log.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
-                      <td className="p-5 font-semibold text-foreground">
+                    <tr key={log.id} className="hover:bg-muted/30 transition duration-150">
+                      <td className="py-4 px-6 font-bold text-foreground">
                         {log.staff_name}
                       </td>
-                      <td className="p-5 text-muted-foreground">
+                      <td className="py-4 px-6 text-xs text-muted-foreground font-medium">
                         {log.action}
                       </td>
-                      <td className="p-5 text-muted-foreground">
+                      <td className="py-4 px-6 text-xs text-muted-foreground font-medium">
                         {new Date(log.created_at).toLocaleString('en-IN', {
                           day: '2-digit',
                           month: 'short',
@@ -405,51 +407,51 @@ export default function StaffSettingsPage() {
         </div>
       ) : (
         /* Security Settings tab */
-        <div className="glass-panel p-8 rounded-2xl max-w-md w-full flex flex-col gap-6">
+        <div className="bg-card neu-extruded p-8 sm:p-10 rounded-3xl max-w-md w-full flex flex-col gap-6 border-0">
           <div>
-            <h2 className="text-xl font-bold text-foreground">Change Password</h2>
-            <p className="text-muted-foreground text-sm mt-1">Update your Super Admin merchant credentials</p>
+            <h2 className="text-xl font-extrabold text-foreground tracking-tight">Change Password</h2>
+            <p className="text-muted-foreground text-xs font-medium mt-1">Update your Super Admin merchant credentials</p>
           </div>
 
           {changeSelfSuccess && (
-            <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400">
               {changeSelfSuccess}
             </div>
           )}
 
           {changeSelfError && (
-            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-600 dark:text-red-400">
               {changeSelfError}
             </div>
           )}
 
           <form onSubmit={handleChangeSelfPassword} className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Current Password</label>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="password"
                   required
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                  className="w-full pl-11 pr-4 py-3 neu-input rounded-2xl text-xs font-medium"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase">New Password</label>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">New Password</label>
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                  className="w-full pl-11 pr-4 py-3 neu-input rounded-2xl text-xs font-medium"
                 />
               </div>
             </div>
@@ -457,7 +459,7 @@ export default function StaffSettingsPage() {
             <button
               type="submit"
               disabled={changeSelfLoading}
-              className="mt-2 flex items-center justify-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
+              className="mt-2 flex items-center justify-center gap-2 px-6 py-3 neu-btn-primary font-bold rounded-2xl cursor-pointer text-xs transition duration-200 disabled:opacity-50"
             >
               {changeSelfLoading ? (
                 <>
@@ -474,61 +476,61 @@ export default function StaffSettingsPage() {
 
       {/* Invite Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-md bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col gap-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-card neu-extruded p-8 rounded-3xl flex flex-col gap-6 border-0">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">
+              <h2 className="text-xl font-extrabold text-foreground tracking-tight">
                 {editingStaff ? 'Edit Staff Profile' : 'Add Staff Member'}
               </h2>
               <button 
                 onClick={() => setModalOpen(false)}
-                className="p-2 hover:bg-muted rounded-full transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
+                className="p-2 neu-btn rounded-xl transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {error && (
-              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-600 dark:text-red-400">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* First & Last Name */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">First Name</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">First Name</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input
                       type="text"
                       required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       placeholder="e.g. John"
-                      className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                      className="w-full pl-9 pr-3 py-2.5 neu-input rounded-2xl text-xs font-medium"
                     />
                   </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Last Name</label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Last Name</label>
                   <input
                     type="text"
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="e.g. Doe"
-                    className="w-full px-4 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                    className="w-full px-4 py-2.5 neu-input rounded-2xl text-xs font-medium"
                   />
                 </div>
               </div>
 
               {/* Email */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Email Address</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
                     type="email"
                     required
@@ -536,38 +538,38 @@ export default function StaffSettingsPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@perfumebooth.com"
-                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm disabled:opacity-50"
+                    className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium disabled:opacity-50"
                   />
                 </div>
               </div>
 
               {/* Password */}
               {!editingStaff && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Password</label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Password</label>
                   <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                      className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium"
                     />
                   </div>
                 </div>
               )}
 
               {/* Role dropdown */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Dashboard Role</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Dashboard Role</label>
                 <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm text-foreground cursor-pointer"
+                    className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-semibold text-foreground cursor-pointer"
                   >
                     <option value="Admin">Admin (Full Dashboard, No User Edit)</option>
                     <option value="Content Manager">Content Manager (CMS Layouts only)</option>
@@ -577,22 +579,22 @@ export default function StaffSettingsPage() {
               </div>
 
               {/* Submit buttons */}
-              <div className="flex justify-end gap-3 mt-4">
+              <div className="flex justify-end gap-3 mt-3">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2.5 border border-border text-foreground font-semibold rounded-xl hover:bg-muted transition duration-200 cursor-pointer text-sm"
+                  className="px-5 py-2.5 neu-btn text-foreground font-bold rounded-2xl cursor-pointer text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitLoading}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 neu-btn-primary font-bold rounded-2xl cursor-pointer text-xs disabled:opacity-50"
                 >
                   {submitLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       <span>Saving...</span>
                     </>
                   ) : (
@@ -607,62 +609,62 @@ export default function StaffSettingsPage() {
 
       {/* Reset Staff Password Modal */}
       {resetModalOpen && selectedStaff && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-md bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col gap-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-card neu-extruded p-8 rounded-3xl flex flex-col gap-6 border-0">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">
+              <h2 className="text-xl font-extrabold text-foreground tracking-tight">
                 Reset Password
               </h2>
               <button 
                 onClick={() => setResetModalOpen(false)}
-                className="p-2 hover:bg-muted rounded-full transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
+                className="p-2 neu-btn rounded-xl transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground font-medium">
               You are resetting the password for <strong className="text-foreground">{selectedStaff.email}</strong> ({selectedStaff.first_name} {selectedStaff.last_name || ''}).
             </p>
 
             {resetStaffError && (
-              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-600 dark:text-red-400">
                 {resetStaffError}
               </div>
             )}
 
-            <form onSubmit={handleResetStaffPassword} className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">New Password</label>
+            <form onSubmit={handleResetStaffPassword} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-muted-foreground uppercase">New Password</label>
                 <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
                     type="password"
                     required
                     value={resetPassword}
                     onChange={(e) => setResetPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-sm"
+                    className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-4">
+              <div className="flex justify-end gap-3 mt-3">
                 <button
                   type="button"
                   onClick={() => setResetModalOpen(false)}
-                  className="px-4 py-2.5 border border-border text-foreground font-semibold rounded-xl hover:bg-muted transition duration-200 cursor-pointer text-sm"
+                  className="px-5 py-2.5 neu-btn text-foreground font-bold rounded-2xl cursor-pointer text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={resetStaffLoading}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 neu-btn-primary font-bold rounded-2xl cursor-pointer text-xs disabled:opacity-50"
                 >
                   {resetStaffLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       <span>Resetting...</span>
                     </>
                   ) : (

@@ -327,17 +327,17 @@ export default function CollectionsPage() {
     return (
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12">
         {/* Editor Top Bar Header */}
-        <div className="flex items-center justify-between border-b border-border pb-5">
+        <div className="flex items-center justify-between border-b border-border/30 pb-5">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="px-3 py-2 text-xs font-semibold hover:bg-secondary border border-border rounded-xl transition duration-200 cursor-pointer text-muted-foreground bg-card"
+              className="px-3.5 py-2 text-xs font-bold neu-btn rounded-xl transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
             >
               &larr; Back to Collections
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
                 {editingCollection ? `Edit Collection: ${editingCollection.title}` : 'Create Collection'}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -349,22 +349,22 @@ export default function CollectionsPage() {
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-xl text-xs transition cursor-pointer"
+              className="px-4 py-2 neu-btn text-foreground font-bold rounded-xl text-xs transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSubmit}
-              className="px-5 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg transition duration-200 text-xs cursor-pointer"
+              className="px-5 py-2 neu-btn-primary font-bold rounded-xl transition duration-200 text-xs cursor-pointer"
             >
-              {editingCollection ? 'Save Changes' : 'Create'}
+              {editingCollection ? 'Save Changes' : 'Create Collection'}
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+          <div className="p-4 rounded-2xl neu-inset-sm text-sm text-red-500 font-medium">
             {error}
           </div>
         )}
@@ -374,49 +374,49 @@ export default function CollectionsPage() {
           <div className="lg:col-span-2 flex flex-col gap-6">
             
             {/* Title & Description Card */}
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
-              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Content</h2>
+            <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-5">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground border-b border-border/30 pb-3">Collection Content</h2>
               
               {/* Title */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Title</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Title</label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="e.g. Summer Best Sellers"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-3 neu-input rounded-2xl transition duration-200 text-sm text-foreground font-medium"
                 />
               </div>
 
               {/* Description */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Description</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Description</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Write a descriptive collection banner text..."
                   rows={6}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground resize-none"
+                  className="w-full px-4 py-3 neu-input rounded-2xl transition duration-200 text-sm text-foreground font-medium resize-none"
                 />
               </div>
             </div>
 
             {/* Products card */}
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-border pb-2.5">
-                <h2 className="text-sm font-bold text-foreground">Products in Collection</h2>
-                <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-5">
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground">Products in Collection</h2>
+                <span className="text-[10px] font-extrabold text-primary neu-inset-sm px-3 py-1 rounded-full uppercase tracking-wider">
                   {selectedProductIds.length} {selectedProductIds.length === 1 ? 'item' : 'items'}
                 </span>
               </div>
 
               {matchType !== 'manual' && (
-                <div className="p-3 bg-muted/10 border border-border rounded-xl text-center">
-                  <p className="text-[11px] text-muted-foreground">
+                <div className="p-3.5 neu-inset-sm rounded-2xl text-center">
+                  <p className="text-xs text-muted-foreground">
                     This collection dynamically matches products by rule: 
-                    <span className="font-semibold text-foreground ml-1">
+                    <span className="font-bold text-foreground ml-1">
                       {matchType.toUpperCase()} &middot; "{matchValue || 'Any'}"
                     </span>
                   </p>
@@ -427,18 +427,18 @@ export default function CollectionsPage() {
                 {/* Search and Picker Input */}
                 {matchType === 'manual' && (
                   <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground/75" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground/75" />
                     <input
                       type="text"
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
                       placeholder="Search product inventory to add..."
-                      className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                      className="w-full pl-12 pr-4 py-3 neu-input rounded-2xl transition duration-200 text-sm text-foreground"
                     />
                     
                     {/* Add Product Dropdown Picker List */}
                     {productSearch && (
-                      <div className="absolute z-10 w-full mt-1.5 max-h-60 overflow-y-auto bg-card border border-border rounded-xl shadow-lg divide-y divide-border/60">
+                      <div className="absolute z-10 w-full mt-2 max-h-60 overflow-y-auto bg-card neu-extruded rounded-2xl border border-border/10 divide-y divide-border/20 shadow-xl">
                         {filteredProducts.filter(p => !selectedProductIds.includes(p.id)).slice(0, 10).map((p) => (
                           <div
                             key={p.id}
@@ -446,24 +446,24 @@ export default function CollectionsPage() {
                               setSelectedProductIds([...selectedProductIds, p.id]);
                               setProductSearch('');
                             }}
-                            className="flex items-center gap-3 p-3 hover:bg-muted/40 cursor-pointer transition"
+                            className="flex items-center gap-3 p-3.5 hover:bg-muted/40 cursor-pointer transition"
                           >
-                            <div className="w-8 h-8 rounded-lg border border-border overflow-hidden bg-background">
+                            <div className="w-9 h-9 rounded-xl neu-inset-sm overflow-hidden flex items-center justify-center p-0.5">
                               {p.image ? (
-                                <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                                <img src={p.image} alt={p.title} className="w-full h-full object-cover rounded-lg" />
                               ) : (
                                 <ImageIcon className="w-4 h-4 text-muted-foreground/50 m-auto" />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-foreground truncate">{p.title}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">{p.brand} &middot; SKU: {p.sku}</p>
+                              <p className="text-xs font-bold text-foreground truncate">{p.title}</p>
+                              <p className="text-[10px] text-muted-foreground truncate font-medium">{p.brand} &middot; SKU: {p.sku}</p>
                             </div>
-                            <span className="text-[10px] font-bold text-primary mr-1 hover:underline">+ Add</span>
+                            <span className="text-xs font-bold text-primary mr-1 hover:underline">+ Add</span>
                           </div>
                         ))}
                         {filteredProducts.filter(p => !selectedProductIds.includes(p.id)).length === 0 && (
-                          <div className="p-4 text-center text-xs text-muted-foreground">
+                          <div className="p-4 text-center text-xs text-muted-foreground font-medium">
                             No unselected products found.
                           </div>
                         )}
@@ -473,42 +473,42 @@ export default function CollectionsPage() {
                 )}
 
                 {/* Selected Products Table Grid list */}
-                <div className="border border-border rounded-xl overflow-hidden">
+                <div className="neu-inset rounded-2xl overflow-hidden">
                   <div className="max-h-96 overflow-y-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-border bg-muted/20 text-muted-foreground font-semibold">
-                          <th className="p-3 w-12">Thumbnail</th>
-                          <th className="p-3">Product Name</th>
-                          <th className="p-3">SKU</th>
-                          <th className="p-3 text-right">Action</th>
+                        <tr className="border-b border-border/30 bg-muted/20 text-muted-foreground font-bold uppercase tracking-wider">
+                          <th className="p-3.5 w-12">Thumbnail</th>
+                          <th className="p-3.5">Product Name</th>
+                          <th className="p-3.5">SKU</th>
+                          <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-border/20">
                         {selectedProducts.map((p) => (
-                          <tr key={p.id} className="border-b border-border/40 hover:bg-muted/10 transition">
-                            <td className="p-3">
-                              <div className="w-10 h-10 rounded-lg border border-border bg-background overflow-hidden flex items-center justify-center">
+                          <tr key={p.id} className="hover:bg-muted/10 transition">
+                            <td className="p-3.5">
+                              <div className="w-10 h-10 rounded-xl neu-inset-sm overflow-hidden flex items-center justify-center p-0.5">
                                 {p.image ? (
-                                  <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                                  <img src={p.image} alt={p.title} className="w-full h-full object-cover rounded-lg" />
                                 ) : (
                                   <ImageIcon className="w-5 h-5 text-muted-foreground/20" />
                                 )}
                               </div>
                             </td>
-                            <td className="p-3">
+                            <td className="p-3.5">
                               <a
                                 href={`/products?edit=${p.slug}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-semibold text-foreground hover:text-primary hover:underline transition"
+                                className="font-bold text-foreground hover:text-primary hover:underline transition"
                                 title="Edit product in a new tab"
                               >
                                 {p.title}
                               </a>
                             </td>
-                            <td className="p-3 font-mono text-muted-foreground">{p.sku}</td>
-                            <td className="p-3 text-right">
+                            <td className="p-3.5 font-mono text-muted-foreground font-medium">{p.sku}</td>
+                            <td className="p-3.5 text-right">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -517,7 +517,7 @@ export default function CollectionsPage() {
                                     setExcludedProductIds(prev => [...prev, p.id]);
                                   }
                                 }}
-                                className="p-1.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 rounded-lg transition cursor-pointer"
+                                className="p-1.5 neu-btn text-muted-foreground hover:text-red-500 rounded-xl transition cursor-pointer"
                                 title="Remove from Collection"
                               >
                                 <X className="w-4 h-4" />
@@ -527,7 +527,7 @@ export default function CollectionsPage() {
                         ))}
                         {selectedProducts.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="p-8 text-center text-muted-foreground font-medium">
+                            <td colSpan={4} className="p-8 text-center text-muted-foreground font-semibold">
                               {matchType === 'manual' 
                                 ? "No products selected. Use the search bar above to add products manually."
                                 : "No products are currently matched by this collection's automatic logic rule."
@@ -543,33 +543,33 @@ export default function CollectionsPage() {
             </div>
 
             {/* Bottom Card: Search Engine SEO Listing Preview */}
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
-              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Search Engine Listing Preview</h2>
+            <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground border-b border-border/30 pb-3">Search Engine Listing Preview</h2>
               
-              <div className="flex flex-col gap-3 p-4 bg-muted/20 border border-border rounded-xl">
-                <span className="text-xs font-semibold text-blue-400 hover:underline truncate block">
+              <div className="flex flex-col gap-3 p-4 neu-inset-sm rounded-2xl">
+                <span className="text-xs font-bold text-primary hover:underline truncate block">
                   https://perfumebooth.com/collections/{slug}
                 </span>
-                <span className="text-xs font-bold text-foreground block">
+                <span className="text-sm font-extrabold text-foreground block">
                   {title || "Unreleased Collection Title"}
                 </span>
-                <span className="text-[11px] text-muted-foreground leading-relaxed block truncate max-w-xl">
+                <span className="text-xs text-muted-foreground leading-relaxed block truncate max-w-xl font-medium">
                   {description || "Add a description to see how this collection will look in search results."}
                 </span>
               </div>
 
               {/* Edit URL Handle */}
               <div className="flex flex-col gap-2 mt-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">URL Handle Slug</label>
-                <div className="flex rounded-xl overflow-hidden border border-border focus-within:border-primary transition duration-200 bg-background text-sm">
-                  <span className="bg-muted px-3.5 py-2.5 text-muted-foreground select-none font-semibold border-r border-border">/collections/</span>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">URL Handle Slug</label>
+                <div className="flex rounded-2xl overflow-hidden neu-input text-sm">
+                  <span className="bg-muted/40 px-3.5 py-2.5 text-muted-foreground select-none font-bold border-r border-border/30">/collections/</span>
                   <input
                     type="text"
                     required
                     value={slug}
                     onChange={(e) => setSlug(e.target.value)}
                     placeholder="e.g. summer-best-sellers"
-                    className="flex-1 bg-transparent px-3 py-2.5 focus:outline-none text-foreground"
+                    className="flex-1 bg-transparent px-3.5 py-2.5 focus:outline-none text-foreground font-medium"
                   />
                 </div>
               </div>
@@ -580,18 +580,18 @@ export default function CollectionsPage() {
           <div className="lg:col-span-1 flex flex-col gap-6">
             
             {/* Status Panel */}
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
-              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Status</h2>
+            <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground border-b border-border/30 pb-3">Collection Status</h2>
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-semibold text-foreground">Status (Active)</span>
+                  <span className="text-xs font-bold text-foreground">Status (Active)</span>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Show collection on shop pages.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsActive(!isActive)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${
-                    isActive ? 'bg-primary' : 'bg-muted border border-border'
+                    isActive ? 'bg-primary' : 'neu-inset-sm'
                   }`}
                 >
                   <span
@@ -604,11 +604,11 @@ export default function CollectionsPage() {
             </div>
 
             {/* Collection Image Upload */}
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
-              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Image</h2>
+            <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground border-b border-border/30 pb-3">Collection Image</h2>
               
-              <div className="flex flex-col gap-4 items-center p-5 border border-dashed border-border rounded-xl bg-muted/20 text-center">
-                <div className="relative w-full h-32 bg-background border border-border rounded-xl flex items-center justify-center overflow-hidden">
+              <div className="flex flex-col gap-4 items-center p-5 neu-inset rounded-2xl text-center">
+                <div className="relative w-full h-32 neu-inset-sm rounded-xl flex items-center justify-center overflow-hidden">
                   {imagePreview ? (
                     <>
                       <img src={imagePreview} alt="Collection Banner Preview" className="w-full h-full object-cover" />
@@ -629,9 +629,9 @@ export default function CollectionsPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-foreground">Upload banner image</span>
-                  <span className="text-[10px] text-muted-foreground">Supported format: WEBP, PNG, JPG (Max 2MB)</span>
-                  <label className="mt-2.5 px-4 py-1.5 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-lg text-xs cursor-pointer inline-block text-center transition">
+                  <span className="text-xs font-bold text-foreground">Upload banner image</span>
+                  <span className="text-[10px] text-muted-foreground">Supported: WEBP, PNG, JPG (Max 2MB)</span>
+                  <label className="mt-2.5 px-4 py-2 neu-btn text-foreground font-bold rounded-xl text-xs cursor-pointer inline-block text-center transition">
                     Browse Image
                     <input type="file" onChange={handleImageChange} className="hidden" accept="image/*" />
                   </label>
@@ -640,19 +640,19 @@ export default function CollectionsPage() {
             </div>
 
             {/* Matching Logic Configuration */}
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col gap-4">
-              <h2 className="text-sm font-bold text-foreground border-b border-border pb-2.5">Collection Type</h2>
+            <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground border-b border-border/30 pb-3">Collection Type</h2>
               
               {/* Match Type Selection */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Matching Logic</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Matching Logic</label>
                 <select
                   value={matchType}
                   onChange={(e) => {
                     setMatchType(e.target.value as any);
                     setMatchValue('');
                   }}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground font-medium"
+                  className="w-full px-4 py-2.5 neu-input rounded-xl transition duration-200 text-xs text-foreground font-bold cursor-pointer"
                 >
                   <option value="manual">Manual Selection</option>
                   <option value="gender">Filter by Gender</option>
@@ -665,13 +665,13 @@ export default function CollectionsPage() {
 
               {/* Match Target Value */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Match Target Value</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Match Target Value</label>
                 {matchType === 'manual' ? (
                   <input
                     type="text"
                     disabled
                     placeholder="N/A for Manual Selection"
-                    className="w-full px-4 py-2.5 bg-muted border border-border rounded-xl text-xs text-muted-foreground cursor-not-allowed"
+                    className="w-full px-4 py-2.5 neu-inset-sm rounded-xl text-xs text-muted-foreground cursor-not-allowed font-medium opacity-60"
                   />
                 ) : (
                   <div className="relative">
@@ -683,10 +683,10 @@ export default function CollectionsPage() {
                       onFocus={() => setShowSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                       placeholder="Select or type a value..."
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground font-medium"
+                      className="w-full px-4 py-2.5 neu-input rounded-xl transition duration-200 text-xs text-foreground font-bold"
                     />
                     {showSuggestions && getSuggestions().length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 max-h-40 overflow-y-auto bg-card border border-border rounded-xl shadow-lg">
+                      <div className="absolute z-10 w-full mt-2 max-h-40 overflow-y-auto bg-card neu-extruded rounded-2xl border border-border/10 shadow-xl">
                         {getSuggestions().map((s) => (
                           <button
                             key={s}
@@ -695,7 +695,7 @@ export default function CollectionsPage() {
                               setMatchValue(s);
                               setShowSuggestions(false);
                             }}
-                            className="w-full text-left px-4 py-2 hover:bg-muted text-xs text-foreground transition font-medium"
+                            className="w-full text-left px-4 py-2 hover:bg-muted text-xs text-foreground transition font-bold"
                           >
                             {s}
                           </button>
@@ -708,12 +708,12 @@ export default function CollectionsPage() {
 
               {/* Sort Order Priority */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Sort Order Priority</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Sort Order Priority</label>
                 <input
                   type="number"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-xs text-foreground font-medium"
+                  className="w-full px-4 py-2.5 neu-input rounded-xl transition duration-200 text-xs text-foreground font-bold"
                 />
               </div>
             </div>
@@ -739,14 +739,19 @@ export default function CollectionsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Collections</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Collections</h1>
+            <span className="px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-primary">
+              Catalogs
+            </span>
+          </div>
           <p className="text-muted-foreground text-sm mt-1">
             Group products into dynamic catalogs or manually select featured lists.
           </p>
         </div>
         <button
           onClick={handleOpenCreate}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+          className="flex items-center gap-2 px-5 py-2.5 neu-btn-primary font-bold rounded-2xl transition duration-200 cursor-pointer text-sm"
         >
           <Plus className="w-5 h-5" />
           <span>Add Collection</span>
@@ -754,28 +759,28 @@ export default function CollectionsPage() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-card border border-border p-5 rounded-2xl shadow-sm">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-card neu-extruded p-5 rounded-3xl border border-border/10">
         {/* Search Input Box */}
         <div className="relative w-full xl:w-96 flex-shrink-0">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search collections by title, description or handle..."
-            className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition duration-200 text-sm text-foreground placeholder:text-muted-foreground/60"
+            className="w-full pl-12 pr-4 py-2.5 neu-input rounded-2xl transition duration-200 text-sm text-foreground placeholder:text-muted-foreground/60"
           />
         </div>
         
         {/* Dropdown Filters Group */}
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           {/* Status Filter */}
-          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
-            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Status</span>
+          <div className="flex items-center gap-2 bg-card neu-extruded-sm border border-border/10 px-3.5 py-2 rounded-2xl">
+            <span className="text-[10px] font-extrabold text-muted-foreground/80 uppercase tracking-wider">Status</span>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-bold pr-1"
             >
               <option value="" className="bg-card text-foreground">All Statuses</option>
               <option value="active" className="bg-card text-foreground">Active</option>
@@ -784,12 +789,12 @@ export default function CollectionsPage() {
           </div>
 
           {/* Matching Logic Filter */}
-          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
-            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Logic</span>
+          <div className="flex items-center gap-2 bg-card neu-extruded-sm border border-border/10 px-3.5 py-2 rounded-2xl">
+            <span className="text-[10px] font-extrabold text-muted-foreground/80 uppercase tracking-wider">Logic</span>
             <select
               value={filterMatchType}
               onChange={(e) => setFilterMatchType(e.target.value)}
-              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-bold pr-1"
             >
               <option value="" className="bg-card text-foreground">All Logic Types</option>
               <option value="manual" className="bg-card text-foreground">Manual Selection</option>
@@ -809,7 +814,7 @@ export default function CollectionsPage() {
                 setFilterStatus('');
                 setFilterMatchType('');
               }}
-              className="text-xs font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer ml-1"
+              className="neu-btn px-3.5 py-2 rounded-xl text-xs font-bold text-red-500 transition duration-150 cursor-pointer ml-1"
             >
               Clear All
             </button>
@@ -818,16 +823,16 @@ export default function CollectionsPage() {
       </div>
 
       {/* Main Table */}
-      <div className="glass-panel border border-border rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-card neu-extruded rounded-3xl overflow-hidden border border-border/10">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Banner</th>
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Collection</th>
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Products</th>
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="p-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+              <tr className="border-b border-border/30 bg-muted/20">
+                <th className="p-5 text-xs font-bold text-muted-foreground uppercase tracking-wider">Banner</th>
+                <th className="p-5 text-xs font-bold text-muted-foreground uppercase tracking-wider">Collection</th>
+                <th className="p-5 text-xs font-bold text-muted-foreground uppercase tracking-wider">Products</th>
+                <th className="p-5 text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
+                <th className="p-5 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -836,7 +841,7 @@ export default function CollectionsPage() {
                   <td colSpan={5} className="p-10 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                      <span className="text-sm text-muted-foreground">Loading collections...</span>
+                      <span className="text-sm font-semibold text-muted-foreground">Loading collections...</span>
                     </div>
                   </td>
                 </tr>
@@ -845,35 +850,39 @@ export default function CollectionsPage() {
                   <td colSpan={5} className="p-10 text-center">
                     <div className="flex flex-col items-center justify-center gap-3 py-6 text-muted-foreground">
                       <FolderOpen className="w-12 h-12 opacity-50" />
-                      <span className="text-sm font-semibold">No Collections Found</span>
-                      <span className="text-xs max-w-xs">Try adjusting your filters or create a new collection category.</span>
+                      <span className="text-sm font-bold text-foreground">No Collections Found</span>
+                      <span className="text-xs max-w-xs font-medium">Try adjusting your filters or create a new collection category.</span>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredCollections.map((col) => (
-                  <tr key={col.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
+                  <tr key={col.id} className="border-b border-border/20 hover:bg-muted/10 transition duration-150">
                     <td className="p-5">
-                      <div className="w-16 h-10 rounded-lg border border-border bg-black overflow-hidden flex items-center justify-center">
+                      <div className="w-16 h-10 rounded-xl neu-inset-sm overflow-hidden flex items-center justify-center p-0.5">
                         {col.image ? (
-                          <img src={col.image} alt={col.title} className="w-full h-full object-cover" />
+                          <img src={col.image} alt={col.title} className="w-full h-full object-cover rounded-lg" />
                         ) : (
                           <ImageIcon className="w-5 h-5 text-muted-foreground/30" />
                         )}
                       </div>
                     </td>
-                    <td className="p-5 font-semibold text-foreground text-sm">{col.title}</td>
-                    <td className="p-5 text-sm text-muted-foreground font-semibold">{col.product_count} items</td>
+                    <td className="p-5 font-bold text-foreground text-sm">{col.title}</td>
+                    <td className="p-5 text-sm">
+                      <span className="neu-inset-sm px-3 py-1 rounded-full text-xs font-bold text-muted-foreground">
+                        {col.product_count} items
+                      </span>
+                    </td>
                     <td className="p-5">
                       <button
                         onClick={() => handleStatusToggle(col)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition border ${
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold neu-inset-sm transition cursor-pointer ${
                           col.is_active
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                            ? 'text-emerald-500'
+                            : 'text-zinc-500'
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${col.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-400'}`} />
+                        <span className={`w-2 h-2 rounded-full ${col.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
                         {col.is_active ? 'Active' : 'Offline'}
                       </button>
                     </td>
@@ -881,13 +890,13 @@ export default function CollectionsPage() {
                       <div className="inline-flex gap-2">
                         <button
                           onClick={() => handleOpenEdit(col)}
-                          className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card transition cursor-pointer"
+                          className="p-2.5 neu-btn text-muted-foreground hover:text-foreground rounded-xl transition cursor-pointer"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteClick(col)}
-                          className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg border border-border hover:border-red-500/20 bg-card transition cursor-pointer"
+                          className="p-2.5 neu-btn text-muted-foreground hover:text-red-500 rounded-xl transition cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -904,21 +913,21 @@ export default function CollectionsPage() {
       {/* Delete Confirmation Modal */}
       {deleteConfirmOpen && collectionToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-card border border-border max-w-md w-full p-6 rounded-2xl shadow-xl flex flex-col gap-4">
-            <h3 className="text-lg font-bold text-foreground">Delete Collection</h3>
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete collection <span className="font-semibold text-foreground">"{collectionToDelete.title}"</span>? This will only delete the collection configuration, not the products linked inside it.
+          <div className="bg-card neu-extruded max-w-md w-full p-7 rounded-3xl border border-border/10 flex flex-col gap-4 shadow-2xl">
+            <h3 className="text-lg font-extrabold text-foreground">Delete Collection</h3>
+            <p className="text-sm text-muted-foreground font-medium">
+              Are you sure you want to delete collection <span className="font-bold text-foreground">"{collectionToDelete.title}"</span>? This will only delete the collection configuration, not the products linked inside it.
             </p>
             <div className="flex justify-end gap-3 mt-2">
               <button
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="px-5 py-2.5 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-xl text-sm transition"
+                className="px-5 py-2.5 neu-btn text-foreground font-bold rounded-2xl text-xs transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="px-5 py-2.5 bg-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/25 transition text-sm"
+                className="px-5 py-2.5 neu-btn text-white font-bold rounded-2xl text-xs bg-red-500 hover:bg-red-600 transition cursor-pointer"
               >
                 Confirm Delete
               </button>

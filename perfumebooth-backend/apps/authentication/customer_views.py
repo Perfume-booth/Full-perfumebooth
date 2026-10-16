@@ -12,6 +12,11 @@ import jwt
 from .models import CustomUser, OTPVerification, SocialAccount, CustomerAddress
 from core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
 from core.throttling import AuthRateThrottle, OTPRateThrottle
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -504,3 +509,125 @@ class CustomerAddressSetDefaultView(APIView):
         addr.save()
 
         return Response({'detail': 'Default address updated successfully.'})
+
+
+class CustomerPasswordResetRequestView(APIView):
+    """
+    POST /api/auth/customer/password-reset/
+    Send password reset email with secure token.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({'detail': 'Email address is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = CustomUser.objects.filter(email=email, is_active=True).first()
+        if user:
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            # Determine frontend URL
+            frontend_url = request.data.get('frontend_url') or request.headers.get('Origin') or 'http://localhost:3000'
+            reset_url = f"{frontend_url.rstrip('/')}/account/reset/{uid}/{token}"
+
+            subject = "Reset Your Password — PerfumeBooth"
+            message = f"Hello {user.first_name or 'Valued Customer'},\n\nPlease click the link below to reset your password:\n{reset_url}\n\nIf you did not request this, please ignore this email."
+            html_message = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+                <h2 style="color: #5B0612;">Reset Your Password</h2>
+                <p>Hello {user.first_name or 'Valued Customer'},</p>
+                <p>We received a request to reset your PerfumeBooth account password. Click the button below to proceed:</p>
+                <p style="margin: 25px 0;">
+                    <a href="{reset_url}" style="background-color: #5B0612; color: #ffffff; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Set New Password</a>
+                </p>
+                <p style="font-size: 12px; color: #666;">Or copy and paste this link into your browser:<br/><a href="{reset_url}" style="color: #B8924A;">{reset_url}</a></p>
+                <p style="font-size: 12px; color: #999; margin-top: 30px;">If you did not request a password reset, you can safely ignore this email.</p>
+            </div>
+            """
+
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'PerfumeBooth <onboarding@resend.dev>'),
+                    recipient_list=[user.email],
+                    html_message=html_message,
+                    fail_silently=False
+                )
+            except Exception as e:
+                logger.warning(f"Could not send password reset email via SMTP ({e}). Dev Reset Link: {reset_url}")
+
+        return Response({
+            'detail': 'If an account exists with that email, a password reset link has been sent.'
+        })
+
+
+class CustomerPasswordResetConfirmView(APIView):
+    """
+    POST /api/auth/customer/password-reset-confirm/
+    Verify token and update password.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        uid = request.data.get('uid') or request.data.get('id')
+        token = request.data.get('token')
+        password = request.data.get('password')
+
+        if not uid or not token or not password:
+            return Response({'detail': 'ID, token, and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(password) < 8:
+            return Response({'detail': 'Password must be at least 8 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = None
+        # Try decoding urlsafe base64 uid first, then fallback to raw UUID
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = CustomUser.objects.filter(pk=user_id).first()
+        except Exception:
+            pass
+
+        if not user:
+            try:
+                user = CustomUser.objects.filter(pk=uid).first()
+            except Exception:
+                pass
+
+        if not user or not default_token_generator.check_token(user, token):
+            return Response({'detail': 'Invalid or expired password reset link.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(password)
+        user.save()
+
+        return Response({'detail': 'Your password has been successfully reset. You can now sign in.'})
+
+
+class CustomerChangePasswordView(APIView):
+    """
+    POST /api/auth/customer/change-password/
+    Change password for logged-in customer.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not old_password or not new_password:
+            return Response({'detail': 'Old and new passwords are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.check_password(old_password):
+            return Response({'detail': 'Current password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 8:
+            return Response({'detail': 'New password must be at least 8 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.set_password(new_password)
+        request.user.save()
+
+        return Response({'detail': 'Password updated successfully.'})

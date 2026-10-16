@@ -30,6 +30,20 @@ class BrandListView(APIView):
             return Response({'status': 'success', 'brands': brands})
         return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+    def put(self, request):
+        old_brand = request.data.get('old_brand') or request.data.get('old_name')
+        new_brand = request.data.get('new_brand') or request.data.get('new_name') or request.data.get('brand')
+        if not old_brand or not new_brand:
+            return Response(
+                {'error': 'Both old_brand and new_brand are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        brands = BrandService.update_brand(old_brand, new_brand)
+        return Response({'status': 'success', 'brands': brands})
+
+    def patch(self, request):
+        return self.put(request)
+
     def delete(self, request):
         brand_name = request.data.get('brand') or request.query_params.get('brand')
         if not brand_name:
@@ -58,7 +72,7 @@ class ProductListView(APIView):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated(), HasRolePermission()]
 
-    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
 
     def get(self, request):
         search_query = request.query_params.get('search', '')
@@ -138,7 +152,7 @@ class ProductDetailView(APIView):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated(), HasRolePermission()]
 
-    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
 
     def get(self, request, slug: str):
         is_merchant = (

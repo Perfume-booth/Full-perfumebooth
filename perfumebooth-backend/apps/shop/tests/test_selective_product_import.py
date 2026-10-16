@@ -17,6 +17,20 @@ from io import BytesIO
 
 
 class SelectiveProductImportTests(TestCase):
+    @patch('celery.result.AsyncResult')
+    def test_status_survives_result_backend_outage(self, result):
+        from apps.shop.views import ProductExcelImportStatusView
+        job = ProductImportJob.objects.create(
+            created_by=self.user, filename='status.csv', file_sha256='',
+            status='applying', task_id='offline-result', progress_current=20, progress_total=105,
+        )
+        result.side_effect = ConnectionError('Result store unavailable')
+        request = RequestFactory().get('/')
+        request.user = self.user
+        response = ProductExcelImportStatusView().get(request, job.id)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['progress'], {'current': 20, 'total': 105})
+
     def setUp(self):
         self.user = CustomUser.objects.create_user(email='importer@example.com', password='test')
         self.product = Product.objects.create(
@@ -279,7 +293,12 @@ class SelectiveProductImportTests(TestCase):
         ]), self.user, mode='UPSERT')
         self.assertEqual(job.status, ProductImportJob.Status.PREVIEW_READY)
         self.assertEqual(job.summary['images_to_add'], 1)
-        apply_preview(job.id, self.user)
+        progress = []
+        apply_preview(job.id, self.user, progress_callback=lambda current, total: progress.append((current, total)))
+        self.assertEqual(progress[0], (0, 6))
+        self.assertEqual(progress[-1], (6, 6))
+        self.assertEqual([current for current, _ in progress], sorted(current for current, _ in progress))
+        self.assertTrue(all(total == 6 for _, total in progress))
         image = ProductImage.objects.get(product=self.product)
         self.assertTrue(image.is_primary)
         self.assertEqual(image.position, 1)
@@ -297,7 +316,8 @@ class SelectiveProductImportTests(TestCase):
         progress_calls = []
         apply_preview(job.id, self.user, progress_callback=lambda c, t: progress_calls.append((c, t)))
         self.assertEqual(ProductImage.objects.filter(product=self.product).count(), 2)
-        self.assertTrue(any(t == 2 for _, t in progress_calls))
+        self.assertIn((2, 7), progress_calls)
+        self.assertEqual(progress_calls[-1], (7, 7))
 
     @patch('apps.shop.product_imports.download_catalog_image')
     def test_variant_image_replace_and_delete(self, download_image):

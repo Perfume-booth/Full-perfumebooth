@@ -275,14 +275,81 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
   if (!email) {
     return { error: "Email is required." };
   }
-  return { success: "If an account exists with that email, a recovery link has been sent." };
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/customer/password-reset/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { error: data.detail || "Failed to process request." };
+    }
+
+    return { success: data.detail || "If an account exists with that email, a recovery link has been sent." };
+  } catch (e) {
+    return { error: "Network error. Please try again later." };
+  }
 }
 
 export async function resetPasswordAction(prevState: any, formData: FormData) {
+  const id = formData.get("id") as string;
+  const token = formData.get("token") as string;
   const password = formData.get("password") as string;
-  if (!password) {
-    return { error: "Password is required." };
+
+  if (!id || !token || !password) {
+    return { error: "Invalid request. Missing reset token or password." };
   }
-  return { success: "Your password has been successfully reset." };
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/customer/password-reset-confirm/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: id, token, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { error: data.detail || "Password reset failed." };
+    }
+
+    return { 
+      success: data.detail || "Your password has been successfully reset.",
+      redirectUrl: "/auth?mode=signin"
+    };
+  } catch (e) {
+    return { error: "Network error. Please try again later." };
+  }
+}
+
+export async function changePasswordAction(oldPassword: string, newPassword: string) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("customerAccessToken")?.value;
+
+  if (!token) {
+    return { error: "You must be signed in to change your password." };
+  }
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/customer/change-password/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { error: data.detail || "Failed to change password." };
+    }
+
+    return { success: data.detail || "Password updated successfully." };
+  } catch (e) {
+    return { error: "Network error. Please try again later." };
+  }
 }
 

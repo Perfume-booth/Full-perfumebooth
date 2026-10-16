@@ -25,47 +25,64 @@
 }
 
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
-  --card: #ffffff;
-  --card-foreground: #111827;
-  --popover: #ffffff;
-  --popover-foreground: #111827;
+  --background: #ebedf2;
+  --foreground: #1e293b;
+  --card: #ebedf2;
+  --card-foreground: #1e293b;
+  --popover: #ebedf2;
+  --popover-foreground: #1e293b;
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --secondary: #f3f4f6;
-  --secondary-foreground: #1f2937;
-  --muted: #f3f4f6;
-  --muted-foreground: #4b5563;
-  --accent: #f3f4f6;
-  --accent-foreground: #111827;
+  --secondary: #e2e6ed;
+  --secondary-foreground: #334155;
+  --muted: #e2e6ed;
+  --muted-foreground: #64748b;
+  --accent: #e2e6ed;
+  --accent-foreground: #1e293b;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #c084fc;
+  --border: rgba(163, 177, 198, 0.4);
+  --input: #ebedf2;
+  --ring: #7c3aed;
+
+  /* Neumorphism Shadows Light */
+  --neu-shadow-extruded: -6px -6px 14px #ffffff, 6px 6px 14px rgba(163, 177, 198, 0.6);
+  --neu-shadow-extruded-sm: -3px -3px 8px #ffffff, 3px 3px 8px rgba(163, 177, 198, 0.5);
+  --neu-shadow-extruded-lg: -10px -10px 24px #ffffff, 10px 10px 24px rgba(163, 177, 198, 0.7);
+  --neu-shadow-inset: inset 3px 3px 6px rgba(163, 177, 198, 0.55), inset -3px -3px 6px #ffffff;
+  --neu-shadow-inset-sm: inset 2px 2px 4px rgba(163, 177, 198, 0.5), inset -2px -2px 4px #ffffff;
+  --neu-shadow-primary: -2px -2px 6px rgba(255, 255, 255, 0.6), 4px 4px 14px rgba(124, 58, 237, 0.45);
 }
 
 .dark {
-  --background: #090d16;
-  --foreground: #f3f4f6;
-  --card: #111827;
-  --card-foreground: #f3f4f6;
-  --popover: #111827;
-  --popover-foreground: #f3f4f6;
-  --primary: #8b5cf6;
+  color-scheme: dark;
+  --background: #0b0e14;
+  --foreground: #f8fafc;
+  --card: #19202c;
+  --card-foreground: #f8fafc;
+  --popover: #19202c;
+  --popover-foreground: #f8fafc;
+  --primary: #9333ea;
   --primary-foreground: #ffffff;
-  --secondary: #1f2937;
-  --secondary-foreground: #f3f4f6;
-  --muted: #1f2937;
-  --muted-foreground: #9ca3af;
-  --accent: #1f2937;
-  --accent-foreground: #f3f4f6;
+  --secondary: #242c3d;
+  --secondary-foreground: #f8fafc;
+  --muted: #242c3d;
+  --muted-foreground: #94a3b8;
+  --accent: #2c364b;
+  --accent-foreground: #f8fafc;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #1f2937;
-  --input: #1f2937;
-  --ring: #c084fc;
+  --border: rgba(255, 255, 255, 0.14);
+  --input: #10141d;
+  --ring: #a855f7;
+
+  /* Neumorphism Shadows Dark */
+  --neu-shadow-extruded: -3px -3px 8px rgba(255, 255, 255, 0.07), 5px 5px 16px rgba(0, 0, 0, 0.75);
+  --neu-shadow-extruded-sm: -2px -2px 5px rgba(255, 255, 255, 0.07), 3px 3px 9px rgba(0, 0, 0, 0.65);
+  --neu-shadow-extruded-lg: -6px -6px 16px rgba(255, 255, 255, 0.09), 8px 8px 24px rgba(0, 0, 0, 0.85);
+  --neu-shadow-inset: inset 2px 2px 6px rgba(0, 0, 0, 0.8), inset -2px -2px 5px rgba(255, 255, 255, 0.05);
+  --neu-shadow-inset-sm: inset 1px 1px 4px rgba(0, 0, 0, 0.7), inset -1px -1px 3px rgba(255, 255, 255, 0.05);
+  --neu-shadow-primary: -1px -1px 4px rgba(255, 255, 255, 0.2), 3px 3px 14px rgba(147, 51, 234, 0.55);
 }
 
 body {
@@ -75,30 +92,148 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Glassmorphism utilities for light mode */
+/* Neumorphic Core Utility Classes */
+.neu-extruded {
+  box-shadow: var(--neu-shadow-extruded);
+  background-color: var(--card);
+}
+
+.neu-extruded-sm {
+  box-shadow: var(--neu-shadow-extruded-sm);
+  background-color: var(--card);
+}
+
+.neu-extruded-lg {
+  box-shadow: var(--neu-shadow-extruded-lg);
+  background-color: var(--card);
+}
+
+.neu-inset {
+  box-shadow: var(--neu-shadow-inset);
+  background-color: var(--background);
+}
+
+.neu-inset-sm {
+  box-shadow: var(--neu-shadow-inset-sm);
+  background-color: var(--background);
+}
+
+.neu-btn {
+  box-shadow: var(--neu-shadow-extruded-sm);
+  background-color: var(--card);
+  color: var(--foreground);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-btn:hover {
+  box-shadow: var(--neu-shadow-extruded);
+  transform: translateY(-1px);
+}
+
+.neu-btn:active {
+  box-shadow: var(--neu-shadow-inset-sm);
+  transform: translateY(0);
+}
+
+.neu-btn-primary {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--neu-shadow-primary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: -2px -2px 8px rgba(255, 255, 255, 0.3), 5px 5px 18px rgba(147, 51, 234, 0.65);
+  transform: translateY(-1px);
+}
+
+.neu-btn-primary:active {
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.3);
+  transform: translateY(0);
+}
+
+.neu-input {
+  box-shadow: var(--neu-shadow-inset);
+  background-color: var(--background);
+  border: 1px solid transparent;
+  color: var(--foreground);
+  transition: all 0.2s ease;
+}
+
+.neu-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--neu-shadow-inset), 0 0 0 2px rgba(124, 58, 237, 0.15);
+  outline: none;
+}
+
+/* Dark Mode Neumorphic Polish & Contrast Enhancements */
+.dark .neu-extruded {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.dark .neu-extruded-sm {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark .neu-extruded-lg {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.dark .neu-inset {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background-color: var(--input);
+}
+
+.dark .neu-inset-sm {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: var(--input);
+}
+
+.dark .neu-btn {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.dark .neu-btn:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: -2px -2px 8px rgba(255, 255, 255, 0.1), 4px 4px 16px rgba(0, 0, 0, 0.85);
+}
+
+.dark .neu-input {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--input);
+}
+
+.dark .neu-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--neu-shadow-inset), 0 0 0 2px rgba(147, 51, 234, 0.3);
+}
+
+/* Vibrant Logo Circles in Dark Mode */
+.dark .logo-circle {
+  mix-blend-mode: screen !important;
+}
+
+/* Checkboxes and Radios */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+}
+
+.dark input[type="checkbox"],
+.dark input[type="radio"] {
+  color-scheme: dark;
+}
+
+/* Glassmorphism fallback compatibility */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: var(--neu-shadow-extruded);
+  background-color: var(--card);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.60);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-/* Glassmorphism utilities for dark mode */
-.dark .glass-panel {
-  background: rgba(17, 24, 39, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.dark .glass-card {
-  background: rgba(17, 24, 39, 0.60);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: var(--neu-shadow-extruded-sm);
+  background-color: var(--card);
 }
 
 /* Scrollbar customization */

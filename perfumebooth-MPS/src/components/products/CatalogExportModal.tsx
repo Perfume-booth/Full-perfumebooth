@@ -9,6 +9,7 @@ interface Product {
   title: string;
   slug: string;
   sku: string;
+  barcode?: string;
   price: string;
   compare_at_price: string | null;
   image: string | null;
@@ -72,7 +73,7 @@ export default function CatalogExportModal({
         'Variant Compare At Price': p.compare_at_price || '',
         'Variant Requires Shipping': 'true',
         'Variant Taxable': 'true',
-        'Variant Barcode': '',
+        'Variant Barcode': p.barcode || attrs.barcode || '',
         'Image Src': p.image || '',
         'Image Position': '1',
         'Image Alt Text': attrs.image_alt_text || p.title,

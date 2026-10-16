@@ -357,6 +357,8 @@ class CheckoutViewAPITests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        import uuid
+        self.client.credentials(HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
         self.product = Product.objects.create(
             title="Oud Royal",
             slug="oud-royal",

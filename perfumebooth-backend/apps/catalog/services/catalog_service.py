@@ -75,17 +75,43 @@ class CatalogService:
         Extracts nested data from the attributes JSONB field and flattens it
         so the API response matches the storefront's expected TypeScript interface.
         """
+        attrs = product.attributes or {}
+        image_url = None
+        if product.image:
+            try:
+                image_url = request.build_absolute_uri(product.image.url) if request else product.image.url
+            except Exception:
+                image_url = None
+
         images_data = []
+        if image_url:
+            images_data.append({
+                'url': image_url,
+                'altText': attrs.get('image_alt_text') or product.title,
+                'width': None,
+                'height': None
+            })
+
         for img in product.images.all():
+            # Skip primary / position 1 image as it is already the main image (images_data[0])
+            if img.is_primary or img.position == 1:
+                continue
             img_url = None
             if img.image:
-                img_url = request.build_absolute_uri(img.image.url) if request else img.image.url
-            images_data.append({
-                'url': img_url,
-                'altText': img.alt_text,
-                'width': img.width,
-                'height': img.height
-            })
+                try:
+                    img_url = request.build_absolute_uri(img.image.url) if request else img.image.url
+                except Exception:
+                    img_url = None
+            if img_url and img_url != image_url:
+                images_data.append({
+                    'url': img_url,
+                    'altText': img.alt_text or product.title,
+                    'width': img.width,
+                    'height': img.height
+                })
+
+        if not image_url and images_data:
+            image_url = images_data[0]['url']
 
         variants_data = []
         for var in product.variants.all():
@@ -95,27 +121,28 @@ class CatalogService:
                 'option1_name': var.option1_name,
                 'option1_value': var.option1_value,
                 'option2_name': var.option2_name,
-                'option2_value': var.option2_value,
                 'sku': var.sku,
+                'barcode': var.barcode or '',
                 'price': str(var.price),
                 'compare_at_price': str(var.compare_at_price) if var.compare_at_price else None,
+                'cost_price': str(var.cost_price) if var.cost_price else None,
                 'stock': var.available_stock,
+                'weight': var.weight or '',
+                'dimensions': var.dimensions or '',
+                'is_default': var.is_default,
+                'is_active': var.is_active,
             })
 
-        attrs = product.attributes or {}
         stock_val = 0
         if hasattr(product, 'inventory') and product.inventory:
             stock_val = product.inventory.stock_level
-
-        image_url = None
-        if product.image:
-            image_url = request.build_absolute_uri(product.image.url) if request else product.image.url
 
         return {
             'id': str(product.id),
             'title': product.title,
             'slug': product.slug,
             'sku': product.sku,
+            'barcode': product.barcode or attrs.get('barcode', ''),
             'description': product.description,
             'price': str(product.price),
             'compare_at_price': str(product.compare_at_price) if product.compare_at_price else None,
@@ -135,6 +162,8 @@ class CatalogService:
             'occasion': attrs.get('occasion', ''),
             'season': attrs.get('season', ''),
             'tags': attrs.get('tags', []),
+            'weight': attrs.get('weight', ''),
+            'shipping': attrs.get('shipping', {}),
             'attributes': attrs,
             'created_at': product.created_at.isoformat() if product.created_at else None,
             'updated_at': product.updated_at.isoformat() if product.updated_at else None,
@@ -181,6 +210,7 @@ class CatalogService:
             products = products.filter(
                 Q(title__icontains=search_query) |
                 Q(sku__icontains=search_query) |
+                Q(barcode__icontains=search_query) |
                 Q(attributes__brand__icontains=search_query)
             )
 
@@ -238,6 +268,7 @@ class CatalogService:
         title = data.get('title')
         slug = data.get('slug')
         sku = data.get('sku')
+        barcode = data.get('barcode') or attributes.get('barcode', '')
         price = data.get('price')
         compare_at_price = data.get('compare_at_price')
         description = data.get('description', '')
@@ -255,20 +286,27 @@ class CatalogService:
         if 'image' in files:
             validate_image_upload(files['image'])
 
+        main_image = files.get('image')
         gallery_images = files.getlist('gallery') if hasattr(files, 'getlist') else []
         for img in gallery_images:
             validate_image_upload(img)
+
+        # First image is main image; remaining are featured gallery images
+        if not main_image and gallery_images:
+            main_image = gallery_images[0]
+            gallery_images = gallery_images[1:]
 
         product = Product.objects.create(
             title=title,
             slug=slug,
             sku=sku,
+            barcode=barcode,
             price=price,
             compare_at_price=compare_at_price if compare_at_price else None,
             description=description,
             is_online=is_online,
             attributes=attributes,
-            image=files.get('image'),
+            image=main_image,
             created_by=user,
             updated_by=user
         )
@@ -280,8 +318,11 @@ class CatalogService:
         stock_level = int(data.get('stock_level', 0))
         Inventory.objects.create(product=product, stock_level=stock_level)
 
-        for img in gallery_images:
-            ProductImage.objects.create(product=product, image=img)
+        if product.image:
+            ProductImage.objects.create(product=product, image=product.image, position=1, is_primary=True)
+
+        for pos, img in enumerate(gallery_images, start=2):
+            ProductImage.objects.create(product=product, image=img, position=pos, is_primary=False)
 
         variants_json = data.get('variants')
         if variants_json:
@@ -304,9 +345,15 @@ class CatalogService:
                     option2_name=v_data.get('option2_name', ''),
                     option2_value=v_data.get('option2_value', ''),
                     sku=v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}",
+                    barcode=v_data.get('barcode', ''),
                     price=Decimal(str(v_data.get('price') or product.price)),
                     compare_at_price=Decimal(str(v_data.get('compare_at_price'))) if v_data.get('compare_at_price') else None,
+                    cost_price=Decimal(str(v_data.get('cost_price'))) if v_data.get('cost_price') else None,
                     stock_level=int(v_data.get('stock') or 0),
+                    weight=str(v_data.get('weight', '')),
+                    dimensions=str(v_data.get('dimensions', '')),
+                    is_default=bool(v_data.get('is_default', False)),
+                    is_active=bool(v_data.get('is_active', True)) if 'is_active' in v_data else True,
                 )
 
         synced = CollectionSyncService.syncProductCollections(product)
@@ -322,8 +369,24 @@ class CatalogService:
         except Product.DoesNotExist:
             return None, False
 
+        attributes = data.get('attributes')
+        if attributes:
+            if isinstance(attributes, str):
+                try:
+                    attributes = json.loads(attributes)
+                except json.JSONDecodeError:
+                    attributes = None
+            if isinstance(attributes, dict):
+                attributes['tags'] = auto_generate_tags(attributes)
+                product.attributes = attributes
+
         product.title = data.get('title', product.title)
         product.sku = data.get('sku', product.sku)
+        if 'barcode' in data:
+            product.barcode = data.get('barcode', '')
+        elif attributes and 'barcode' in attributes:
+            product.barcode = attributes.get('barcode', '')
+
         product.price = data.get('price', product.price)
         product.compare_at_price = data.get('compare_at_price', product.compare_at_price)
         product.description = data.get('description', product.description)
@@ -337,16 +400,10 @@ class CatalogService:
         for img in gallery_images:
             validate_image_upload(img)
 
-        attributes = data.get('attributes')
-        if attributes:
-            if isinstance(attributes, str):
-                try:
-                    attributes = json.loads(attributes)
-                except json.JSONDecodeError:
-                    attributes = None
-            if isinstance(attributes, dict):
-                attributes['tags'] = auto_generate_tags(attributes)
-                product.attributes = attributes
+        # First image is main image; remaining are featured gallery images
+        if not product.image and gallery_images:
+            product.image = gallery_images[0]
+            gallery_images = gallery_images[1:]
 
         if user:
             product.updated_by = user
@@ -361,11 +418,17 @@ class CatalogService:
             stock = int(data['stock_level'])
             Inventory.objects.update_or_create(product=product, defaults={'stock_level': stock})
 
-        for img in gallery_images:
-            ProductImage.objects.create(product=product, image=img)
+        if 'image' in files and product.image:
+            ProductImage.objects.filter(product=product, is_primary=True).update(is_primary=False)
+            ProductImage.objects.create(product=product, image=product.image, position=1, is_primary=True)
+
+        if gallery_images:
+            current_max_pos = product.images.order_by('-position').values_list('position', flat=True).first() or 1
+            for offset, img in enumerate(gallery_images, start=1):
+                ProductImage.objects.create(product=product, image=img, position=current_max_pos + offset, is_primary=False)
 
         variants_json = data.get('variants')
-        if variants_json:
+        if variants_json is not None:
             if isinstance(variants_json, str):
                 try:
                     variants_list = json.loads(variants_json)
@@ -376,21 +439,26 @@ class CatalogService:
             else:
                 variants_list = []
 
-            if variants_list:
-                product.variants.all().delete()
-                for v_data in variants_list:
-                    ProductVariant.objects.create(
-                        product=product,
-                        title=v_data.get('title', 'Default Title'),
-                        option1_name=v_data.get('option1_name', 'Size'),
-                        option1_value=v_data.get('option1_value', '100ml'),
-                        option2_name=v_data.get('option2_name', ''),
-                        option2_value=v_data.get('option2_value', ''),
-                        sku=v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}",
-                        price=Decimal(str(v_data.get('price') or product.price)),
-                        compare_at_price=Decimal(str(v_data.get('compare_at_price'))) if v_data.get('compare_at_price') else None,
-                        stock_level=int(v_data.get('stock') or 0),
-                    )
+            product.variants.all().delete()
+            for v_data in variants_list:
+                ProductVariant.objects.create(
+                    product=product,
+                    title=v_data.get('title', 'Default Title'),
+                    option1_name=v_data.get('option1_name', 'Size'),
+                    option1_value=v_data.get('option1_value', '100ml'),
+                    option2_name=v_data.get('option2_name', ''),
+                    option2_value=v_data.get('option2_value', ''),
+                    sku=v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}",
+                    barcode=v_data.get('barcode', ''),
+                    price=Decimal(str(v_data.get('price') or product.price)),
+                    compare_at_price=Decimal(str(v_data.get('compare_at_price'))) if v_data.get('compare_at_price') else None,
+                    cost_price=Decimal(str(v_data.get('cost_price'))) if v_data.get('cost_price') else None,
+                    stock_level=int(v_data.get('stock') or 0),
+                    weight=str(v_data.get('weight', '')),
+                    dimensions=str(v_data.get('dimensions', '')),
+                    is_default=bool(v_data.get('is_default', False)),
+                    is_active=bool(v_data.get('is_active', True)) if 'is_active' in v_data else True,
+                )
 
         synced = CollectionSyncService.syncProductCollections(product)
         cache.clear()

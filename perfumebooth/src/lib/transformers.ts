@@ -1,5 +1,7 @@
 import { Product } from "@/types/product";
 import { METAFIELD_MAPPINGS } from "./product-fields.config";
+import { cleanImageUrl } from './media-url';
+export { cleanImageUrl } from './media-url';
 
 export function cleanMetafieldValue(val: any): string {
     if (val === undefined || val === null) return "";
@@ -66,6 +68,8 @@ export interface NormalizedProduct {
     selectedVariantId: string;
     stock_count: number;
     productType?: string;
+    weight?: string;
+    shipping?: any;
     isFull?: boolean;
     raw: any;
 }
@@ -132,26 +136,6 @@ export function getBrandFromTags(tags: any): string | null {
     return null;
 }
 
-export function cleanImageUrl(url: string | null | undefined): string | undefined {
-    if (!url) return undefined;
-    
-    // Always use localhost:8000 in dev so the browser on the host machine can resolve and load the images.
-    const API_URL = 'http://localhost:8000';
-    
-    // Append cache buster to force browser to ignore old application/octet-stream cache
-    const cacheBuster = '?v=1';
-    
-    if (url.startsWith('/media/')) return `${API_URL}${url}${cacheBuster}`;
-    if (url.includes('http://django:8000') || url.includes('http://localhost:8000') || url.includes('http://localhost/media/')) {
-      const newUrl = url
-        .replace('http://django:8000', API_URL)
-        .replace('http://localhost:8000', API_URL)
-        .replace('http://localhost/media/', 'http://localhost:8000/media/');
-      return newUrl.includes('?') ? newUrl : `${newUrl}${cacheBuster}`;
-    }
-    return url;
-}
-
 /**
  * Normalizes product data returned by the catalog API.
  * into a consistent format for the UI.
@@ -180,9 +164,9 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
         if (url && !allImages.includes(url)) allImages.push(url);
     });
     
-    if (product.images && Array.isArray(product.images) && !allImages.length) {
+    if (Array.isArray(product.images)) {
         product.images.forEach((img: any) => {
-            const url = cleanImageUrl(typeof img === 'string' ? img : img.image);
+            const url = cleanImageUrl(typeof img === 'string' ? img : (img.url || img.image));
             if (url && !allImages.includes(url)) allImages.push(url);
         });
     }
@@ -318,6 +302,8 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
         selectedVariantId: product.selectedVariantId || product.variants?.edges?.[0]?.node?.id || product.variants?.[0]?.id || "",
         stock_count,
         productType: product.productType || product.product_type || "",
+        weight: product.weight || product.attributes?.weight || "",
+        shipping: product.shipping || product.attributes?.shipping || null,
         isFull: product.isFull || false,
         raw: product
     };

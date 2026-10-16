@@ -50,16 +50,16 @@ export default function CSVImportPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Upload Card */}
-        <div className="md:col-span-2 bg-card p-6 rounded-2xl border border-border flex flex-col gap-6 shadow-xs">
+        <div className="md:col-span-2 bg-card neu-extruded p-6 sm:p-8 rounded-3xl border-0 flex flex-col gap-6">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Import Product CSV</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="text-lg font-extrabold text-foreground tracking-tight">Import Product CSV</h2>
+            <p className="text-xs text-muted-foreground font-medium mt-0.5">
               Select or drop your product catalog file (`.csv`).
             </p>
           </div>
 
           {/* Dropzone */}
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border hover:border-primary bg-secondary/20 hover:bg-secondary/40 p-10 rounded-xl cursor-pointer transition-all text-center">
+          <label className="flex flex-col items-center justify-center neu-inset p-10 rounded-2xl cursor-pointer transition-all text-center hover:opacity-90">
             <input
               type="file"
               accept=".csv"
@@ -69,25 +69,25 @@ export default function CSVImportPage() {
                 if (file) handleFileUpload(file);
               }}
             />
-            <div className="p-4 bg-primary/10 rounded-full text-primary mb-3">
+            <div className="p-4 bg-card neu-extruded-sm rounded-2xl text-primary mb-3">
               <FileUp className="w-8 h-8" />
             </div>
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-sm font-bold text-foreground">
               Click to browse or drag & drop CSV file here
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 font-medium">
               Supports the standard PerfumeBooth product CSV columns
             </p>
           </label>
 
           {/* Load Sample Button */}
-          <div className="flex items-center justify-between border-t border-border pt-4">
+          <div className="flex flex-wrap items-center justify-between border-t border-border/50 pt-4 gap-3">
             <span className="text-xs text-muted-foreground font-medium">
               Want to try without uploading your file?
             </span>
             <button
               onClick={handleLoadSample}
-              className="px-4 py-2 bg-secondary text-foreground text-xs font-semibold rounded-lg hover:bg-secondary/80 flex items-center gap-2 border border-border cursor-pointer transition-all"
+              className="px-4 py-2.5 neu-btn text-foreground text-xs font-bold rounded-2xl hover:text-primary flex items-center gap-2 cursor-pointer transition-all"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               Load Sample Perfume Catalog
@@ -96,45 +96,45 @@ export default function CSVImportPage() {
         </div>
 
         {/* Status / Overview Panel */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex flex-col justify-between shadow-xs">
+        <div className="bg-card neu-extruded p-6 sm:p-8 rounded-3xl border-0 flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
+            <h3 className="text-base font-extrabold text-foreground mb-4 flex items-center gap-2 tracking-tight">
               <FileSpreadsheet className="w-5 h-5 text-primary" />
               Imported File Status
             </h3>
 
             {products.length > 0 ? (
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 text-emerald-600 text-xs font-semibold bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Successfully loaded {fileName || 'Catalog File'}
+                <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold neu-inset-sm p-3 rounded-2xl">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Loaded {fileName || 'Catalog File'}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-secondary/50 p-3 rounded-lg border border-border">
-                    <span className="text-muted-foreground block">Products</span>
-                    <strong className="text-lg text-foreground font-bold">{stats.totalProducts}</strong>
+                  <div className="neu-inset-sm p-3.5 rounded-2xl">
+                    <span className="text-muted-foreground font-medium block">Products</span>
+                    <strong className="text-xl text-foreground font-extrabold tracking-tight">{stats.totalProducts}</strong>
                   </div>
-                  <div className="bg-secondary/50 p-3 rounded-lg border border-border">
-                    <span className="text-muted-foreground block">Variants</span>
-                    <strong className="text-lg text-foreground font-bold">{stats.totalVariants}</strong>
+                  <div className="neu-inset-sm p-3.5 rounded-2xl">
+                    <span className="text-muted-foreground font-medium block">Variants</span>
+                    <strong className="text-xl text-foreground font-extrabold tracking-tight">{stats.totalVariants}</strong>
                   </div>
                 </div>
 
-                <div className="text-xs text-muted-foreground space-y-1 bg-secondary/30 p-3 rounded-lg border border-border">
-                  <p className="font-semibold text-foreground">Next Available Actions:</p>
-                  <p>• Edit a single field without touching other fields</p>
-                  <p>• Spreadsheet grid view with live cell highlights</p>
+                <div className="text-xs text-muted-foreground space-y-1 neu-inset-sm p-4 rounded-2xl font-medium leading-relaxed">
+                  <p className="font-bold text-foreground">Next Available Actions:</p>
+                  <p>• Edit a single field without touching others</p>
+                  <p>• Spreadsheet grid view with live highlights</p>
                   <p>• Smart bulk operations & price increases</p>
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-muted-foreground space-y-2 py-4">
+              <div className="text-xs text-muted-foreground space-y-2 py-4 font-medium">
                 <p>No CSV file currently loaded into memory.</p>
-                <div className="p-3 bg-amber-500/10 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-500/20 flex gap-2">
+                <div className="p-3.5 neu-inset-sm text-amber-600 rounded-2xl flex gap-2 font-semibold">
                   <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    Upload your file or click <strong>Load Sample Catalog</strong> above to start editing.
+                    Upload your file or click <strong>Load Sample Catalog</strong> to start editing.
                   </span>
                 </div>
               </div>
@@ -145,7 +145,7 @@ export default function CSVImportPage() {
             <div className="flex flex-col gap-2 pt-4">
               <button
                 onClick={() => router.push('/csv-editor/single')}
-                className="w-full py-2.5 bg-primary text-primary-foreground text-xs font-bold rounded-xl hover:bg-primary/90 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
+                className="w-full py-3 neu-btn-primary text-xs font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
               >
                 Update One Field <ArrowRight className="w-4 h-4" />
               </button>

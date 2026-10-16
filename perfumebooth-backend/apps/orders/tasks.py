@@ -41,7 +41,8 @@ def send_order_email_receipt(self, order_id: str) -> dict:
         from django.core.mail import send_mail
         from django.conf import settings
         
-        if not order.user or not order.user.email:
+        recipient = order.customer_email or (order.user.email if order.user else '')
+        if not recipient:
             return {'status': 'skipped', 'reason': 'user email not found'}
             
         subject = f'Order #{order.order_number} Confirmed — PerfumeBooth'
@@ -67,7 +68,7 @@ def send_order_email_receipt(self, order_id: str) -> dict:
             subject=subject,
             message=message,
             from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'PerfumeBooth <onboarding@resend.dev>'),
-            recipient_list=[order.user.email],
+            recipient_list=[recipient],
             html_message=html_message,
             fail_silently=False
         )
@@ -95,8 +96,67 @@ def push_order_to_shiprocket_task(self, order_id: str) -> dict:
         return {'status': 'skipped', 'reason': 'order not found'}
 
     from .shiprocket import create_shiprocket_order
+    if order.shipments.exclude(provider_order_id='').exists():
+        return {'success': True, 'status': 'already_created'}
     res = create_shiprocket_order(order)
     return res
+
+
+@shared_task(name='apps.orders.tasks.process_payment_outbox')
+def process_payment_outbox():
+    """Durable dispatch. Ambiguous external outcomes need review, not blind retry."""
+    from datetime import timedelta
+    from django.db import transaction
+    from django.utils import timezone
+    from .models import PaymentOutbox
+    PaymentOutbox.objects.filter(status='processing', updated_at__lt=timezone.now() - timedelta(minutes=10)).update(
+        status='review', last_error='Worker interrupted; confirm external delivery before retry')
+    for entry_id in list(PaymentOutbox.objects.filter(status='pending').values_list('pk', flat=True)[:100]):
+        with transaction.atomic():
+            entry = PaymentOutbox.objects.select_for_update().get(pk=entry_id)
+            if entry.status != 'pending':
+                continue
+            if entry.order.payment_status != Order.PaymentStatus.PAID or entry.order.status not in (Order.Status.PAID, Order.Status.PROCESSING):
+                entry.status = 'review'
+                entry.last_error = 'Order state changed before dispatch; operator review required'
+                entry.save(update_fields=['status', 'last_error', 'updated_at'])
+                continue
+            entry.status = 'processing'
+            entry.save(update_fields=['status', 'updated_at'])
+        try:
+            if entry.kind == 'receipt':
+                result = send_order_email_receipt.run(str(entry.order_id))
+                success = result.get('status') == 'sent'
+            else:
+                result = push_order_to_shiprocket_task.run(str(entry.order_id))
+                success = result.get('success') is True
+            entry.status = 'done' if success else 'review'
+            entry.last_error = '' if success else 'Delivery not confirmed; inspect provider before retry'
+        except Exception:
+            entry.status = 'review'
+            entry.last_error = 'Delivery outcome uncertain; inspect provider before retry'
+        entry.save(update_fields=['status', 'last_error', 'updated_at'])
+
+
+@shared_task(name='apps.orders.tasks.reconcile_payments')
+def reconcile_payments():
+    import logging
+    from datetime import timedelta
+    from django.utils import timezone
+    from .models import PaymentAttempt
+    from .payments import reconcile
+    attempts = PaymentAttempt.objects.select_related('order').filter(
+        status__in=['creating', 'unknown', 'ready'],
+        updated_at__lt=timezone.now() - timedelta(minutes=1),
+        created_at__gte=timezone.now() - timedelta(days=7),
+    ).order_by('updated_at')[:50]
+    for attempt in attempts:
+        try:
+            reconcile(attempt)
+        except Exception:
+            logging.getLogger(__name__).exception('Payment reconciliation failed for attempt %s', attempt.pk)
+        finally:
+            PaymentAttempt.objects.filter(pk=attempt.pk).update(updated_at=timezone.now())
 
 
 @shared_task(

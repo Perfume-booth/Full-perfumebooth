@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import CatalogImportModal from '@/components/products/CatalogImportModal';
 import CatalogExportModal from '@/components/products/CatalogExportModal';
 import BatchImageDropzone from '@/components/products/BatchImageDropzone';
 import VariantManager, { VariantItem } from '@/components/products/VariantManager';
-import { apiFetch } from '@/lib/api';
+import ShippingSection, { ShippingValues } from '@/components/products/ShippingSection';
+import { apiFetch, getApiBaseUrl, formatProductImageUrl } from '@/lib/api';
 import {
   Plus,
   Search,
@@ -22,7 +23,8 @@ import {
   FileUp,
   FileDown,
   FileSpreadsheet,
-  Wand2
+  Wand2,
+  Package
 } from 'lucide-react';
 
 interface Product {
@@ -33,6 +35,7 @@ interface Product {
   title: string;
   slug: string;
   sku: string;
+  barcode?: string;
   price: string;
   compare_at_price: string | null;
   image: string | null;
@@ -136,10 +139,66 @@ export default function ProductsPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+  // Scroll & Highlight Position Tracking
+  const [highlightSlug, setHighlightSlug] = useState<string | null>(null);
+  const scrollPosRef = useRef<number>(0);
+  const lastWorkedSlugRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (highlightSlug) {
+      const timer = setTimeout(() => {
+        setHighlightSlug(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightSlug]);
+
+  useEffect(() => {
+    if (!modalOpen && !loading && (lastWorkedSlugRef.current || scrollPosRef.current > 0)) {
+      const targetSlug = lastWorkedSlugRef.current;
+      const targetY = scrollPosRef.current;
+
+      let attempts = 0;
+      const maxAttempts = 6;
+
+      let timeoutId: any;
+      const tryScroll = () => {
+        if (targetSlug) {
+          const el = document.getElementById(`product-row-${targetSlug}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            lastWorkedSlugRef.current = null;
+            scrollPosRef.current = 0;
+            return;
+          }
+        }
+        attempts++;
+        if (attempts < maxAttempts) {
+          timeoutId = setTimeout(tryScroll, 100);
+        } else {
+          if (targetY > 0) {
+            window.scrollTo({ top: targetY, behavior: 'smooth' });
+          }
+          lastWorkedSlugRef.current = null;
+          scrollPosRef.current = 0;
+        }
+      };
+
+      timeoutId = setTimeout(tryScroll, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [modalOpen, loading, products]);
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+  };
+
   // Form Fields
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
   const [price, setPrice] = useState('');
   const [comparePrice, setComparePrice] = useState('');
   const [description, setDescription] = useState('');
@@ -172,6 +231,20 @@ export default function ProductsPage() {
   const [bulkActionOption, setBulkActionOption] = useState('percent_discount');
   const [bulkActionValue, setBulkActionValue] = useState(0);
   const [noteOptions, setNoteOptions] = useState<string[]>(NOTE_OPTIONS);
+
+  // Shipping State
+  const [shippingData, setShippingData] = useState<ShippingValues>({
+    isPhysical: true,
+    packageType: 'Store default • Box - 10 × 12 × 15 cm, 0.5 kg',
+    length: '10.0',
+    width: '12.0',
+    height: '15.0',
+    sizeUnit: 'cm',
+    weight: '0.5',
+    weightUnit: 'kg',
+    countryOfOrigin: 'India',
+    hsCode: '3303.00.10',
+  });
 
   // In-line cell editing state
   const [editingCell, setEditingCell] = useState<{ slug: string; field: 'price' | 'stock' } | null>(null);
@@ -215,6 +288,7 @@ export default function ProductsPage() {
           return p;
         })
       );
+      setHighlightSlug(slug);
     } catch (err) {
       console.error('Failed to save inline cell edit:', err);
     } finally {
@@ -405,6 +479,10 @@ export default function ProductsPage() {
   };
 
   const handleDuplicate = (product: Product) => {
+    if (typeof window !== 'undefined') {
+      scrollPosRef.current = window.scrollY;
+    }
+    lastWorkedSlugRef.current = product.slug;
     setEditingProduct(null);
     setTitle(`${product.title} (Copy)`);
     
@@ -437,6 +515,23 @@ export default function ProductsPage() {
     setMetaDescription(product.attributes.meta_description || '');
     setImageAltText(product.attributes.image_alt_text || '');
     
+    // Duplicate Shipping Data
+    const dupShip = product.attributes.shipping || {};
+    const dupWeight = dupShip.weight?.value ?? product.attributes.weight ?? '0.5';
+    const cleanDupWeight = typeof dupWeight === 'string' ? dupWeight.replace(/[^0-9.]/g, '') : String(dupWeight);
+    setShippingData({
+      isPhysical: dupShip.is_physical !== undefined ? dupShip.is_physical : true,
+      packageType: dupShip.package_type || 'Store default • Box - 10 × 12 × 15 cm, 0.5 kg',
+      length: String(dupShip.dimensions?.length ?? '10.0'),
+      width: String(dupShip.dimensions?.width ?? '12.0'),
+      height: String(dupShip.dimensions?.height ?? '15.0'),
+      sizeUnit: dupShip.dimensions?.unit || 'cm',
+      weight: cleanDupWeight || '0.5',
+      weightUnit: dupShip.weight?.unit || 'kg',
+      countryOfOrigin: dupShip.customs?.country_of_origin || product.attributes.country_of_origin || 'India',
+      hsCode: dupShip.customs?.hs_code || product.attributes.hs_code || '3303.00.10',
+    });
+
     setImageFile(null);
     setGalleryFiles(null);
     setError('');
@@ -457,6 +552,10 @@ export default function ProductsPage() {
   };
 
   const handleOpenCreate = () => {
+    if (typeof window !== 'undefined') {
+      scrollPosRef.current = window.scrollY;
+    }
+    lastWorkedSlugRef.current = null;
     setEditingProduct(null);
     setTitle('');
     setSlug('');
@@ -484,8 +583,21 @@ export default function ProductsPage() {
     setMetaTitle('');
     setMetaDescription('');
     setImageAltText('');
+    setBarcode('');
     setManualTags([]);
     setVariantsList([]);
+    setShippingData({
+      isPhysical: true,
+      packageType: 'Store default • Box - 10 × 12 × 15 cm, 0.5 kg',
+      length: '10.0',
+      width: '12.0',
+      height: '15.0',
+      sizeUnit: 'cm',
+      weight: '0.5',
+      weightUnit: 'kg',
+      countryOfOrigin: 'India',
+      hsCode: '3303.00.10',
+    });
     setImageFile(null);
     setGalleryFiles(null);
     setError('');
@@ -493,11 +605,16 @@ export default function ProductsPage() {
   };
 
   const handleOpenEdit = (product: Product) => {
+    if (typeof window !== 'undefined') {
+      scrollPosRef.current = window.scrollY;
+    }
+    lastWorkedSlugRef.current = product.slug;
     setEditingProduct(product);
     setVariantsList(product.variants || []);
     setTitle(product.title);
     setSlug(product.slug);
     setSku(product.sku);
+    setBarcode(product.barcode || product.attributes?.barcode || '');
     setPrice(product.price);
     setComparePrice(product.compare_at_price || '');
     setDescription(product.attributes.description || '');
@@ -523,6 +640,23 @@ export default function ProductsPage() {
     setMetaTitle(product.attributes.meta_title || '');
     setMetaDescription(product.attributes.meta_description || '');
     setImageAltText(product.attributes.image_alt_text || '');
+
+    // Parse Shipping Data
+    const ship = product.attributes.shipping || {};
+    const weightVal = ship.weight?.value ?? product.attributes.weight ?? '0.5';
+    const cleanWeight = typeof weightVal === 'string' ? weightVal.replace(/[^0-9.]/g, '') : String(weightVal);
+    setShippingData({
+      isPhysical: ship.is_physical !== undefined ? ship.is_physical : true,
+      packageType: ship.package_type || 'Store default • Box - 10 × 12 × 15 cm, 0.5 kg',
+      length: String(ship.dimensions?.length ?? '10.0'),
+      width: String(ship.dimensions?.width ?? '12.0'),
+      height: String(ship.dimensions?.height ?? '15.0'),
+      sizeUnit: ship.dimensions?.unit || 'cm',
+      weight: cleanWeight || '0.5',
+      weightUnit: ship.weight?.unit || 'kg',
+      countryOfOrigin: ship.customs?.country_of_origin || product.attributes.country_of_origin || 'India',
+      hsCode: ship.customs?.hs_code || product.attributes.hs_code || '3303.00.10',
+    });
 
     // Parse initial manual tags
     const loadedTags = Array.isArray(product.attributes.tags)
@@ -578,6 +712,7 @@ export default function ProductsPage() {
     formData.append('title', title);
     formData.append('slug', slug);
     formData.append('sku', sku);
+    formData.append('barcode', barcode);
     formData.append('price', price);
     if (comparePrice) formData.append('compare_at_price', comparePrice);
     formData.append('description', description);
@@ -586,6 +721,7 @@ export default function ProductsPage() {
 
     // Save attributes as JSON payload
     const attributes = {
+      barcode,
       scent_notes: scentProfile,
       volume_ml: volume,
       description,
@@ -603,13 +739,32 @@ export default function ProductsPage() {
       bottle_material: bottleMaterial,
       meta_title: metaTitle,
       meta_description: metaDescription,
-      image_alt_text: imageAltText
+      image_alt_text: imageAltText,
+      shipping: {
+        is_physical: shippingData.isPhysical,
+        package_type: shippingData.packageType,
+        dimensions: {
+          length: shippingData.length,
+          width: shippingData.width,
+          height: shippingData.height,
+          unit: shippingData.sizeUnit,
+        },
+        weight: {
+          value: shippingData.weight,
+          unit: shippingData.weightUnit,
+        },
+        customs: {
+          country_of_origin: shippingData.countryOfOrigin,
+          hs_code: shippingData.hsCode,
+        },
+      },
+      weight: shippingData.weight ? `${shippingData.weight} ${shippingData.weightUnit}` : '0.5 kg',
+      country_of_origin: shippingData.countryOfOrigin,
+      hs_code: shippingData.hsCode
     };
     formData.append('attributes', JSON.stringify(attributes));
 
-    if (variantsList && variantsList.length > 0) {
-      formData.append('variants', JSON.stringify(variantsList));
-    }
+    formData.append('variants', JSON.stringify(variantsList || []));
 
     if (imageFile) {
       formData.append('image', imageFile);
@@ -622,16 +777,22 @@ export default function ProductsPage() {
     }
 
     try {
+      let savedProductData: any = null;
       if (editingProduct) {
-        await apiFetch(`/shop/products/${editingProduct.slug}/`, {
+        savedProductData = await apiFetch(`/shop/products/${editingProduct.slug}/`, {
           method: 'PUT',
           body: formData,
         });
       } else {
-        await apiFetch('/shop/products/', {
+        savedProductData = await apiFetch('/shop/products/', {
           method: 'POST',
           body: formData,
         });
+      }
+      const savedSlug = savedProductData?.slug || slug || editingProduct?.slug || null;
+      if (savedSlug) {
+        lastWorkedSlugRef.current = savedSlug;
+        setHighlightSlug(savedSlug);
       }
       setModalOpen(false);
       fetchProducts();
@@ -676,8 +837,9 @@ export default function ProductsPage() {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => setModalOpen(false)}
-            className="p-2.5 hover:bg-secondary border border-border rounded-xl transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground bg-card"
+            onClick={handleCloseModal}
+            className="p-3 neu-btn rounded-2xl transition duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -692,17 +854,19 @@ export default function ProductsPage() {
         </div>
 
         {error && (
-          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+          <div className="p-4 rounded-2xl neu-inset bg-red-500/10 border border-red-500/20 text-sm text-red-500">
             {error}
           </div>
         )}
 
-        <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
+        <div className="bg-card neu-extruded-lg p-8 rounded-3xl border border-border/10">
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* 1-Click Preset Scent Template Selector */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
-              <div className="flex items-center gap-2.5">
-                <Wand2 className="w-5 h-5 text-primary flex-shrink-0" />
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-5 neu-inset rounded-2xl border border-primary/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl neu-extruded-sm flex items-center justify-center text-primary flex-shrink-0">
+                  <Wand2 className="w-5 h-5" />
+                </div>
                 <div>
                   <span className="text-xs font-bold text-foreground block">Preset Scent Templates</span>
                   <span className="text-[11px] text-muted-foreground">Select a fragrance family to auto-fill Top/Heart/Base notes, accords & gender in 1 click</span>
@@ -712,7 +876,7 @@ export default function ProductsPage() {
                 onChange={(e) => {
                   if (e.target.value) handleApplyPresetTemplate(e.target.value);
                 }}
-                className="w-full md:w-auto px-3.5 py-2 bg-background border border-primary/40 rounded-xl text-xs font-bold text-foreground focus:outline-none cursor-pointer hover:border-primary transition"
+                className="w-full md:w-auto px-4 py-2.5 neu-input rounded-xl text-xs font-bold text-foreground cursor-pointer transition"
               >
                 <option value="">-- Apply Preset Fragrance Template --</option>
                 {PRESET_TEMPLATES.map((t) => (
@@ -733,7 +897,7 @@ export default function ProductsPage() {
                   value={title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="e.g. MPF L'amour EDP"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -746,7 +910,7 @@ export default function ProductsPage() {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="e.g. mpf-lamour-edp"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -759,7 +923,22 @@ export default function ProductsPage() {
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
                   placeholder="e.g. MPF-LAMOUR-100"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
+                />
+              </div>
+
+              {/* Barcode (ISBN, UPC, GTIN) */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center justify-between">
+                  <span>Barcode</span>
+                  <span className="text-[10px] text-muted-foreground/70 normal-case font-normal">(ISBN, UPC, GTIN)</span>
+                </label>
+                <input
+                  type="text"
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                  placeholder="e.g. 8901234567890"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -772,7 +951,7 @@ export default function ProductsPage() {
                   min="0"
                   value={stockLevel}
                   onChange={(e) => setStockLevel(parseInt(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -787,7 +966,7 @@ export default function ProductsPage() {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="4999.00"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -801,7 +980,7 @@ export default function ProductsPage() {
                   value={comparePrice}
                   onChange={(e) => setComparePrice(e.target.value)}
                   placeholder="5999.00"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -811,7 +990,7 @@ export default function ProductsPage() {
                 <select
                   value={volume}
                   onChange={(e) => setVolume(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="50ml">50ml</option>
                   <option value="75ml">75ml</option>
@@ -825,28 +1004,52 @@ export default function ProductsPage() {
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-semibold text-muted-foreground uppercase">Brand Name</label>
                   {brand && brand !== 'NEW_BRAND' && !showNewBrandInput && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (confirm(`Are you sure you want to delete the brand "${brand}"?`)) {
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newName = prompt(`Enter new name for brand "${brand}":`, brand);
+                          if (!newName || newName.trim() === '' || newName.trim() === brand) return;
                           try {
-                            const res = await apiFetch(`/shop/brands/`, {
-                              method: 'DELETE',
-                              body: JSON.stringify({ brand }),
+                            await apiFetch(`/shop/brands/`, {
+                              method: 'PUT',
+                              body: JSON.stringify({ old_brand: brand, new_brand: newName.trim() }),
                               headers: { 'Content-Type': 'application/json' }
                             });
-                            alert(`Brand "${brand}" deleted successfully.`);
-                            setBrand('');
+                            alert(`Brand "${brand}" renamed to "${newName.trim()}" successfully.`);
+                            setBrand(newName.trim());
                             fetchBrands();
-                          } catch (err) {
-                            console.error(err);
+                          } catch (err: any) {
+                            alert(err.message || 'Failed to update brand.');
                           }
-                        }
-                      }}
-                      className="text-[10px] font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer uppercase tracking-wider"
-                    >
-                      Delete Brand
-                    </button>
+                        }}
+                        className="text-[10px] font-bold text-primary hover:underline cursor-pointer uppercase tracking-wider"
+                      >
+                        Edit Brand
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to delete the brand "${brand}"?`)) {
+                            try {
+                              const res = await apiFetch(`/shop/brands/`, {
+                                method: 'DELETE',
+                                body: JSON.stringify({ brand }),
+                                headers: { 'Content-Type': 'application/json' }
+                              });
+                              alert(`Brand "${brand}" deleted successfully.`);
+                              setBrand('');
+                              fetchBrands();
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                        className="text-[10px] font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer uppercase tracking-wider"
+                      >
+                        Delete Brand
+                      </button>
+                    </div>
                   )}
                 </div>
                 {!showNewBrandInput ? (
@@ -861,7 +1064,7 @@ export default function ProductsPage() {
                         setBrand(val);
                       }
                     }}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                    className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                   >
                     <option value="">-- Choose Brand --</option>
                     {brandsList.map(b => (
@@ -876,7 +1079,7 @@ export default function ProductsPage() {
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
                       placeholder="Enter new brand name..."
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                      className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                     />
                     <div className="flex justify-end">
                       <button
@@ -900,7 +1103,7 @@ export default function ProductsPage() {
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="Men">Men</option>
                   <option value="Women">Women</option>
@@ -914,7 +1117,7 @@ export default function ProductsPage() {
                 <select
                   value={occasion}
                   onChange={(e) => setOccasion(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="Daily">Daily </option>
                   <option value="Date Night">Date Night</option>
@@ -930,7 +1133,7 @@ export default function ProductsPage() {
                 <select
                   value={season}
                   onChange={(e) => setSeason(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="All Seasons">All Seasons</option>
                   <option value="Summer">Summer</option>
@@ -946,7 +1149,7 @@ export default function ProductsPage() {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="Attar">Attar</option>
                   <option value="Body Mist">Body Mist</option>
@@ -963,7 +1166,7 @@ export default function ProductsPage() {
                 <select
                   value={productType}
                   onChange={(e) => setProductType(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="Eau de Parfum">Eau de Parfum</option>
                   <option value="Eau de Toilette">Eau de Toilette</option>
@@ -979,7 +1182,7 @@ export default function ProductsPage() {
                 <select
                   value={bottleMaterial}
                   onChange={(e) => setBottleMaterial(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="Glass">Glass</option>
                   <option value="Premium Frosted Glass">Premium Frosted Glass</option>
@@ -995,7 +1198,7 @@ export default function ProductsPage() {
                 <select
                   value={isOnline ? 'Published' : 'Draft'}
                   onChange={(e) => setIsOnline(e.target.value === 'Published')}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="Published">Published (Visible online)</option>
                   <option value="Draft">Draft (Offline/Hidden)</option>
@@ -1010,7 +1213,7 @@ export default function ProductsPage() {
                   value={vendor}
                   onChange={(e) => setVendor(e.target.value)}
                   placeholder="e.g. PerfumeBooth India"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
 
@@ -1022,7 +1225,7 @@ export default function ProductsPage() {
                   value={topNotes}
                   onChange={(e) => setTopNotes(e.target.value)}
                   placeholder="e.g. Lemon, Calabrian Bergamot"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
                 <select
                   value=""
@@ -1036,7 +1239,7 @@ export default function ProductsPage() {
                       setTopNotes([...currentNotes, val].join(', '));
                     }
                   }}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="">-- Add Scent Note --</option>
                   {noteOptions.map(option => (
@@ -1049,7 +1252,7 @@ export default function ProductsPage() {
                     {parseNotes(topNotes).map(note => (
                       <span
                         key={note}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary transition-all duration-200"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl neu-inset-sm text-xs font-semibold text-primary transition-all duration-200"
                       >
                         {note}
                         <button
@@ -1076,7 +1279,7 @@ export default function ProductsPage() {
                   value={middleNotes}
                   onChange={(e) => setMiddleNotes(e.target.value)}
                   placeholder="e.g. Jasmine, Rose"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
                 <select
                   value=""
@@ -1090,7 +1293,7 @@ export default function ProductsPage() {
                       setMiddleNotes([...currentNotes, val].join(', '));
                     }
                   }}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="">-- Add Scent Note --</option>
                   {noteOptions.map(option => (
@@ -1103,7 +1306,7 @@ export default function ProductsPage() {
                     {parseNotes(middleNotes).map(note => (
                       <span
                         key={note}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary transition-all duration-200"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl neu-inset-sm text-xs font-semibold text-primary transition-all duration-200"
                       >
                         {note}
                         <button
@@ -1130,7 +1333,7 @@ export default function ProductsPage() {
                   value={baseNotes}
                   onChange={(e) => setBaseNotes(e.target.value)}
                   placeholder="e.g. Amberwood, Cedar"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
                 <select
                   value=""
@@ -1144,7 +1347,7 @@ export default function ProductsPage() {
                       setBaseNotes([...currentNotes, val].join(', '));
                     }
                   }}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
                 >
                   <option value="">-- Add Scent Note --</option>
                   {noteOptions.map(option => (
@@ -1157,7 +1360,7 @@ export default function ProductsPage() {
                     {parseNotes(baseNotes).map(note => (
                       <span
                         key={note}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary transition-all duration-200"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl neu-inset-sm text-xs font-semibold text-primary transition-all duration-200"
                       >
                         {note}
                         <button
@@ -1184,7 +1387,7 @@ export default function ProductsPage() {
                   value={tags}
                   onChange={(e) => handleTagsChange(e.target.value)}
                   placeholder="e.g. fresh, luxury, sweet, office"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
             </div>
@@ -1197,7 +1400,7 @@ export default function ProductsPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Enter detailed description..."
                 rows={4}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground resize-y"
               />
             </div>
 
@@ -1211,9 +1414,28 @@ export default function ProductsPage() {
               onChange={(updated) => setVariantsList(updated)}
             />
 
+            {/* Shipping Features Component */}
+            <ShippingSection
+              values={shippingData}
+              onChange={(updated) => setShippingData((prev) => ({ ...prev, ...updated }))}
+            />
+
             {/* Batch Image Dropzone Component */}
             <BatchImageDropzone
               productTitle={title}
+              initialFeaturedUrl={editingProduct ? formatProductImageUrl(editingProduct.image || editingProduct.images?.[0]?.url) : null}
+              initialGalleryUrls={(() => {
+                if (!editingProduct) return [];
+                const allUrls = (editingProduct.images || [])
+                  .map((img: any) => formatProductImageUrl(img.url))
+                  .filter((u): u is string => Boolean(u));
+                const mainUrl = formatProductImageUrl(editingProduct.image || editingProduct.images?.[0]?.url);
+                // If first image is the main image, take all remaining images as featured
+                if (allUrls.length > 0 && (allUrls[0] === mainUrl || (mainUrl && allUrls[0].includes(mainUrl.split('/').pop()?.split('_')[0] || '___')))) {
+                  return allUrls.slice(1);
+                }
+                return allUrls.filter((url) => url !== mainUrl);
+              })()}
               onFeaturedFileChange={(file) => setImageFile(file)}
               onGalleryFilesChange={(files) => {
                 const dt = new DataTransfer();
@@ -1223,7 +1445,7 @@ export default function ProductsPage() {
             />
 
             {/* Search Engine Listing Preview */}
-            <div className="border-t border-border pt-6 flex flex-col gap-6">
+            <div className="border-t border-border/40 pt-6 flex flex-col gap-6">
               <div>
                 <h3 className="text-sm font-bold text-foreground">Search engine listing</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -1232,7 +1454,7 @@ export default function ProductsPage() {
               </div>
 
               {/* Real-time Google Search Snippet Preview */}
-              <div className="p-4 bg-secondary/30 border border-border rounded-xl flex flex-col gap-1 max-w-2xl">
+              <div className="p-5 neu-inset rounded-2xl flex flex-col gap-1 max-w-2xl border border-border/20">
                 <span className="text-[12px] text-emerald-600 dark:text-emerald-500 font-normal truncate block">
                   https://perfumebooth.com/products/{slug || 'product-handle'}
                 </span>
@@ -1257,7 +1479,7 @@ export default function ProductsPage() {
                     value={metaTitle}
                     onChange={(e) => setMetaTitle(e.target.value)}
                     placeholder={title || "e.g. Premium EDP Perfume | PerfumeBooth"}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                    className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                   />
                 </div>
 
@@ -1273,7 +1495,7 @@ export default function ProductsPage() {
                     onChange={(e) => setMetaDescription(e.target.value)}
                     placeholder={description || "e.g. Discover our premium scent crafted for longevity..."}
                     rows={3}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary transition duration-200 text-sm text-foreground"
+                    className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground resize-y"
                   />
                 </div>
                 
@@ -1281,18 +1503,18 @@ export default function ProductsPage() {
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex justify-end gap-3 mt-4">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border/30">
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
-                className="px-5 py-2.5 border border-border text-foreground font-semibold rounded-xl hover:bg-secondary transition duration-200 cursor-pointer text-sm"
+                onClick={handleCloseModal}
+                className="px-6 py-2.5 neu-btn text-foreground font-semibold rounded-2xl cursor-pointer text-sm"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitLoading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm disabled:opacity-50"
+                className="flex items-center gap-2 px-7 py-2.5 neu-btn-primary font-semibold rounded-2xl cursor-pointer text-sm disabled:opacity-50"
               >
                 {submitLoading ? (
                   <>
@@ -1312,7 +1534,7 @@ export default function ProductsPage() {
 
   const handleExportExcel = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/shop/products/excel-export/', {
+      const res = await fetch(`${getApiBaseUrl()}/shop/products/excel-export/`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -1360,36 +1582,36 @@ export default function ProductsPage() {
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">Products</h1>
-            <span className="text-xs font-bold text-muted-foreground bg-secondary/80 border border-border px-2.5 py-1 rounded-xl uppercase tracking-wider">
+            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Products</h1>
+            <span className="text-xs font-bold text-primary neu-inset-sm px-3.5 py-1 rounded-full uppercase tracking-wider">
               {products.length} {products.length === 1 ? 'product' : 'products'}
             </span>
           </div>
           <p className="text-muted-foreground text-sm">Manage store catalog, pricing, inventory, and media assets</p>
         </div>
-        <div className='flex justify-center items-center gap-3'>
+        <div className='flex flex-wrap items-center gap-3'>
           {selectedSlugs.length > 0 && (
             <>
               <button
                 onClick={() => handleBulkStatusChange(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-emerald-600 dark:text-emerald-400 font-semibold rounded-2xl cursor-pointer text-sm"
               >
                 <Check className="w-4 h-4" />
                 <span>Publish ({selectedSlugs.length})</span>
               </button>
               <button
                 onClick={() => handleBulkStatusChange(false)}
-                className="flex items-center gap-2 px-4 py-2 bg-zinc-600 hover:bg-zinc-700 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-zinc-600 dark:text-zinc-400 font-semibold rounded-2xl cursor-pointer text-sm"
               >
                 <X className="w-4 h-4" />
                 <span>Unpublish ({selectedSlugs.length})</span>
               </button>
               <button
                 onClick={handleBulkDelete}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-red-500 font-semibold rounded-2xl cursor-pointer text-sm"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Delete ({selectedSlugs.length})</span>
@@ -1402,7 +1624,7 @@ export default function ProductsPage() {
                   setBulkActionValue(10);
                   setBulkEditOpen(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-primary font-semibold rounded-2xl cursor-pointer text-sm"
               >
                 <span>Bulk Adjust ({selectedSlugs.length})</span>
               </button>
@@ -1410,21 +1632,21 @@ export default function ProductsPage() {
           )}
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-semibold rounded-xl transition duration-200 cursor-pointer text-sm"
+            className="flex items-center gap-2 px-4 py-2.5 neu-btn font-semibold rounded-2xl cursor-pointer text-sm"
           >
-            <FileDown className="w-4 h-4 text-muted-foreground" />
+            <FileDown className="w-4 h-4 text-primary" />
             <span>Import</span>
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-semibold rounded-xl transition duration-200 cursor-pointer text-sm"
+            className="flex items-center gap-2 px-4 py-2.5 neu-btn font-semibold rounded-2xl cursor-pointer text-sm"
           >
-            <FileUp className="w-4 h-4 text-muted-foreground" />
+            <FileUp className="w-4 h-4 text-primary" />
             <span>Export</span>
           </button>
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition duration-200 cursor-pointer text-sm"
+            className="flex items-center gap-2 px-5 py-2.5 neu-btn-primary font-semibold rounded-2xl cursor-pointer text-sm"
           >
             <Plus className="w-4 h-4" />
             <span>Add product</span>
@@ -1433,23 +1655,23 @@ export default function ProductsPage() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-card border border-border p-5 rounded-2xl shadow-sm">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-card neu-extruded p-5 rounded-3xl border border-border/10">
         {/* Search Input Box */}
         <div className="relative w-full xl:w-96 flex-shrink-0">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title or SKU..."
-            className="w-full pl-11 pr-4 py-2.5 bg-background border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition duration-200 text-sm text-foreground placeholder:text-muted-foreground/60"
+            className="w-full pl-11 pr-4 py-2.5 neu-input rounded-2xl text-sm text-foreground placeholder:text-muted-foreground/60"
           />
         </div>
         
         {/* Dropdown Filters Group */}
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           {/* Brand Filter */}
-          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+          <div className="flex items-center gap-2 neu-inset-sm px-3.5 py-2 rounded-2xl border border-border/20">
             <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Brand</span>
             <select
               value={filterBrand}
@@ -1464,7 +1686,7 @@ export default function ProductsPage() {
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+          <div className="flex items-center gap-2 neu-inset-sm px-3.5 py-2 rounded-2xl border border-border/20">
             <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Status</span>
             <select
               value={filterStatus}
@@ -1478,7 +1700,7 @@ export default function ProductsPage() {
           </div>
 
           {/* Stock Filter */}
-          <div className="flex items-center gap-2 bg-background border border-border px-3 py-2 rounded-xl transition hover:border-border-hover">
+          <div className="flex items-center gap-2 neu-inset-sm px-3.5 py-2 rounded-2xl border border-border/20">
             <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Stock</span>
             <select
               value={filterStock}
@@ -1513,11 +1735,11 @@ export default function ProductsPage() {
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       ) : (
-        <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="bg-card neu-extruded rounded-3xl overflow-hidden border border-border/10">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-border text-muted-foreground font-semibold">
+                <tr className="border-b border-border/40 text-muted-foreground font-bold text-xs uppercase tracking-wider">
                   <th className="p-5 w-10">
                     <input
                       type="checkbox"
@@ -1542,16 +1764,26 @@ export default function ProductsPage() {
                   <th className="p-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/20">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-10 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-10 text-center text-muted-foreground font-medium">
                       No products found. Add your first item!
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product) => (
-                    <tr key={product.id} className="border-b border-border/50 hover:bg-muted/10 transition duration-150">
+                  filteredProducts.map((product) => {
+                    const isHighlighted = highlightSlug === product.slug;
+                    return (
+                      <tr
+                        key={product.id}
+                        id={`product-row-${product.slug}`}
+                        className={`transition-all duration-700 ${
+                          isHighlighted
+                            ? 'bg-primary/15 ring-2 ring-primary ring-inset shadow-md'
+                            : 'hover:bg-primary/[0.03]'
+                        }`}
+                      >
                       <td className="p-5 w-10">
                         <input
                           type="checkbox"
@@ -1567,45 +1799,69 @@ export default function ProductsPage() {
                         />
                       </td>
                       <td className="p-5">
-                        {product.image ? (
-                          ['mp4', 'webm', 'mov', 'ogg', 'm4v'].some(ext => product.image?.toLowerCase().endsWith('.' + ext)) ? (
+                        {(() => {
+                          const displayUrl = formatProductImageUrl(product.image || product.images?.[0]?.url);
+                          if (!displayUrl) {
+                            return (
+                              <div className="w-12 h-12 rounded-xl neu-inset-sm flex items-center justify-center text-muted-foreground border border-border/20">
+                                <ImageIcon className="w-5 h-5" />
+                              </div>
+                            );
+                          }
+                          const isVideo = ['mp4', 'webm', 'mov', 'ogg', 'm4v'].some(ext => displayUrl.toLowerCase().endsWith('.' + ext));
+                          return isVideo ? (
                             <video
-                              src={product.image}
-                              className="w-12 h-12 object-cover rounded-lg border border-border bg-black"
+                              src={displayUrl}
+                              className="w-12 h-12 object-cover rounded-xl neu-extruded-sm border border-border/20 bg-black"
                               muted
                               playsInline
                             />
                           ) : (
                             <img
-                              src={product.image}
+                              src={displayUrl}
                               alt={product.title}
-                              className="w-12 h-12 object-cover rounded-lg border border-border bg-black"
+                              className="w-12 h-12 object-cover rounded-xl neu-extruded-sm border border-border/20 bg-black"
                             />
-                          )
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center text-muted-foreground border border-border">
-                            <ImageIcon className="w-5 h-5" />
-                          </div>
-                        )}
+                          );
+                        })()}
                       </td>
                       <td className="p-5">
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(product)}
-                          className="font-semibold text-foreground hover:text-primary transition text-left cursor-pointer hover:underline block"
+                          className="font-bold text-foreground hover:text-primary transition text-left cursor-pointer hover:underline block"
                         >
                           {product.title}
                         </button>
-                        <div className="text-xs text-muted-foreground mt-0.5">{product.sku}</div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="text-xs font-mono text-muted-foreground">{product.sku}</span>
+                          {(product.barcode || product.attributes?.barcode) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-mono neu-inset-sm text-foreground/80 border border-border/30" title="Barcode">
+                              {product.barcode || product.attributes?.barcode}
+                            </span>
+                          )}
+                          {product.attributes?.shipping?.is_physical === false ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-muted-foreground border border-border/30">
+                              Digital
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-primary border border-primary/20">
+                              <Package className="w-2.5 h-2.5" />
+                              {product.attributes?.shipping?.weight?.value
+                                ? `${product.attributes.shipping.weight.value} ${product.attributes.shipping.weight.unit || 'kg'}`
+                                : (product.attributes?.weight ? (String(product.attributes.weight).includes('kg') ? product.attributes.weight : `${product.attributes.weight} kg`) : '0.5 kg')}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-5">
-                        <div className="font-semibold text-foreground">{product.brand}</div>
+                        <div className="font-bold text-foreground">{product.brand}</div>
                       </td>
                       {/* Price Cell (In-Line Editable) */}
                       <td className="p-5">
                         {editingCell?.slug === product.slug && editingCell?.field === 'price' ? (
                           <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground">₹</span>
+                            <span className="text-xs font-bold text-muted-foreground">₹</span>
                             <input
                               type="number"
                               autoFocus
@@ -1616,7 +1872,7 @@ export default function ProductsPage() {
                                 if (e.key === 'Escape') setEditingCell(null);
                               }}
                               onBlur={() => handleSaveInlineCell(product.slug, 'price', editingValue)}
-                              className="w-24 px-2 py-1 bg-background border border-primary rounded text-xs font-bold text-foreground focus:outline-none"
+                              className="w-24 px-2 py-1 neu-input rounded-xl text-xs font-bold text-foreground"
                             />
                           </div>
                         ) : (
@@ -1628,12 +1884,12 @@ export default function ProductsPage() {
                             title="Click to quick-edit price"
                             className="cursor-pointer group flex flex-col"
                           >
-                            <div className="text-foreground font-medium flex items-center gap-1 group-hover:text-primary transition">
+                            <div className="text-foreground font-bold flex items-center gap-1 group-hover:text-primary transition">
                               <span>₹{parseFloat(product.price).toLocaleString('en-IN')}</span>
                               <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition text-muted-foreground" />
                             </div>
                             {product.compare_at_price && (
-                              <div className="text-xs text-muted-foreground line-through mt-0.5">
+                              <div className="text-xs text-muted-foreground line-through mt-0.5 font-medium">
                                 ₹{parseFloat(product.compare_at_price).toLocaleString('en-IN')}
                               </div>
                             )}
@@ -1654,7 +1910,7 @@ export default function ProductsPage() {
                               if (e.key === 'Escape') setEditingCell(null);
                             }}
                             onBlur={() => handleSaveInlineCell(product.slug, 'stock', editingValue)}
-                            className="w-20 px-2 py-1 bg-background border border-primary rounded text-xs font-bold text-foreground focus:outline-none"
+                            className="w-20 px-2 py-1 neu-input rounded-xl text-xs font-bold text-foreground"
                           />
                         ) : (
                           <div
@@ -1666,16 +1922,16 @@ export default function ProductsPage() {
                             className="cursor-pointer group inline-flex items-center gap-1"
                           >
                             {product.stock === 0 ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-red-500/10 text-red-400 rounded-lg group-hover:border group-hover:border-red-500/30">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-red-500 dark:text-red-300 neu-inset-sm rounded-full border border-red-500/30 bg-red-500/5">
                                 Out of Stock
                               </span>
                             ) : product.stock <= 10 ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-amber-500/10 text-amber-400 rounded-lg group-hover:border group-hover:border-amber-500/30">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-amber-500 dark:text-amber-300 neu-inset-sm rounded-full border border-amber-500/30 bg-amber-500/5">
                                 Low Stock: {product.stock} units
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 rounded-lg group-hover:border group-hover:border-emerald-500/30">
-                                {product.stock} in stock
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-300 neu-inset-sm rounded-full border border-emerald-500/30 bg-emerald-500/5">
+                                {product.stock}
                               </span>
                             )}
                             <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition text-muted-foreground ml-0.5" />
@@ -1683,16 +1939,16 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="p-5">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${product.is_online
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-zinc-500/10 text-zinc-400'
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold neu-inset-sm ${product.is_online
+                          ? 'text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/5'
+                          : 'text-zinc-500 dark:text-zinc-400 border border-border/30'
                           }`}>
                           {product.is_online ? 'Online' : 'Offline'}
                         </span>
                       </td>
                       <td className="p-5">
                         <div className="flex flex-col text-xs gap-0.5">
-                          <span className="text-foreground font-semibold text-[10px]">
+                          <span className="text-foreground font-bold text-[10px]">
                             L: {product.created_by_name || 'System'}
                           </span>
                           <span className="text-muted-foreground text-[10px]">
@@ -1705,21 +1961,22 @@ export default function ProductsPage() {
                           <button
                             onClick={() => handleDuplicate(product)}
                             title="Duplicate Product"
-                            className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card transition cursor-pointer"
+                            className="w-8 h-8 neu-btn text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer"
                           >
-                            <Copy className="w-4 h-4" />
+                            <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(product.slug)}
                             title="Delete Product"
-                            className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg border border-border hover:border-red-500/20 bg-card transition cursor-pointer"
+                            className="w-8 h-8 neu-btn text-red-500 hover:text-red-400 rounded-xl flex items-center justify-center cursor-pointer"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1728,9 +1985,9 @@ export default function ProductsPage() {
       )}
       {bulkEditOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border p-6 rounded-2xl w-full max-w-md shadow-xl flex flex-col gap-5 animate-in fade-in zoom-in duration-150">
+          <div className="bg-card neu-extruded-lg border border-border/20 p-7 rounded-3xl w-full max-w-md shadow-2xl flex flex-col gap-6 animate-in fade-in zoom-in duration-150">
             <div>
-              <h2 className="text-lg font-bold text-foreground">Bulk Edit Products ({selectedSlugs.length})</h2>
+              <h2 className="text-lg font-extrabold text-foreground tracking-tight">Bulk Edit Products ({selectedSlugs.length})</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Apply bulk updates to pricing or inventory levels.</p>
             </div>
 
@@ -1738,7 +1995,7 @@ export default function ProductsPage() {
               {/* Action Type */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase">Adjustment Type</label>
-                <div className="grid grid-cols-2 gap-2 bg-secondary/30 p-1 rounded-lg">
+                <div className="grid grid-cols-2 gap-2 neu-inset-sm p-1.5 rounded-2xl border border-border/20">
                   <button
                     type="button"
                     onClick={() => {
@@ -1746,7 +2003,7 @@ export default function ProductsPage() {
                       setBulkActionOption('percent_discount');
                       setBulkActionValue(10);
                     }}
-                    className={`py-1.5 text-xs font-semibold rounded-md transition ${bulkActionType === 'price' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`py-2 text-xs font-bold rounded-xl transition ${bulkActionType === 'price' ? 'neu-btn-primary' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Adjust Price
                   </button>
@@ -1757,7 +2014,7 @@ export default function ProductsPage() {
                       setBulkActionOption('add');
                       setBulkActionValue(10);
                     }}
-                    className={`py-1.5 text-xs font-semibold rounded-md transition ${bulkActionType === 'stock' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`py-2 text-xs font-bold rounded-xl transition ${bulkActionType === 'stock' ? 'neu-btn-primary' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Adjust Stock
                   </button>
@@ -1770,7 +2027,7 @@ export default function ProductsPage() {
                 <select
                   value={bulkActionOption}
                   onChange={(e) => setBulkActionOption(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-xs text-foreground font-semibold"
+                  className="w-full px-3.5 py-2.5 neu-input rounded-2xl text-xs text-foreground font-semibold cursor-pointer"
                 >
                   {bulkActionType === 'price' ? (
                     <>
@@ -1795,23 +2052,23 @@ export default function ProductsPage() {
                   value={bulkActionValue}
                   onChange={(e) => setBulkActionValue(parseFloat(e.target.value) || 0)}
                   placeholder="e.g. 10"
-                  className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:border-primary text-xs text-foreground font-semibold"
+                  className="w-full px-3.5 py-2.5 neu-input rounded-2xl text-xs text-foreground font-semibold"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+            <div className="flex items-center justify-end gap-3 border-t border-border/30 pt-4">
               <button
                 type="button"
                 onClick={() => setBulkEditOpen(false)}
-                className="px-4 py-2 border border-border text-foreground font-semibold rounded-xl hover:bg-secondary transition text-xs cursor-pointer"
+                className="px-5 py-2.5 neu-btn text-foreground font-semibold rounded-2xl transition text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApplyBulkAdjust}
-                className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition text-xs cursor-pointer"
+                className="px-5 py-2.5 neu-btn-primary font-semibold rounded-2xl transition text-xs cursor-pointer"
               >
                 Apply Updates
               </button>

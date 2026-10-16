@@ -72,7 +72,10 @@ class InventoryReservationLifecycleTests(TestCase):
     def test_verified_payment_commits_reservation_once(self, _email, _shiprocket):
         order = self.checkout()
 
-        paid_order = process_payment_webhook('pay_inventory_test', str(order.id))
+        from apps.orders.models import PaymentAttempt
+        from apps.orders.payments import process_entity
+        PaymentAttempt.objects.create(order=order, gateway_order_id='order_test')
+        paid_order, _ = process_entity({'id': 'pay_inventory_test', 'order_id': 'order_test', 'amount': int(order.total * 100), 'currency': 'INR', 'status': 'captured'}, 'test_capture', 'payment.captured')
 
         self.inventory.refresh_from_db()
         reservation = order.inventory_reservations.get()

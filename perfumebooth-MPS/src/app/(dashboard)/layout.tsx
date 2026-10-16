@@ -63,8 +63,8 @@ export default function DashboardLayout({
         <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
           <Navbar />
           <main className="flex-1 flex items-center justify-center p-8">
-            <div className="max-w-md w-full glass-panel p-8 rounded-2xl shadow-2xl flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-400">
+            <div className="max-w-md w-full bg-card neu-extruded p-8 rounded-3xl border border-border/10 flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-2xl neu-inset-sm flex items-center justify-center text-red-500">
                 <ShieldAlert className="w-8 h-8" />
               </div>
               <h2 className="text-xl font-bold text-foreground">Access Denied</h2>
@@ -73,7 +73,7 @@ export default function DashboardLayout({
               </p>
               <button 
                 onClick={() => router.push(defaultHome)}
-                className="mt-2 px-6 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:shadow-lg transition duration-200 cursor-pointer text-sm"
+                className="mt-2 px-6 py-2.5 neu-btn-primary font-bold rounded-2xl transition duration-200 cursor-pointer text-sm"
               >
                 Go Back Home
               </button>

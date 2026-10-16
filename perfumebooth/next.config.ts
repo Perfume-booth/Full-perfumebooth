@@ -9,6 +9,12 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  allowedDevOrigins: [
+    '192.168.31.168',
+    '192.168.31.168:3000',
+    'localhost',
+    'localhost:3000'
+  ],
   skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: ["@/components/ui/icons"],

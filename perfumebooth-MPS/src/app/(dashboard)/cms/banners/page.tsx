@@ -157,29 +157,34 @@ export default function BannersPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full pb-12">
       {/* Top Navigation Sub-Tabs */}
-      <div className="flex border-b border-white/10 mb-6 gap-2">
-        <button
-          onClick={() => router.push('/cms/banners')}
-          className="px-5 py-2.5 font-semibold text-sm border-b-2 border-[var(--color-gold)] text-[var(--color-gold)] flex items-center gap-2 bg-white/5 rounded-t-lg"
-        >
-          <ImageIcon size={16} />
-          <span>Header Banners & Slideshows</span>
-        </button>
+      <div className="flex gap-3">
         <button
           onClick={() => router.push('/cms')}
-          className="px-5 py-2.5 font-semibold text-sm text-gray-400 hover:text-white flex items-center gap-2 rounded-t-lg transition-colors"
+          className="px-5 py-2.5 font-bold text-xs text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-2xl neu-btn transition-colors cursor-pointer"
         >
-          <Layout size={16} />
-          <span>Page Content & Layout Builder</span>
+          <Layout className="w-4 h-4" />
+          <span>Info Pages Content Editor</span>
+        </button>
+        <button
+          onClick={() => router.push('/cms/banners')}
+          className="px-5 py-2.5 font-bold text-xs neu-inset-sm text-primary flex items-center gap-2 rounded-2xl"
+        >
+          <ImageIcon className="w-4 h-4" />
+          <span>Header Banners & Slideshows</span>
         </button>
       </div>
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Header Banners & Slideshows</h1>
-          <p className="text-gray-400 text-sm">Upload and manage hero slideshow graphics for homepage and product categories</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Header Banners & Slideshows</h1>
+            <span className="px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-primary">
+              Media
+            </span>
+          </div>
+          <p className="text-muted-foreground text-sm mt-1">Upload and manage hero slideshow graphics for homepage and product categories</p>
         </div>
         <button 
           onClick={() => {
@@ -188,70 +193,70 @@ export default function BannersPage() {
             setIsActive(true);
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded font-semibold hover:opacity-90 transition-opacity cursor-pointer text-sm"
+          className="flex items-center gap-2 neu-btn-primary px-5 py-2.5 rounded-2xl font-bold transition-opacity cursor-pointer text-sm"
         >
-          <PlusCircle size={18} />
-          Create Banner
+          <PlusCircle className="w-4 h-4" />
+          <span>Create Banner</span>
         </button>
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="animate-spin text-[var(--color-gold)]" size={32} />
+        <div className="flex justify-center items-center py-20 text-primary">
+          <Loader2 className="animate-spin" size={32} />
         </div>
       ) : (
-        <div className="bg-[#121212] border border-white/10 rounded-lg overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-300">
-            <thead className="bg-white/5 text-gray-400">
+        <div className="bg-card neu-extruded border border-border/10 rounded-3xl overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/20 text-muted-foreground text-xs uppercase font-bold tracking-wider border-b border-border/30">
               <tr>
-                <th className="px-6 py-4 font-medium">Primary Image</th>
-                <th className="px-6 py-4 font-medium">Page Slug</th>
-                <th className="px-6 py-4 font-medium">Title</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
+                <th className="px-6 py-4 font-bold">Primary Image</th>
+                <th className="px-6 py-4 font-bold">Page Slug</th>
+                <th className="px-6 py-4 font-bold">Title</th>
+                <th className="px-6 py-4 font-bold">Status</th>
+                <th className="px-6 py-4 font-bold text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border/20">
               {banners.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground font-semibold">
                     No banners found. Create one to get started.
                   </td>
                 </tr>
               ) : (
                 banners.map((banner) => (
-                  <tr key={banner.id} className="hover:bg-white/5">
+                  <tr key={banner.id} className="hover:bg-muted/10 transition">
                     <td className="px-6 py-4">
                       {banner.primary_image ? (
-                        <div className="relative w-24 h-12 bg-white/10 rounded overflow-hidden">
+                        <div className="relative w-24 h-12 neu-inset-sm rounded-xl overflow-hidden p-0.5">
                           <Image 
                             src={banner.primary_image} 
                             alt={banner.title || 'Banner'} 
                             fill 
                             sizes="96px"
-                            className="object-cover" 
+                            className="object-cover rounded-lg" 
                           />
                         </div>
                       ) : (
-                        <div className="w-24 h-12 bg-white/10 rounded flex items-center justify-center text-gray-500">
+                        <div className="w-24 h-12 neu-inset-sm rounded-xl flex items-center justify-center text-muted-foreground/40">
                           <ImageIcon size={20} />
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 font-mono text-[var(--color-gold)]">/{banner.page_slug}</td>
+                    <td className="px-6 py-4 font-mono font-bold text-primary text-xs">/{banner.page_slug}</td>
                     <td className="px-6 py-4">
-                      {banner.title || '-'}
-                      <div className="text-xs text-gray-500 mt-1">{banner.image_count} image(s)</div>
+                      <span className="font-bold text-foreground text-sm">{banner.title || '-'}</span>
+                      <div className="text-xs text-muted-foreground mt-0.5 font-medium">{banner.image_count} image(s)</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${banner.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold neu-inset-sm ${banner.is_active ? 'text-emerald-500' : 'text-red-500'}`}>
                         {banner.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button 
                         onClick={() => openEditModal(banner)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer mr-2"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 neu-btn text-foreground rounded-xl text-xs font-bold transition duration-200 cursor-pointer mr-2"
                         title="Edit Banner Settings"
                       >
                         <Edit size={14} />
@@ -259,7 +264,7 @@ export default function BannersPage() {
                       </button>
                       <button 
                         onClick={() => handleDelete(banner.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 neu-btn text-muted-foreground hover:text-red-500 rounded-xl text-xs font-bold transition duration-200 cursor-pointer"
                         title="Delete Banner"
                       >
                         <Trash2 size={14} />
@@ -275,16 +280,16 @@ export default function BannersPage() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-              <h2 className="text-xl font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-card neu-extruded border border-border/10 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-border/30 shrink-0 bg-muted/20">
+              <h2 className="text-xl font-extrabold text-foreground">
                 {pageSlug ? `Edit Banner (/${pageSlug})` : 'Create Page Banner'}
               </h2>
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-white"
+                className="w-8 h-8 rounded-xl neu-btn flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 ✕
               </button>
@@ -292,62 +297,62 @@ export default function BannersPage() {
             
             <form id="banner-modal-content" onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Page Slug *</label>
-                <div className="flex items-center">
-                  <span className="px-3 py-2 bg-white/5 border border-white/10 border-r-0 rounded-l-md text-gray-500">/</span>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Page Slug *</label>
+                <div className="flex items-center neu-input rounded-2xl overflow-hidden">
+                  <span className="px-3.5 py-2.5 bg-muted/40 font-bold text-muted-foreground border-r border-border/30">/</span>
                   <input
                     type="text"
                     required
                     value={pageSlug}
                     onChange={e => setPageSlug(e.target.value)}
                     placeholder="e.g. men, al-haramain, notes/woody"
-                    className="w-full bg-[#121212] border border-white/10 rounded-r-md px-3 py-2 text-white outline-none focus:border-primary"
+                    className="w-full bg-transparent px-3.5 py-2.5 text-foreground outline-none text-sm font-bold"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">This must match the URL slug exactly.</p>
+                <p className="text-[11px] text-muted-foreground mt-1 font-medium">This must match the URL slug exactly.</p>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Alt Text</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Alt Text</label>
                 <input
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white outline-none focus:border-primary"
+                  className="w-full neu-input rounded-2xl px-4 py-2.5 text-foreground outline-none text-sm font-medium"
                 />
               </div>
 
-              <div className="space-y-6 pt-4 border-t border-white/10">
+              <div className="space-y-6 pt-4 border-t border-border/30">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-white">Slides</h3>
+                  <h3 className="text-base font-extrabold text-foreground">Slides</h3>
                 </div>
                 
                 {slides.map((slide, index) => (
-                  <div key={index} className="p-4 bg-white/5 border border-white/10 rounded-lg space-y-4 relative">
+                  <div key={index} className="p-5 neu-inset rounded-2xl space-y-4 relative">
                     {slides.length > 1 && (
                       <button
                         type="button"
                         onClick={() => setSlides(slides.filter((_, i) => i !== index))}
-                        className="absolute top-4 right-4 text-gray-500 hover:text-red-500"
+                        className="absolute top-4 right-4 neu-btn p-1.5 rounded-xl text-muted-foreground hover:text-red-500 cursor-pointer"
                       >
                         <Trash2 size={16} />
                       </button>
                     )}
                     
-                    <h4 className="text-sm font-medium text-gray-300">Slide {index + 1}</h4>
+                    <h4 className="text-xs font-extrabold text-primary uppercase tracking-wider">Slide {index + 1}</h4>
                     
                     <div>
-                      <label className="block text-sm text-gray-400 mb-1">
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
                         {slide.existingImageUrl ? 'Desktop Media (Select to replace)' : 'Desktop Media (Image/Video)'}
                       </label>
                       {slide.existingImageUrl && (
-                        <div className="mb-2 p-2 bg-black/40 rounded border border-white/10 flex items-center gap-3">
-                          <div className="relative w-24 h-12 rounded overflow-hidden shrink-0 border border-white/10">
+                        <div className="mb-2 p-2 neu-inset-sm rounded-xl flex items-center gap-3">
+                          <div className="relative w-24 h-12 rounded-lg overflow-hidden shrink-0">
                             <Image src={slide.existingImageUrl} alt="Current Desktop" fill className="object-cover" />
                           </div>
                           <div className="text-xs">
-                            <span className="font-semibold text-[var(--color-gold)] block">Active Desktop Image</span>
-                            <span className="text-[10px] text-gray-400 truncate block max-w-[220px]">{slide.existingImageUrl}</span>
+                            <span className="font-bold text-primary block">Active Desktop Image</span>
+                            <span className="text-[10px] text-muted-foreground truncate block max-w-[220px] font-medium">{slide.existingImageUrl}</span>
                           </div>
                         </div>
                       )}
@@ -359,22 +364,22 @@ export default function BannersPage() {
                           newSlides[index].imageFile = e.target.files?.[0] || null;
                           setSlides(newSlides);
                         }}
-                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white text-xs outline-none"
+                        className="w-full neu-input rounded-xl px-3 py-2 text-foreground text-xs outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm text-gray-400 mb-1">
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
                         {slide.existingMobileUrl ? 'Mobile Media (Select to replace)' : 'Mobile Media (Image/Video)'}
                       </label>
                       {slide.existingMobileUrl && (
-                        <div className="mb-2 p-2 bg-black/40 rounded border border-white/10 flex items-center gap-3">
-                          <div className="relative w-16 h-12 rounded overflow-hidden shrink-0 border border-white/10">
+                        <div className="mb-2 p-2 neu-inset-sm rounded-xl flex items-center gap-3">
+                          <div className="relative w-16 h-12 rounded-lg overflow-hidden shrink-0">
                             <Image src={slide.existingMobileUrl} alt="Current Mobile" fill className="object-cover" />
                           </div>
                           <div className="text-xs">
-                            <span className="font-semibold text-primary block">Active Mobile Image</span>
-                            <span className="text-[10px] text-gray-400 truncate block max-w-[220px]">{slide.existingMobileUrl}</span>
+                            <span className="font-bold text-primary block">Active Mobile Image</span>
+                            <span className="text-[10px] text-muted-foreground truncate block max-w-[220px] font-medium">{slide.existingMobileUrl}</span>
                           </div>
                         </div>
                       )}
@@ -386,12 +391,12 @@ export default function BannersPage() {
                           newSlides[index].mobileImageFile = e.target.files?.[0] || null;
                           setSlides(newSlides);
                         }}
-                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white text-xs outline-none"
+                        className="w-full neu-input rounded-xl px-3 py-2 text-foreground text-xs outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm text-gray-400 mb-1">Link URL (Optional)</label>
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Link URL (Optional)</label>
                       <input
                         type="text"
                         value={slide.linkUrl}
@@ -401,7 +406,7 @@ export default function BannersPage() {
                           setSlides(newSlides);
                         }}
                         placeholder="e.g. /products/perfume-name"
-                        className="w-full bg-[#121212] border border-white/10 rounded-md px-3 py-2 text-white outline-none focus:border-primary"
+                        className="w-full neu-input rounded-xl px-3 py-2 text-foreground outline-none text-xs font-medium"
                       />
                     </div>
                   </div>
@@ -411,7 +416,6 @@ export default function BannersPage() {
                   type="button"
                   onClick={() => {
                     setSlides([...slides, { imageFile: null, mobileImageFile: null, linkUrl: '' }]);
-                    // Scroll to bottom of modal
                     setTimeout(() => {
                       const modal = document.getElementById('banner-modal-content');
                       if (modal) {
@@ -419,39 +423,39 @@ export default function BannersPage() {
                       }
                     }, 50);
                   }}
-                  className="w-full py-3 border-2 border-dashed border-white/10 hover:border-primary/50 text-gray-400 hover:text-primary transition-colors rounded-lg flex items-center justify-center gap-2 font-medium"
+                  className="w-full py-3 neu-btn text-muted-foreground hover:text-foreground rounded-2xl flex items-center justify-center gap-2 font-bold text-xs cursor-pointer"
                 >
-                  <PlusCircle size={18} />
-                  Add Another Slide
+                  <PlusCircle size={16} />
+                  <span>Add Another Slide</span>
                 </button>
               </div>
 
-              <div className="flex items-center mt-4">
+              <div className="flex items-center pt-2">
                 <input
                   type="checkbox"
                   id="isActive"
                   checked={isActive}
                   onChange={e => setIsActive(e.target.checked)}
-                  className="mr-2"
+                  className="mr-2.5 w-4 h-4 rounded text-primary"
                 />
-                <label htmlFor="isActive" className="text-sm text-gray-300">Active (Visible on site)</label>
+                <label htmlFor="isActive" className="text-xs font-bold text-foreground cursor-pointer">Active (Visible on site)</label>
               </div>
 
-              <div className="flex justify-end gap-3 p-6 mt-6 border-t border-white/10 sticky bottom-0 bg-[#1a1a1a] z-10 -mx-6 -mb-6">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border/30">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                  className="px-5 py-2.5 neu-btn text-muted-foreground hover:text-foreground rounded-2xl text-xs font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2 bg-primary text-primary-foreground rounded font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 neu-btn-primary rounded-2xl font-bold text-xs disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
-                  {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                  Save Banner
+                  {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                  <span>Save Banner</span>
                 </button>
               </div>
             </form>

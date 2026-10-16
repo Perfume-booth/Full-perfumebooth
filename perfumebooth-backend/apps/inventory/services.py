@@ -71,7 +71,7 @@ class InventoryReservationService:
     @transaction.atomic
     def commit_order(cls, order):
         reservations = list(
-            InventoryReservation.objects.select_for_update()
+            InventoryReservation.objects.select_for_update(of=('self',))
             .select_related('product', 'variant')
             .filter(order=order, status=InventoryReservation.Status.ACTIVE)
         )
@@ -108,7 +108,7 @@ class InventoryReservationService:
     @transaction.atomic
     def release_order(cls, order, expired=False):
         reservations = list(
-            InventoryReservation.objects.select_for_update()
+            InventoryReservation.objects.select_for_update(of=('self',))
             .select_related('product', 'variant')
             .filter(order=order, status=InventoryReservation.Status.ACTIVE)
         )
@@ -144,11 +144,14 @@ class InventoryReservationService:
         released = 0
         from apps.orders.models import Order
         for order in Order.objects.filter(id__in=order_ids):
-            order_release_count = cls.release_order(order, expired=True)
-            released += order_release_count
-            order.refresh_from_db(fields=['payment_status', 'status'])
-            if order_release_count and order.payment_status == Order.PaymentStatus.PENDING:
-                order.payment_status = Order.PaymentStatus.FAILED
-                order.status = Order.Status.CANCELLED
-                order.save(update_fields=['payment_status', 'status', 'updated_at'])
+            with transaction.atomic():
+                order = Order.objects.select_for_update().get(pk=order.pk)
+                if order.payment_status != Order.PaymentStatus.PENDING:
+                    continue
+                order_release_count = cls.release_order(order, expired=True)
+                released += order_release_count
+                if order_release_count:
+                    order.payment_status = Order.PaymentStatus.FAILED
+                    order.status = Order.Status.CANCELLED
+                    order.save(update_fields=['payment_status', 'status', 'updated_at'])
         return released

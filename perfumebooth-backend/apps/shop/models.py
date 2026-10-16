@@ -21,6 +21,7 @@ class Product(models.Model):
     title = models.CharField(max_length=500)
     slug = models.SlugField(max_length=500, unique=True, db_index=True)
     sku = models.CharField(max_length=200, unique=True, db_index=True)
+    barcode = models.CharField(max_length=100, blank=True, default='', db_index=True)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, db_index=True)
     compare_at_price = models.DecimalField(
@@ -90,6 +91,13 @@ class ProductVariant(models.Model):
     )
     stock_level = models.PositiveIntegerField(default=0)
     reserved_stock = models.PositiveIntegerField(default=0)
+    cost_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    barcode = models.CharField(max_length=100, blank=True, default='')
+    weight = models.CharField(max_length=50, blank=True, default='')
+    dimensions = models.CharField(max_length=100, blank=True, default='')
+    is_default = models.BooleanField(default=False, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     image = models.FileField(upload_to='variants/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

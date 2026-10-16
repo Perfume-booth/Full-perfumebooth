@@ -942,7 +942,11 @@ class ProductExcelImportStatusView(APIView):
             ProductImportJob.Status.QUEUED, ProductImportJob.Status.APPLY_QUEUED,
         }:
             from celery.result import AsyncResult
-            info = AsyncResult(job.task_id).info
+            try:
+                info = AsyncResult(job.task_id).info
+            except Exception:
+                logger.warning('Import progress backend unavailable for %s', job.id, exc_info=True)
+                info = None
             if isinstance(info, dict) and 'current' in info:
                 payload['progress'] = {'current': info['current'], 'total': info.get('total', 1)}
         return Response(payload)
@@ -991,7 +995,7 @@ class ProductExcelImportTemplateView(APIView):
 
     def get(self, request):
         from django.http import HttpResponse
-        from .product_import_template import build_product_import_template
+        from .product_import_template import build_product_import_template, TEMPLATE_VERSION
         mode = str(request.query_params.get('mode', 'UPDATE_ONLY')).upper()
         if mode not in {'UPDATE_ONLY', 'CREATE_ONLY', 'UPSERT'}:
             return Response({'detail': 'Invalid template mode.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -999,7 +1003,7 @@ class ProductExcelImportTemplateView(APIView):
             build_product_import_template(mode),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         )
-        response['Content-Disposition'] = f'attachment; filename=perfumebooth-products-{mode.lower()}-template-v7.xlsx'
+        response['Content-Disposition'] = f'attachment; filename=perfumebooth-products-{mode.lower()}-template-v{TEMPLATE_VERSION}.xlsx'
         return response
 
 

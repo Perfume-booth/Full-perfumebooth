@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from .services import verify_razorpay_signature, process_payment_webhook, calculate_coupon
 from .tasks import send_order_email_receipt
-from .models import Order, OrderItem, Shipment, AbandonedCart
+from .models import Order, OrderItem, Shipment, AbandonedCart, Coupon
 from apps.shop.models import Product, ProductVariant, Inventory
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
@@ -34,7 +34,7 @@ class CouponValidationView(APIView):
             subtotal = float(request.data.get('subtotal', 0))
         except (TypeError, ValueError):
             return Response({'detail': 'Invalid subtotal.'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(calculate_coupon(request.data.get('code', ''), subtotal))
+        return Response(calculate_coupon(request.data.get('code', ''), subtotal, user=request.user))
 
 
 class OrderListView(APIView):
@@ -99,7 +99,7 @@ class OrderListView(APIView):
 
     def post(self, request):
         clean_input = validate_checkout_request(request.data)
-        result = CheckoutService.process_checkout(request.user if request.user.is_authenticated else None, clean_input)
+        result = CheckoutService.idempotent_checkout(request.user, clean_input, request.headers.get('Idempotency-Key'))
         return Response({
             'success': True,
             'order_id': result['order_id'],
@@ -250,45 +250,49 @@ class RazorpayWebhookView(APIView):
 
         try:
             event = json.loads(payload_body)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return Response({'detail': 'Invalid JSON.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if not isinstance(event, dict):
+            return Response({'detail': 'Invalid event.'}, status=400)
         event_type = event.get('event')
-        if event_type not in {'payment.captured', 'payment.failed'}:
+        if event_type not in {'payment.captured', 'payment.failed', 'payment.authorized'}:
             return Response({'detail': 'Event not handled.'}, status=status.HTTP_200_OK)
 
-        payment_intent_id = event['payload']['payment']['entity']['id']
-        order_id = event['payload']['payment']['entity'].get('notes', {}).get('order_id')
-
-        if not order_id:
-            return Response({'detail': 'Missing order_id in notes.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if event_type == 'payment.failed':
-            try:
-                with transaction.atomic():
-                    order = Order.objects.select_for_update().get(id=order_id)
-                    if order.payment_status == Order.PaymentStatus.PENDING:
-                        InventoryReservationService.release_order(order)
-                        order.payment_status = Order.PaymentStatus.FAILED
-                        order.status = Order.Status.CANCELLED
-                        order.save(update_fields=['payment_status', 'status', 'updated_at'])
-            except Order.DoesNotExist:
-                return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
-            return Response({'detail': 'OK'}, status=status.HTTP_200_OK)
-
         try:
-            order = process_payment_webhook(payment_intent_id, order_id)
-        except RuntimeError:
-            return Response({'detail': 'Already processed.'}, status=status.HTTP_200_OK)
-        except ValueError as e:
-            logger.warning("Razorpay webhook order lookup failed: %s", e)
-            return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        send_order_email_receipt.apply_async(
-            args=[str(order.id)], queue='emails'
-        )
+            entity = event['payload']['payment']['entity']
+        except (KeyError, TypeError):
+            return Response({'detail': 'Malformed payment event.'}, status=400)
+        import hashlib
+        from .payments import process_entity
+        event_id = request.headers.get('X-Razorpay-Event-Id') or hashlib.sha256(payload_body).hexdigest()
+        if len(event_id) > 200:
+            return Response({'detail': 'Invalid event identifier.'}, status=400)
+        process_entity(entity, 'webhook:' + event_id, event_type)
 
         return Response({'detail': 'OK'}, status=status.HTTP_200_OK)
+
+
+class PaymentInitializeView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [CheckoutRateThrottle]
+
+    def post(self, request):
+        from .payments import initialize
+        return Response(initialize(request.user, validate_checkout_request(request.data), request.headers.get('Idempotency-Key')))
+
+
+class PaymentVerifyView(APIView):
+    permission_classes = [permissions.AllowAny]
+    # The signed gateway proof is the capability; an expired customer login
+    # must not prevent payment reconciliation after money has been captured.
+    authentication_classes = []
+    throttle_classes = [CheckoutRateThrottle]
+
+    def post(self, request):
+        from .payments import verify
+        result = verify(request.data)
+        return Response(result, status=200 if result['success'] else 202)
 
 
 class ShippingRatesAPIView(APIView):
@@ -440,3 +444,229 @@ class AbandonedCartRecoverView(APIView):
             })
         except AbandonedCart.DoesNotExist:
             return Response({'detail': 'Invalid or expired cart recovery token.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class MerchantCouponListView(APIView):
+    """
+    GET /api/orders/merchant/coupons/ — List all coupons with stats.
+    POST /api/orders/merchant/coupons/ — Create a new coupon.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get(self, request):
+        search_q = request.query_params.get('q', '').strip()
+        status_filter = request.query_params.get('status', '').strip()
+
+        coupons_qs = Coupon.objects.all().order_by('-created_at')
+
+        if search_q:
+            coupons_qs = coupons_qs.filter(code__icontains=search_q)
+
+        if status_filter == 'active':
+            coupons_qs = coupons_qs.filter(is_active=True)
+        elif status_filter == 'inactive':
+            coupons_qs = coupons_qs.filter(is_active=False)
+
+        coupons_data = []
+        for c in coupons_qs:
+            coupons_data.append({
+                'id': str(c.id),
+                'code': c.code,
+                'description': c.description,
+                'discount_type': c.discount_type,
+                'discount_value': str(c.discount_value),
+                'min_order_value': str(c.min_order_value),
+                'max_discount': str(c.max_discount) if c.max_discount else None,
+                'start_date': c.start_date.isoformat() if c.start_date else None,
+                'end_date': c.end_date.isoformat() if c.end_date else None,
+                'usage_limit': c.usage_limit,
+                'times_used': c.times_used,
+                'is_active': c.is_active,
+                'first_order_only': c.first_order_only,
+                'created_at': c.created_at.isoformat(),
+            })
+
+        total_coupons = len(coupons_data)
+        active_coupons = sum(1 for c in coupons_data if c['is_active'])
+        total_redemptions = sum(c['times_used'] for c in coupons_data)
+
+        return Response({
+            'metrics': {
+                'total_coupons': total_coupons,
+                'active_coupons': active_coupons,
+                'total_redemptions': total_redemptions,
+            },
+            'coupons': coupons_data
+        })
+
+    def post(self, request):
+        code = str(request.data.get('code', '')).strip().upper()
+        if not code:
+            return Response({'detail': 'Coupon code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Coupon.objects.filter(code=code).exists():
+            return Response({'detail': f'Coupon code "{code}" already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        discount_type = request.data.get('discount_type', 'percentage')
+        if discount_type not in ['percentage', 'fixed', 'free_shipping']:
+            return Response({'detail': 'Invalid discount type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            discount_value = float(request.data.get('discount_value', 0))
+        except (ValueError, TypeError):
+            discount_value = 0.0
+
+        try:
+            min_order_value = float(request.data.get('min_order_value', 0))
+        except (ValueError, TypeError):
+            min_order_value = 0.0
+
+        max_discount = request.data.get('max_discount')
+        if max_discount is not None and max_discount != '':
+            try:
+                max_discount = float(max_discount)
+            except (ValueError, TypeError):
+                max_discount = None
+        else:
+            max_discount = None
+
+        usage_limit = request.data.get('usage_limit')
+        if usage_limit is not None and usage_limit != '':
+            try:
+                usage_limit = int(usage_limit)
+            except (ValueError, TypeError):
+                usage_limit = None
+        else:
+            usage_limit = None
+
+        coupon = Coupon.objects.create(
+            code=code,
+            description=request.data.get('description', '').strip(),
+            discount_type=discount_type,
+            discount_value=discount_value,
+            min_order_value=min_order_value,
+            max_discount=max_discount,
+            start_date=request.data.get('start_date') or None,
+            end_date=request.data.get('end_date') or None,
+            usage_limit=usage_limit,
+            first_order_only=bool(request.data.get('first_order_only', False)),
+            is_active=bool(request.data.get('is_active', True))
+        )
+
+        log_action(request.user, f"Created coupon code: {coupon.code}", request)
+
+        return Response({
+            'id': str(coupon.id),
+            'code': coupon.code,
+            'detail': 'Coupon created successfully.'
+        }, status=status.HTTP_201_CREATED)
+
+
+class MerchantCouponDetailView(APIView):
+    """
+    GET, PUT, DELETE /api/orders/merchant/coupons/<uuid:pk>/
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get(self, request, pk):
+        try:
+            c = Coupon.objects.get(id=pk)
+        except Coupon.DoesNotExist:
+            return Response({'detail': 'Coupon not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            'id': str(c.id),
+            'code': c.code,
+            'description': c.description,
+            'discount_type': c.discount_type,
+            'discount_value': str(c.discount_value),
+            'min_order_value': str(c.min_order_value),
+            'max_discount': str(c.max_discount) if c.max_discount else None,
+            'start_date': c.start_date.isoformat() if c.start_date else None,
+            'end_date': c.end_date.isoformat() if c.end_date else None,
+            'usage_limit': c.usage_limit,
+            'times_used': c.times_used,
+            'is_active': c.is_active,
+            'first_order_only': c.first_order_only,
+            'created_at': c.created_at.isoformat(),
+        })
+
+    def put(self, request, pk):
+        try:
+            coupon = Coupon.objects.get(id=pk)
+        except Coupon.DoesNotExist:
+            return Response({'detail': 'Coupon not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        code = request.data.get('code')
+        if code:
+            code = code.strip().upper()
+            if Coupon.objects.filter(code=code).exclude(id=coupon.id).exists():
+                return Response({'detail': f'Coupon code "{code}" already in use.'}, status=status.HTTP_400_BAD_REQUEST)
+            coupon.code = code
+
+        if 'description' in request.data:
+            coupon.description = request.data.get('description', '').strip()
+        if 'discount_type' in request.data:
+            coupon.discount_type = request.data.get('discount_type')
+        if 'discount_value' in request.data:
+            coupon.discount_value = float(request.data.get('discount_value', 0))
+        if 'min_order_value' in request.data:
+            coupon.min_order_value = float(request.data.get('min_order_value', 0))
+        if 'max_discount' in request.data:
+            max_d = request.data.get('max_discount')
+            coupon.max_discount = float(max_d) if max_d not in [None, ''] else None
+        if 'start_date' in request.data:
+            coupon.start_date = request.data.get('start_date') or None
+        if 'end_date' in request.data:
+            coupon.end_date = request.data.get('end_date') or None
+        if 'usage_limit' in request.data:
+            u_lim = request.data.get('usage_limit')
+            coupon.usage_limit = int(u_lim) if u_lim not in [None, ''] else None
+        if 'first_order_only' in request.data:
+            coupon.first_order_only = bool(request.data.get('first_order_only'))
+        if 'is_active' in request.data:
+            coupon.is_active = bool(request.data.get('is_active'))
+
+        coupon.save()
+        log_action(request.user, f"Updated coupon code: {coupon.code}", request)
+        return Response({'detail': 'Coupon updated successfully.'})
+
+    def delete(self, request, pk):
+        try:
+            coupon = Coupon.objects.get(id=pk)
+        except Coupon.DoesNotExist:
+            return Response({'detail': 'Coupon not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        code = coupon.code
+        coupon.delete()
+        log_action(request.user, f"Deleted coupon code: {code}", request)
+        return Response({'detail': f'Coupon "{code}" deleted successfully.'})
+
+
+class MerchantCouponToggleStatusView(APIView):
+    """
+    POST /api/orders/merchant/coupons/<uuid:pk>/toggle/
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def post(self, request, pk):
+        try:
+            coupon = Coupon.objects.get(id=pk)
+        except Coupon.DoesNotExist:
+            return Response({'detail': 'Coupon not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        coupon.is_active = not coupon.is_active
+        coupon.save(update_fields=['is_active'])
+
+        state = "activated" if coupon.is_active else "deactivated"
+        log_action(request.user, f"{state.capitalize()} coupon code: {coupon.code}", request)
+
+        return Response({
+            'id': str(coupon.id),
+            'is_active': coupon.is_active,
+            'detail': f'Coupon "{coupon.code}" {state}.'
+        })
+

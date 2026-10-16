@@ -5,6 +5,7 @@ import { getProductRecommendations } from '@/lib/catalog';
 import { stripHtml } from '@/lib/utils';
 import { METAFIELD_MAPPINGS } from '@/lib/product-fields.config';
 import { parseRating, getBrandFromTags, cleanMetafieldValue } from '@/lib/transformers';
+import { cleanImageUrl as normalizeMediaUrl } from '@/lib/media-url';
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductDetailsClient from "@/components/product/ProductDetailsClient";
 import ProductReviews from "@/components/product/ProductReviews";
@@ -38,6 +39,7 @@ export interface Product {
     id: number | string;
     title: string;
     slug: string;
+    barcode?: string;
     brand: string;
     tagline: string;
     description: string;
@@ -72,26 +74,31 @@ export interface Product {
     rating_count?: number;
     reviewsHtml?: string;
     availableForSale?: boolean;
-    variants?: { id?: string; title: string; price: number | string; sku?: string }[];
+    variants?: {
+        id?: string;
+        title: string;
+        option1_name?: string;
+        option1_value?: string;
+        option2_name?: string;
+        option2_value?: string;
+        sku?: string;
+        barcode?: string;
+        price: number | string;
+        compareAtPrice?: string;
+        cost_price?: string;
+        weight?: string;
+        dimensions?: string;
+        is_default?: boolean;
+        availableForSale?: boolean;
+        quantityAvailable?: number;
+        requiresShipping?: boolean;
+    }[];
     coupons?: { code: string; label: string; description: string }[];
 }
 
 // Server-side fetching
 function cleanImageUrl(url: string | null | undefined): string | null {
-    if (!url) return null;
-
-    const isDocker = process.env.WATCHPACK_POLLING === "true";
-    const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
-
-    // Append cache buster to force browser to ignore old application/octet-stream cache
-    const cacheBuster = '?v=1';
-
-    if (url.startsWith('/media/')) return `${API_URL}${url}${cacheBuster}`;
-    if (url.includes('http://django:8000') || url.includes('http://localhost:8000')) {
-        const newUrl = url.replace('http://django:8000', API_URL).replace('http://localhost:8000', API_URL);
-        return newUrl.includes('?') ? newUrl : `${newUrl}${cacheBuster}`;
-    }
-    return url;
+    return normalizeMediaUrl(url) ?? null;
 }
 
 async function getProduct(slug: string): Promise<Product | null> {
@@ -99,7 +106,7 @@ async function getProduct(slug: string): Promise<Product | null> {
         const isDocker = process.env.WATCHPACK_POLLING === "true";
         const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
         const res = await fetch(`${API_URL}/api/shop/products/${slug}/`, {
-            next: { revalidate: 3600 }
+            cache: 'no-store'
         });
         if (!res.ok) return null;
         const rawJson = await res.json();
@@ -112,12 +119,19 @@ async function getProduct(slug: string): Promise<Product | null> {
             alt_text: img.altText || img.alt_text || p.title
         })) || [];
 
-        if (images.length === 0 && p.image) {
-            images.push({
-                id: 0,
-                image: cleanImageUrl(p.image) || '',
-                alt_text: p.title
-            });
+        const mainImgUrl = cleanImageUrl(p.image);
+        if (mainImgUrl) {
+            const existingIdx = images.findIndex((img: any) => img.image === mainImgUrl);
+            if (existingIdx > 0) {
+                const [item] = images.splice(existingIdx, 1);
+                images.unshift(item);
+            } else if (existingIdx === -1) {
+                images.unshift({
+                    id: 0,
+                    image: mainImgUrl,
+                    alt_text: p.title
+                });
+            }
         }
 
         const priceVal = parseFloat(p.price || "0").toFixed(2);
@@ -135,10 +149,20 @@ async function getProduct(slug: string): Promise<Product | null> {
             variants: p.variants?.length ? p.variants.map((variant: any) => ({
                 id: String(variant.id),
                 title: variant.title || variant.option1_value || "Default Title",
+                option1_name: variant.option1_name,
+                option1_value: variant.option1_value,
+                option2_name: variant.option2_name,
+                option2_value: variant.option2_value,
+                sku: variant.sku,
+                barcode: variant.barcode,
                 price: String(variant.price),
                 compareAtPrice: variant.compare_at_price ? String(variant.compare_at_price) : undefined,
-                availableForSale: Number(variant.stock_level) > 0,
-                quantityAvailable: Number(variant.stock_level || 0),
+                cost_price: variant.cost_price ? String(variant.cost_price) : undefined,
+                weight: variant.weight,
+                dimensions: variant.dimensions,
+                is_default: Boolean(variant.is_default),
+                availableForSale: Number(variant.stock_level ?? variant.stock) > 0,
+                quantityAvailable: Number(variant.stock_level ?? variant.stock ?? 0),
                 requiresShipping: true
             })) : [{
                 id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
@@ -245,6 +269,8 @@ export default async function ProductPage({
         description: stripHtml(product.description).substring(0, 160),
         sku: product.variants && product.variants.length > 0 ? product.variants[0].sku : String(product.id),
         mpn: product.variants && product.variants.length > 0 ? product.variants[0].sku : String(product.id),
+        gtin: product.barcode || (product.variants && product.variants.length > 0 ? product.variants[0].barcode : undefined),
+        barcode: product.barcode || (product.variants && product.variants.length > 0 ? product.variants[0].barcode : undefined),
         url: `https://www.perfumebooth.com/products/${product.slug}`,
         category: product.category || product.type,
         brand: {

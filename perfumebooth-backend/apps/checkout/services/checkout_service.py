@@ -13,6 +13,11 @@ Coordinates:
 """
 import random
 import datetime
+import hashlib
+import json
+import uuid
+from dataclasses import asdict
+from rest_framework.exceptions import APIException, ValidationError
 from django.db import transaction
 
 from apps.orders.models import Order, OrderItem
@@ -28,6 +33,30 @@ class CheckoutService:
     Coordinates checkout business logic within an atomic database transaction.
     Guarantees that no price, discount, or shipping charge is trusted from the client.
     """
+
+    @classmethod
+    @transaction.atomic
+    def idempotent_checkout(cls, user, input_data, key):
+        from apps.orders.models import CheckoutRequest
+        try:
+            key = str(uuid.UUID(str(key)))
+        except (ValueError, TypeError, AttributeError):
+            raise ValidationError({'detail': 'A UUID Idempotency-Key header is required.'})
+        payload = asdict(input_data)
+        payload['user'] = str(user.pk) if user and user.is_authenticated else None
+        fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        record, _ = CheckoutRequest.objects.get_or_create(key=key, defaults={'fingerprint': fingerprint})
+        record = CheckoutRequest.objects.select_for_update().get(pk=record.pk)
+        if record.fingerprint != fingerprint:
+            error = APIException('Idempotency key already used with different checkout details.')
+            error.status_code = 409
+            raise error
+        if record.response:
+            return record.response
+        result = cls.process_checkout(user, input_data)
+        record.response = result
+        record.save(update_fields=['response'])
+        return result
 
     @classmethod
     @transaction.atomic
@@ -82,7 +111,13 @@ class CheckoutService:
                 or (user.email if user and user.is_authenticated else '')
             ),
             customer_phone=input_data.shipping_address.get('phone', ''),
+            coupon_code=totals.coupon_code or '',
         )
+
+        if totals.coupon_code:
+            from apps.orders.models import Coupon
+            from django.db.models import F
+            Coupon.objects.filter(code=totals.coupon_code.upper()).update(times_used=F('times_used') + 1)
 
         # Create OrderItem records
         for item in line_items:

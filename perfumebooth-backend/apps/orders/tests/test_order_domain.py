@@ -138,10 +138,15 @@ class OrderDomainTests(TestCase):
     @patch('apps.orders.tasks.send_order_email_receipt.delay')
     def test_payment_webhook_updates_explicit_payment_status(self, email_delay, shipment_delay):
         result = self.checkout()
-        order = process_payment_webhook('pay_phase4_123', result['order_id'])
+        from apps.orders.models import PaymentAttempt, PaymentOutbox
+        from apps.orders.payments import process_entity
+        pending = Order.objects.get(pk=result['order_id'])
+        PaymentAttempt.objects.create(order=pending, gateway_order_id='order_test')
+        order, _ = process_entity({'id': 'pay_phase4_123', 'order_id': 'order_test', 'amount': int(pending.total * 100), 'currency': 'INR', 'status': 'captured'}, 'test_capture', 'payment.captured')
 
         self.assertEqual(order.status, Order.Status.PAID)
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(order.payment_intent_id, 'pay_phase4_123')
-        email_delay.assert_called_once()
-        shipment_delay.assert_called_once()
+        email_delay.assert_not_called()
+        shipment_delay.assert_not_called()
+        self.assertEqual(PaymentOutbox.objects.filter(order=order).count(), 2)

@@ -14,7 +14,6 @@ import {
   BarChart2,
   FileSpreadsheet,
   Users,
-  Megaphone,
   FolderOpen,
   BookOpen,
 } from 'lucide-react';
@@ -42,7 +41,7 @@ export default function Sidebar() {
     { name: 'Customers', href: '/customers', icon: Users, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Analytics', href: '/analytics', icon: BarChart2, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Reports', href: '/reports', icon: FileSpreadsheet, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
-    { name: 'Marketing', href: '/marketing', icon: Megaphone, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Coupons & Deals', href: '/coupons', icon: Ticket, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'CMS Builder', href: '/cms', icon: Sliders, allowedRoles: ['Super Admin', 'Admin', 'Content Manager'] },
     { name: 'Blog Manager', href: '/cms/blog', icon: BookOpen, allowedRoles: ['Super Admin', 'Admin', 'Content Manager'] },
     { name: 'Staff Settings', href: '/settings/staff', icon: Shield, allowedRoles: ['Super Admin'] },
@@ -63,13 +62,13 @@ export default function Sidebar() {
   );
 
   return (
-    <aside className="w-64 glass-panel border-r border-border h-screen sticky top-0 flex flex-col justify-between p-6">
+    <aside className="w-64 bg-card neu-extruded border-r border-border/20 h-screen sticky top-0 flex flex-col justify-between p-6 z-20 transition-all duration-300">
       <div className="flex flex-col gap-8">
-        <div className="flex items-center justify-start h-10 w-full text-foreground">
+        <div className="flex items-center justify-start h-10 w-full text-foreground px-1">
           <PerfumeLogo />
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-2.5">
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.href === '/cms'
@@ -79,13 +78,16 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive
-                    ? 'bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/20 scale-[1.02]'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${isActive
+                    ? 'neu-inset text-primary font-semibold border border-primary/25 scale-[0.99]'
+                    : 'text-muted-foreground hover:neu-extruded-sm hover:text-foreground hover:scale-[1.01]'
                   }`}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.name}</span>
+                <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : ''}`} />
+                <span className="text-sm">{item.name}</span>
+                {isActive && (
+                  <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(124,58,237,0.8)] ml-auto" />
+                )}
               </Link>
             );
           })}
@@ -94,10 +96,10 @@ export default function Sidebar() {
 
       <button
         onClick={handleLogout}
-        className="flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-all duration-200 mt-auto cursor-pointer"
+        className="flex items-center gap-3 px-4 py-3 rounded-2xl text-red-500 hover:neu-inset-sm hover:text-red-600 transition-all duration-200 mt-auto cursor-pointer"
       >
         <LogOut className="w-5 h-5" />
-        <span>Logout</span>
+        <span className="text-sm font-medium">Logout</span>
       </button>
     </aside>
   );
