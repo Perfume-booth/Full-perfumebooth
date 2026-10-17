@@ -140,6 +140,24 @@ export async function registerAction(prevState: any, formData: FormData) {
 
 export async function logoutAction() {
   const cookieStore = await cookies();
+  const token = cookieStore.get("customerAccessToken")?.value;
+  try {
+    if (token) {
+      const res = await fetch(`${BACKEND_URL}/api/auth/logout/`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) {
+        return { error: "Logout failed on server. Please try again." };
+      }
+    }
+  } catch (e) {
+    console.error("Logout network error:", e);
+    return { error: "Network error during logout. Please retry." };
+  }
   cookieStore.delete("customerAccessToken");
   cookieStore.delete("customerRefreshToken");
   cookieStore.delete("isLoggedIn");

@@ -44,6 +44,75 @@ export function cleanMetafieldValue(val: any): string {
     return strVal;
 }
 
+/**
+ * Sanitizes and normalizes product categories/types, stripping out raw taxonomy
+ * paths like "Health & Beauty > Personal Care > Cosmetics > Perfumes & Colognes > Eaux de Parfum"
+ * and standardizing to clean consumer fragrance terms like "Eau de Parfum", "Extrait de Parfum", "Attar", etc.
+ */
+export function cleanCategoryName(raw?: string): string {
+    if (!raw || typeof raw !== "string") return "";
+
+    let cleaned = raw.trim();
+
+    // If breadcrumb taxonomy style with ">", extract the most specific leaf segment
+    if (cleaned.includes(">")) {
+        const parts = cleaned.split(">").map((s) => s.trim()).filter(Boolean);
+        cleaned = parts[parts.length - 1] || "";
+    }
+
+    // Remove common prefix taxonomy words if somehow still prefixed
+    cleaned = cleaned
+        .replace(/^health\s*&\s*beauty\s*/i, "")
+        .replace(/^personal\s*care\s*/i, "")
+        .replace(/^cosmetics\s*/i, "")
+        .replace(/^perfumes\s*(&|and)\s*colognes\s*/i, "")
+        .replace(/^perfumes\s*/i, "")
+        .replace(/^colognes\s*/i, "")
+        .trim();
+
+    const lower = cleaned.toLowerCase();
+
+    // Fragrance concentration & category normalization
+    if (/^(eaux?|eau)\s*de\s*p/i.test(lower) || lower === "edp") {
+        return "Eau de Parfum";
+    }
+    if (/^extrait/i.test(lower) || lower.includes("extract") || lower === "cpo") {
+        return "Extrait de Parfum";
+    }
+    if (/^(eaux?|eau)\s*de\s*t/i.test(lower) || lower === "edt") {
+        return "Eau de Toilette";
+    }
+    if (/^(eaux?|eau)\s*de\s*c/i.test(lower) || lower === "edc") {
+        return "Eau de Cologne";
+    }
+    if (lower.includes("attar") || lower.includes("ittar") || lower.includes("concentrated perfume")) {
+        return "Attar";
+    }
+    if (lower.includes("deodorant")) {
+        return "Deodorant";
+    }
+    if (lower.includes("mist") || lower.includes("spray") || lower.includes("body")) {
+        return "Body Mist";
+    }
+    if (lower.includes("gift") || lower.includes("set") || lower.includes("discovery")) {
+        return "Gift Set";
+    }
+
+    // Fallbacks for generic or invalid categories
+    if (
+        !cleaned ||
+        lower === "uncategorized" ||
+        lower.includes("pet") ||
+        lower.includes("animal") ||
+        lower === "fragrance" ||
+        lower === "fragrances"
+    ) {
+        return "Fragrances";
+    }
+
+    return cleaned;
+}
+
 
 export interface NormalizedProduct {
     id: string;
@@ -68,6 +137,8 @@ export interface NormalizedProduct {
     selectedVariantId: string;
     stock_count: number;
     productType?: string;
+    product_form?: string;
+    bottle_material?: string;
     weight?: string;
     shipping?: any;
     isFull?: boolean;
@@ -301,7 +372,9 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
         size_ml: cleanMetafieldValue(getMeta('size_ml') || getMeta('size')),
         selectedVariantId: product.selectedVariantId || product.variants?.edges?.[0]?.node?.id || product.variants?.[0]?.id || "",
         stock_count,
-        productType: product.productType || product.product_type || "",
+        productType: cleanCategoryName(product.productType || product.product_type || product.category || ""),
+        product_form: product.product_form || product.attributes?.product_form || "",
+        bottle_material: product.bottle_material || product.attributes?.bottle_material || "",
         weight: product.weight || product.attributes?.weight || "",
         shipping: product.shipping || product.attributes?.shipping || null,
         isFull: product.isFull || false,
@@ -330,6 +403,8 @@ export function toStoreProduct(product: NormalizedProduct) {
         selectedVariantId: product.selectedVariantId,
         // Comparison fields
         productType: product.productType || "",
+        product_form: product.product_form || "",
+        bottle_material: product.bottle_material || "",
         gender: product.gender || "",
         size_ml: product.size_ml || "",
         top_notes: product.top_notes || "",

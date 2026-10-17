@@ -21,12 +21,15 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import PerfumeLogo from '@/components/Logo';
+import { apiFetch } from '@/lib/api';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -47,9 +50,20 @@ export default function Sidebar() {
     { name: 'Staff Settings', href: '/settings/staff', icon: Shield, allowedRoles: ['Super Admin'] },
   ];
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push('/login');
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError('');
+    try {
+      await apiFetch('/auth/logout/', { method: 'POST' });
+      clearAuth();
+      router.replace('/login');
+      router.refresh();
+    } catch {
+      setLogoutError('Logout could not be confirmed. Please retry.');
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   if (!mounted || !user) {
@@ -94,13 +108,17 @@ export default function Sidebar() {
         </nav>
       </div>
 
+      <div className="mt-auto">
+      {logoutError && <p role="alert" className="text-sm text-red-500">{logoutError}</p>}
       <button
         onClick={handleLogout}
+        disabled={loggingOut}
         className="flex items-center gap-3 px-4 py-3 rounded-2xl text-red-500 hover:neu-inset-sm hover:text-red-600 transition-all duration-200 mt-auto cursor-pointer"
       >
         <LogOut className="w-5 h-5" />
-        <span className="text-sm font-medium">Logout</span>
+        <span className="text-sm font-medium">{loggingOut ? 'Logging out…' : 'Logout'}</span>
       </button>
+      </div>
     </aside>
   );
 }

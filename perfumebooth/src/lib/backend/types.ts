@@ -19,6 +19,8 @@ export interface Product {
   vendor: string;
   tags?: string[];
   productType: string;
+  category?: string;
+  gender?: string;
   priceRange: {
     minVariantPrice: { amount: string; currencyCode: string };
   };

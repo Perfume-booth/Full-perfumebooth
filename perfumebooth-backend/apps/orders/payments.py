@@ -123,7 +123,7 @@ def process_entity(entity, event_id, event_type):
     if (type(entity['amount']) is not int or entity['amount'] != int(order.total * 100)
             or entity['currency'] != order.currency or order.payment_method != Order.PaymentMethod.RAZORPAY):
         raise ValidationError('Payment amount, currency or method does not match order.')
-    expected_status = {'payment.captured': 'captured', 'payment.failed': 'failed', 'payment.authorized': 'authorized'}
+    expected_status = {'payment.captured': 'captured', 'payment.failed': 'failed', 'payment.authorized': 'authorized', 'payment.refunded': 'refunded'}
     if entity['status'] != expected_status.get(event_type):
         raise ValidationError('Payment event and status disagree.')
     outcome = 'ignored'
@@ -151,6 +151,15 @@ def process_entity(entity, event_id, event_type):
     elif event_type == 'payment.failed':
         # A failed attempt is not a failed order: Checkout permits another attempt.
         outcome = 'attempt_failed' if order.payment_status == Order.PaymentStatus.PENDING else 'ignored'
+    elif event_type == 'payment.refunded':
+        if order.payment_status == Order.PaymentStatus.PAID or order.status in (Order.Status.PAID, Order.Status.PROCESSING):
+            order.payment_status = Order.PaymentStatus.REFUNDED
+            order.status = Order.Status.REFUNDED
+            order.save(update_fields=['payment_status', 'status', 'updated_at'])
+            InventoryReservationService.restore_order(order, reason='Gateway payment refund processed')
+            outcome = 'refunded'
+        else:
+            outcome = 'ignored'
     else:
         outcome = 'awaiting_capture'
     attempt.save(update_fields=['status', 'last_error', 'updated_at'])

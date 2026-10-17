@@ -134,6 +134,36 @@ class InventoryReservationService:
         return len(reservations)
 
     @classmethod
+    @transaction.atomic
+    def restore_order(cls, order, reason='Order cancelled or refunded'):
+        """Restores inventory for committed or reserved orders upon cancellation or refund."""
+        cls.release_order(order)
+        committed_reservations = list(
+            InventoryReservation.objects.select_for_update(of=('self',))
+            .select_related('product', 'variant')
+            .filter(order=order, status=InventoryReservation.Status.COMMITTED)
+        )
+        for reservation in committed_reservations:
+            if reservation.variant_id:
+                stock_record = ProductVariant.objects.select_for_update().get(id=reservation.variant_id)
+            else:
+                stock_record = Inventory.objects.select_for_update().get(product_id=reservation.product_id)
+
+            stock_record.stock_level += reservation.quantity
+            stock_record.save(update_fields=['stock_level'])
+            reservation.status = InventoryReservation.Status.RELEASED
+            reservation.released_at = timezone.now()
+            reservation.save(update_fields=['status', 'released_at', 'updated_at'])
+            cls._record(
+                reservation,
+                InventoryMovement.Type.RETURN,
+                stock_delta=reservation.quantity,
+                reserved_delta=0,
+                reason=reason,
+            )
+        return len(committed_reservations)
+
+    @classmethod
     def release_expired(cls, batch_size=200):
         order_ids = list(
             InventoryReservation.objects.filter(

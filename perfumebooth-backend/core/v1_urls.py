@@ -29,7 +29,7 @@ from apps.shop.views import (
 
 # Orders & Checkout Views
 from apps.orders.views import (
-    OrderListView, OrderDetailView, CouponValidationView,
+    OrderListView, OrderDetailView, OrderCancelView, CouponValidationView,
     ShippingRatesAPIView, RazorpayWebhookView, ShiprocketWebhookView,
     AbandonedCartAPIView, AbandonedCartRecoverView, PaymentInitializeView, PaymentVerifyView
 )
@@ -80,10 +80,12 @@ checkout_patterns = [
 
 orders_patterns = [
     path('', OrderListView.as_view(), name='v1-order-list'),
+    path('<path:pk>/cancel/', OrderCancelView.as_view(), name='v1-order-cancel'),
     path('<path:pk>/', OrderDetailView.as_view(), name='v1-order-detail'),
 ]
 
 admin_patterns = [
+    path('products/advanced-import/', include('apps.shop.advanced_import_urls')),
     path('products/', ProductListView.as_view(), name='v1-admin-products'),
     path('products/excel-export/', ProductExcelExportView.as_view(), name='v1-admin-products-excel-export'),
     path('products/excel-import/', ProductExcelImportView.as_view(), name='v1-admin-products-excel-import'),

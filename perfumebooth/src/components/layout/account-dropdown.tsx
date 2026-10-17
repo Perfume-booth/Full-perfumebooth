@@ -198,13 +198,29 @@ export default function AccountDropdown({ trigger }: { trigger?: React.ReactNode
     return () => document.removeEventListener("keydown", handler);
   }, [open]);
 
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+
   async function handleLogout() { 
-    setOpen(false);
-    await logoutAction(); 
-    useWishlist.getState().clearWishlist();
-    useNewsletterStore.getState().reset();
-    // Force a full page reload to clear all client-side state and re-read cookies in layouts
-    window.location.href = "/";
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError("");
+    try {
+      const res = await logoutAction(); 
+      if (res && res.error) {
+        setLogoutError(res.error);
+        return;
+      }
+      setOpen(false);
+      useWishlist.getState().clearWishlist();
+      useNewsletterStore.getState().reset();
+      // Force a full page reload to clear all client-side state and re-read cookies in layouts
+      window.location.href = "/";
+    } catch {
+      setLogoutError("Logout could not be confirmed. Please retry.");
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -318,14 +334,17 @@ export default function AccountDropdown({ trigger }: { trigger?: React.ReactNode
             {/* ── Sign Out / Sign In ─────────────────────────────────────────── */}
             {isMounted && isLoggedIn && (
               <div className="px-2 py-1.5">
+                {logoutError && (
+                  <p role="alert" className="text-xs text-red-500 px-3 py-1 font-medium">{logoutError}</p>
+                )}
                 <MenuRow
                   item={{
                     icon:    LogOut,
-                    label:   "Sign Out",
+                    label:   loggingOut ? "Signing Out…" : "Sign Out",
                     onClick: handleLogout,
                     danger:  true,
                   }}
-                  onClose={() => setOpen(false)}
+                  onClose={() => !loggingOut && setOpen(false)}
                 />
               </div>
             )}

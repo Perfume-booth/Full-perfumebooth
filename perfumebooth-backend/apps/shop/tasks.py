@@ -15,6 +15,12 @@ from .models import Product, Inventory, ProductImportJob
 from .product_imports import apply_preview, create_preview
 
 
+@shared_task(queue='imports', name='apps.shop.tasks.run_scheduled_imports')
+def run_scheduled_imports():
+    from .advanced_imports import run_due_imports
+    return run_due_imports()
+
+
 @shared_task(bind=True, queue='imports', name='apps.shop.tasks.process_catalog_preview_job')
 def process_catalog_preview_job(self, job_id: str) -> dict:
     """Build a durable catalog preview outside the HTTP request lifecycle."""

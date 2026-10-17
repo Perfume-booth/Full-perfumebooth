@@ -155,6 +155,8 @@ class CatalogService:
             'category': attrs.get('category', ''),
             'gender': attrs.get('gender', ''),
             'productType': attrs.get('productType') or attrs.get('type', ''),
+            'product_form': attrs.get('product_form', ''),
+            'bottle_material': attrs.get('bottle_material', ''),
             'concentration': attrs.get('concentration', ''),
             'top_notes': attrs.get('top_notes', ''),
             'middle_notes': attrs.get('middle_notes', ''),
@@ -164,10 +166,99 @@ class CatalogService:
             'tags': attrs.get('tags', []),
             'weight': attrs.get('weight', ''),
             'shipping': attrs.get('shipping', {}),
+            'collections': attrs.get('collections', []),
             'attributes': attrs,
             'created_at': product.created_at.isoformat() if product.created_at else None,
             'updated_at': product.updated_at.isoformat() if product.updated_at else None,
         }
+
+    @classmethod
+    def apply_search_query(cls, queryset, search_query: str):
+        """
+        Applies tokenization, pg_trgm fuzzy matching (typo tolerance),
+        and weighted relevance ranking to the product queryset.
+        """
+        import re
+        from django.db import connection
+        from django.db.models import Case, When, Value, FloatField, F, Q
+
+        clean = search_query.strip()
+        if not clean:
+            return queryset.order_by('title')
+
+        # 1. Tokenization: Extract distinct lowercase tokens
+        tokens = [t.lower() for t in re.split(r'[\s,\-_/|]+', clean) if len(t) >= 2]
+        is_postgres = connection.vendor == 'postgresql'
+
+        when_conditions = [
+            # Exact matches (Highest priority)
+            When(title__iexact=clean, then=Value(120.0)),
+            When(attributes__brand__iexact=clean, then=Value(80.0)),
+
+            # Prefix matches (Type-ahead priority)
+            When(title__istartswith=clean, then=Value(60.0)),
+            When(attributes__brand__istartswith=clean, then=Value(40.0)),
+
+            # Substring matches
+            When(title__icontains=clean, then=Value(35.0)),
+            When(attributes__brand__icontains=clean, then=Value(25.0)),
+            When(sku__icontains=clean, then=Value(40.0)),
+            When(barcode__icontains=clean, then=Value(40.0)),
+        ]
+
+        # Token scoring: reward matches across title, brand, scent notes, and categories
+        for t in tokens[:8]:
+            when_conditions.append(When(title__icontains=t, then=Value(15.0)))
+            when_conditions.append(When(attributes__brand__icontains=t, then=Value(10.0)))
+            when_conditions.append(When(attributes__top_notes__icontains=t, then=Value(6.0)))
+            when_conditions.append(When(attributes__middle_notes__icontains=t, then=Value(6.0)))
+            when_conditions.append(When(attributes__base_notes__icontains=t, then=Value(6.0)))
+            when_conditions.append(When(attributes__category__icontains=t, then=Value(4.0)))
+            when_conditions.append(When(attributes__tags__icontains=t, then=Value(4.0)))
+
+        # Build base filter
+        filter_q = (
+            Q(title__icontains=clean) |
+            Q(attributes__brand__icontains=clean) |
+            Q(sku__icontains=clean) |
+            Q(barcode__icontains=clean) |
+            Q(attributes__category__icontains=clean)
+        )
+
+        for t in tokens:
+            filter_q |= (
+                Q(title__icontains=t) |
+                Q(attributes__brand__icontains=t) |
+                Q(attributes__top_notes__icontains=t) |
+                Q(attributes__middle_notes__icontains=t) |
+                Q(attributes__base_notes__icontains=t)
+            )
+
+        if is_postgres:
+            try:
+                from django.contrib.postgres.search import TrigramSimilarity, TrigramWordSimilarity
+
+                # Fuzzy trigram similarity annotations for title and brand
+                queryset = queryset.annotate(
+                    title_w_sim=TrigramWordSimilarity(clean, 'title'),
+                    title_sim=TrigramSimilarity('title', clean),
+                )
+
+                relevance_expr = (
+                    Case(*when_conditions, default=Value(0.0), output_field=FloatField())
+                    + (F('title_w_sim') * 60.0)
+                    + (F('title_sim') * 30.0)
+                )
+
+                # Include fuzzy matches (typos like 'haramein', 'oudh', 'vanila')
+                fuzzy_q = filter_q | Q(title_w_sim__gte=0.32) | Q(title_sim__gte=0.25)
+                return queryset.annotate(relevance_score=relevance_expr).filter(fuzzy_q).order_by('-relevance_score', 'title')
+            except Exception as e:
+                logger.warning(f"pg_trgm search fallback due to: {e}")
+
+        # Fallback for SQLite / non-postgres environments
+        relevance_expr = Case(*when_conditions, default=Value(0.0), output_field=FloatField())
+        return queryset.annotate(relevance_score=relevance_expr).filter(filter_q).order_by('-relevance_score', 'title')
 
     @classmethod
     def get_products(cls,
@@ -183,8 +274,10 @@ class CatalogService:
         """
         Retrieves products applying visibility, search, stock level, and brand filters.
         """
+        import hashlib
+        q_hash = hashlib.md5((search_query or '').strip().encode('utf-8')).hexdigest()
         cache_key = (
-            f'catalog:products:page:{page}:size:{page_size}:search:{search_query}:'
+            f'catalog:products:page:{page}:size:{page_size}:q:{q_hash}:'
             f'stock:{stock_status}:brand:{brand}:status:{status_filter}:paginated:{paginate}'
         )
         cached = cache.get(cache_key)
@@ -195,7 +288,6 @@ class CatalogService:
             Product.objects
             .select_related('created_by', 'updated_by')
             .prefetch_related('images', 'variants', 'created_by__roles__role', 'updated_by__roles__role')
-            .order_by('title')
         )
 
         if not is_merchant:
@@ -207,12 +299,9 @@ class CatalogService:
                 products = products.filter(is_online=False)
 
         if search_query:
-            products = products.filter(
-                Q(title__icontains=search_query) |
-                Q(sku__icontains=search_query) |
-                Q(barcode__icontains=search_query) |
-                Q(attributes__brand__icontains=search_query)
-            )
+            products = cls.apply_search_query(products, search_query)
+        else:
+            products = products.order_by('title')
 
         if stock_status == 'low':
             products = products.filter(inventory__stock_level__gt=0, inventory__stock_level__lte=10)
@@ -356,6 +445,21 @@ class CatalogService:
                     is_active=bool(v_data.get('is_active', True)) if 'is_active' in v_data else True,
                 )
 
+        # Manual Collections Sync
+        manual_collections = attributes.get('collections', []) if isinstance(attributes, dict) else []
+        if isinstance(manual_collections, list):
+            for col_name in manual_collections:
+                if isinstance(col_name, str) and col_name.strip():
+                    c_title = col_name.strip()
+                    c_slug = c_title.lower().replace(" ", "-")
+                    if c_title.lower() in ['new', 'new launch', 'new launches', 'new arrival', 'new arrivals']:
+                        c_slug = 'new'
+                    col, _ = Collection.objects.get_or_create(
+                        slug=c_slug,
+                        defaults={'title': c_title, 'match_type': 'manual', 'is_active': True}
+                    )
+                    col.products.add(product)
+
         synced = CollectionSyncService.syncProductCollections(product)
         cache.clear()
         if user and request:
@@ -460,6 +564,28 @@ class CatalogService:
                     is_active=bool(v_data.get('is_active', True)) if 'is_active' in v_data else True,
                 )
 
+        # Manual Collections Sync
+        if attributes and 'collections' in attributes:
+            manual_collections = attributes.get('collections', [])
+            if isinstance(manual_collections, list):
+                active_col_slugs = set()
+                for col_name in manual_collections:
+                    if isinstance(col_name, str) and col_name.strip():
+                        c_title = col_name.strip()
+                        c_slug = c_title.lower().replace(" ", "-")
+                        if c_title.lower() in ['new', 'new launch', 'new launches', 'new arrival', 'new arrivals']:
+                            c_slug = 'new'
+                        active_col_slugs.add(c_slug)
+                        col, _ = Collection.objects.get_or_create(
+                            slug=c_slug,
+                            defaults={'title': c_title, 'match_type': 'manual', 'is_active': True}
+                        )
+                        col.products.add(product)
+                # Detach product from manual collections that were unassigned
+                for old_col in Collection.objects.filter(match_type='manual', products=product):
+                    if old_col.slug not in active_col_slugs:
+                        old_col.products.remove(product)
+
         synced = CollectionSyncService.syncProductCollections(product)
         cache.clear()
         if user and request:
@@ -553,5 +679,34 @@ class CatalogService:
             if user and request:
                 log_action(user, f"Bulk adjusted stock level for {count} products", request)
             return True, f"Successfully adjusted stock level for {count} products.", count
+
+        add_to_collection = patch_data.get('add_to_collection')
+        if add_to_collection and isinstance(add_to_collection, str) and add_to_collection.strip():
+            c_title = add_to_collection.strip()
+            c_slug = c_title.lower().replace(" ", "-")
+            if c_title.lower() in ['new', 'new launch', 'new launches', 'new arrival', 'new arrivals']:
+                c_slug = 'new'
+            col, _ = Collection.objects.get_or_create(
+                slug=c_slug,
+                defaults={'title': c_title, 'match_type': 'manual', 'is_active': True}
+            )
+            products = Product.objects.filter(slug__in=slugs)
+            count = 0
+            for p in products:
+                col.products.add(p)
+                p_attrs = p.attributes or {}
+                cols = p_attrs.get('collections', [])
+                if not isinstance(cols, list):
+                    cols = []
+                if c_title not in cols:
+                    cols.append(c_title)
+                    p_attrs['collections'] = cols
+                    p.attributes = p_attrs
+                    p.save(update_fields=['attributes'])
+                count += 1
+            cache.clear()
+            if user and request:
+                log_action(user, f"Bulk added {count} products to collection '{c_title}'", request)
+            return True, f"Successfully added {count} products to collection '{c_title}'.", count
 
         return False, "No valid action provided.", 0

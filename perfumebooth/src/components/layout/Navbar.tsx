@@ -48,6 +48,8 @@ export default function Navbar({ initialBrands = [] }: { initialBrands?: string[
   const scrollY = useScrollPosition();
   const isScrolled = scrollY > 10;
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const pathname = usePathname();
   const [brands, setBrands] = useState<string[]>(initialBrands);
 
@@ -453,15 +455,37 @@ export default function Navbar({ initialBrands = [] }: { initialBrands?: string[
                 {/* Sign out */}
                 {isMounted && isLoggedIn && (
                   <div className="px-4 py-3">
-                    <button onClick={async () => {
-                      setMobileOpen(false);
-                      await logoutAction();
-                      useWishlist.getState().clearWishlist();
-                      useNewsletterStore.getState().reset();
-                      window.location.href = "/";
-                    }} className="flex items-center gap-3 w-full px-3 py-3 rounded-lg hover:bg-red-50 transition-colors">
+                    {logoutError && (
+                      <p role="alert" className="text-xs text-red-500 mb-2 font-medium">{logoutError}</p>
+                    )}
+                    <button
+                      disabled={loggingOut}
+                      onClick={async () => {
+                        if (loggingOut) return;
+                        setLoggingOut(true);
+                        setLogoutError("");
+                        try {
+                          const res = await logoutAction();
+                          if (res && res.error) {
+                            setLogoutError(res.error);
+                            return;
+                          }
+                          setMobileOpen(false);
+                          useWishlist.getState().clearWishlist();
+                          useNewsletterStore.getState().reset();
+                          window.location.href = "/";
+                        } catch {
+                          setLogoutError("Logout could not be confirmed. Please retry.");
+                        } finally {
+                          setLoggingOut(false);
+                        }
+                      }}
+                      className="flex items-center gap-3 w-full px-3 py-3 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                    >
                       <LogOut size={15} className="text-red-400 flex-shrink-0" />
-                      <span className="text-[13px] text-red-400 font-medium">Sign Out</span>
+                      <span className="text-[13px] text-red-400 font-medium">
+                        {loggingOut ? "Signing Out…" : "Sign Out"}
+                      </span>
                     </button>
                   </div>
                 )}

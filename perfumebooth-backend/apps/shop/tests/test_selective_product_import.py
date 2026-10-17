@@ -389,7 +389,9 @@ class SelectiveProductImportTests(TestCase):
         request = RequestFactory().get('/api/shop/products/excel-export/', HTTP_HOST='testserver')
         response = ProductExcelExportView().get(request)
         workbook = load_workbook(BytesIO(response.content), data_only=False)
-        self.assertEqual(workbook['Products']['A2'].value, 'original')
+        exported_handles = [row[0] for row in workbook['Products'].iter_rows(min_row=2, values_only=True)]
+        self.assertIn('original', exported_handles)
+        self.assertIn('untouched', exported_handles)
         self.assertEqual(workbook['Variants']['C2'].value, variant.sku)
         image_ids = [workbook['Images'].cell(row, 5).value for row in range(2, 5)]
         self.assertIn(str(image.id), image_ids)

@@ -243,10 +243,31 @@ export async function getProductOffers(productId: string, productTags: string[] 
   return offers;
 }
 
-export async function cancelOrder(orderId: string, customerId: string) {
-  // TODO: Replace with your own backend API call
-  console.log("cancelOrder is not implemented yet.", { orderId, customerId });
-  return { success: false, error: "Order cancellation is not implemented yet." };
+export async function cancelOrder(orderId: string, customerId?: string) {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("customerAccessToken")?.value;
+    const baseUrl = process.env.DJANGO_API_URL || process.env.BACKEND_API_URL || "http://localhost:8000";
+    const res = await fetch(`${baseUrl}/api/v1/orders/${orderId}/cancel/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ reason: "Cancelled by customer" }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.detail || "Failed to cancel order." };
+    }
+    revalidatePath("/account");
+    revalidatePath(`/orders/${orderId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Order cancellation error:", error);
+    return { success: false, error: error.message || "Failed to cancel order." };
+  }
 }
 
 export async function getGuestOrderAction(orderName: string, email: string) {

@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 from apps.shop.models import Product, ProductVariant, Inventory
-from apps.orders.models import Order, OrderItem
+from apps.orders.models import Coupon, Order, OrderItem
 from apps.checkout.services.pricing_service import PricingService
 from apps.checkout.services.inventory_service import InventoryService
 from apps.checkout.services.checkout_service import CheckoutService
@@ -66,6 +66,9 @@ class PricingServiceTests(TestCase):
             price=Decimal("299.99"),
             stock_level=10
         )
+        Coupon.objects.create(code='SAVE10', discount_type=Coupon.DiscountType.PERCENTAGE, discount_value=10, is_active=True)
+        Coupon.objects.create(code='BLOOM15', discount_type=Coupon.DiscountType.PERCENTAGE, discount_value=15, is_active=True)
+        Coupon.objects.create(code='FREESHIP', discount_type=Coupon.DiscountType.FREE_SHIPPING, discount_value=0, is_active=True)
 
     def test_line_price_resolution(self):
         # Product price
@@ -248,6 +251,7 @@ class CheckoutServiceTests(TestCase):
             price=Decimal("450.00"),
             stock_level=5
         )
+        Coupon.objects.create(code='SAVE10', discount_type=Coupon.DiscountType.PERCENTAGE, discount_value=10, is_active=True)
 
     def test_successful_checkout_end_to_end(self):
         checkout_input = CheckoutInput(

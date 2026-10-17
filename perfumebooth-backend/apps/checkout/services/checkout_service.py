@@ -71,10 +71,23 @@ class CheckoutService:
         line_items = PricingService.build_line_items(locked_items)
 
         # 5, 6: Validate coupons, compute shipping fee and final total
+        # Serialize coupon eligibility and redemption within this transaction.
+        # Prevent concurrent orders from passing the same usage-limit check.
+        if input_data.coupon_code:
+            from apps.orders.models import Coupon
+            list(Coupon.objects.select_for_update().filter(
+                code__iexact=input_data.coupon_code.strip()
+            ))
+        resolved_email = (
+            input_data.shipping_address.get('email')
+            or (user.email if user and user.is_authenticated else '')
+        )
         totals = PricingService.calculate_order_totals(
             line_items=line_items,
             coupon_code=input_data.coupon_code,
-            shipping_address=input_data.shipping_address
+            shipping_address=input_data.shipping_address,
+            user=user,
+            customer_email=resolved_email
         )
 
         # Generate unique order tracking number
@@ -106,18 +119,24 @@ class CheckoutService:
             payment_method=input_data.payment_method,
             payment_status=Order.PaymentStatus.PENDING,
             shipping_address=shipping_snapshot,
-            customer_email=(
-                input_data.shipping_address.get('email')
-                or (user.email if user and user.is_authenticated else '')
-            ),
+            customer_email=resolved_email,
             customer_phone=input_data.shipping_address.get('phone', ''),
             coupon_code=totals.coupon_code or '',
         )
 
         if totals.coupon_code:
-            from apps.orders.models import Coupon
+            from apps.orders.models import Coupon, CouponRedemption
             from django.db.models import F
-            Coupon.objects.filter(code=totals.coupon_code.upper()).update(times_used=F('times_used') + 1)
+            coupon = Coupon.objects.select_for_update().filter(code=totals.coupon_code.upper()).first()
+            if coupon:
+                Coupon.objects.filter(id=coupon.id).update(times_used=F('times_used') + 1)
+                CouponRedemption.objects.create(
+                    coupon=coupon,
+                    user=user if user and user.is_authenticated else None,
+                    order=order,
+                    customer_email=resolved_email,
+                    discount_amount=totals.coupon_discount if hasattr(totals, 'coupon_discount') else totals.discount_amount
+                )
 
         # Create OrderItem records
         for item in line_items:
@@ -137,6 +156,9 @@ class CheckoutService:
         InventoryReservationService.reserve(order, locked_items)
         if input_data.payment_method == Order.PaymentMethod.COD:
             InventoryReservationService.commit_order(order)
+            from apps.orders.models import PaymentOutbox
+            for kind in ('receipt', 'fulfillment'):
+                PaymentOutbox.objects.get_or_create(order=order, kind=kind)
 
         # 9: Return structured checkout result
         return {

@@ -69,6 +69,8 @@ export interface Product {
     season?: string;
     occasion?: string;
     material?: string;
+    bottle_material?: string;
+    product_form?: string;
     fragrance?: string;
     rating?: number;
     rating_count?: number;
@@ -374,9 +376,11 @@ export default async function ProductPage({
                                         gender: product.gender,
                                         season: product.season,
                                         idealFor: product.ideal_for,
-                                        size: `${product.size_ml}ml`,
+                                        size: product.size_ml ? `${product.size_ml}ml` : undefined,
                                         type: product.type,
                                         occasion: product.occasion,
+                                        material: product.bottle_material || product.material || (product as any).attributes?.bottle_material,
+                                        form: product.product_form || (product as any).attributes?.product_form,
                                     }}
                                 />
                             </article>

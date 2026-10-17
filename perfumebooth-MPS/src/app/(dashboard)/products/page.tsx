@@ -24,7 +24,8 @@ import {
   FileDown,
   FileSpreadsheet,
   Wand2,
-  Package
+  Package,
+  FolderPlus
 } from 'lucide-react';
 
 interface Product {
@@ -42,6 +43,9 @@ interface Product {
   images: { url: string; altText: string }[];
   variants?: VariantItem[];
   attributes: Record<string, any>;
+  product_form?: string;
+  bottle_material?: string;
+  collections?: string[];
   stock: number;
   is_online: boolean;
   created_by_name?: string;
@@ -58,6 +62,7 @@ const PRESET_TEMPLATES = [
     scentProfile: 'Oud',
     category: 'Perfume',
     productType: 'Extrait de Parfum',
+    productForm: 'Spray',
     gender: 'Unisex'
   },
   {
@@ -69,6 +74,7 @@ const PRESET_TEMPLATES = [
     scentProfile: 'Fresh',
     category: 'Perfume',
     productType: 'Eau de Parfum',
+    productForm: 'Spray',
     gender: 'Men'
   },
   {
@@ -80,6 +86,7 @@ const PRESET_TEMPLATES = [
     scentProfile: 'Floral',
     category: 'Perfume',
     productType: 'Eau de Parfum',
+    productForm: 'Spray',
     gender: 'Women'
   },
   {
@@ -91,6 +98,7 @@ const PRESET_TEMPLATES = [
     scentProfile: 'Spicy',
     category: 'Attar',
     productType: 'Attar/CPO',
+    productForm: 'Oil',
     gender: 'Unisex'
   },
   {
@@ -102,6 +110,7 @@ const PRESET_TEMPLATES = [
     scentProfile: 'Fresh',
     category: 'Body Mist',
     productType: 'Eau de Toilette',
+    productForm: 'Mist',
     gender: 'Women'
   }
 ];
@@ -132,6 +141,8 @@ export default function ProductsPage() {
   const [filterBrand, setFilterBrand] = useState('');
   const [filterStatus, setFilterStatus] = useState(''); // 'online', 'offline', or ''
   const [filterStock, setFilterStock] = useState(''); // 'instock', 'outofstock', or ''
+  const [filterForm, setFilterForm] = useState(''); // Product form filter
+  const [filterCollection, setFilterCollection] = useState(''); // Collection filter
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -220,9 +231,13 @@ export default function ProductsPage() {
   const [tags, setTags] = useState('');
   const [productType, setProductType] = useState('Eau de Parfum');
   const [bottleMaterial, setBottleMaterial] = useState('Glass');
+  const [productForm, setProductForm] = useState('Spray');
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [imageAltText, setImageAltText] = useState('');
+  const [collectionsInput, setCollectionsInput] = useState<string[]>([]);
+  const [newCollectionText, setNewCollectionText] = useState('');
+  const [availableCollections, setAvailableCollections] = useState<{ id: string; title: string; slug: string }[]>([]);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
   const [variantsList, setVariantsList] = useState<VariantItem[]>([]);
   const [manualTags, setManualTags] = useState<string[]>([]);
@@ -259,6 +274,9 @@ export default function ProductsPage() {
     setScentProfile(template.scentProfile);
     setCategory(template.category);
     setProductType(template.productType);
+    if ((template as any).productForm) {
+      setProductForm((template as any).productForm);
+    }
     setGender(template.gender);
   };
 
@@ -403,9 +421,64 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchCollections = async () => {
+    try {
+      const data = await apiFetch('/shop/collections/');
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setAvailableCollections(list.map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        slug: c.slug
+      })));
+    } catch (err: any) {
+      console.error('Error fetching collections:', err);
+    }
+  };
+
+  const handleAddCollection = (val?: string) => {
+    const nameToAdd = (val || newCollectionText).trim();
+    if (!nameToAdd) return;
+    if (!collectionsInput.some(c => c.toLowerCase() === nameToAdd.toLowerCase())) {
+      setCollectionsInput(prev => [...prev, nameToAdd]);
+    }
+    setNewCollectionText('');
+  };
+
+  const handleRemoveCollection = (nameToRemove: string) => {
+    setCollectionsInput(prev => prev.filter(c => c.toLowerCase() !== nameToRemove.toLowerCase()));
+  };
+
+  const handleBulkAddToCollection = async () => {
+    const colName = prompt(`Enter collection name to add ${selectedSlugs.length} selected products to (e.g. New Launches):`);
+    if (!colName || !colName.trim()) return;
+    try {
+      const res = await apiFetch('/shop/products/', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slugs: selectedSlugs,
+          add_to_collection: colName.trim()
+        })
+      });
+      alert(res.detail || `Added ${selectedSlugs.length} products to ${colName.trim()}.`);
+      setSelectedSlugs([]);
+      fetchProducts();
+      fetchCollections();
+    } catch (err: any) {
+      alert(err.message || 'Failed to add products to collection.');
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchBrands();
+    fetchCollections();
   }, []);
 
   useEffect(() => {
@@ -511,6 +584,14 @@ export default function ProductsPage() {
     setTags(Array.isArray(product.attributes.tags) ? product.attributes.tags.join(', ') : (product.attributes.tags || ''));
     setProductType(product.attributes.productType || 'Eau de Parfum');
     setBottleMaterial(product.attributes.bottle_material || 'Glass');
+    setProductForm(product.attributes.product_form || (product as any).product_form || 'Spray');
+    const dupCollections = Array.isArray(product.attributes?.collections)
+      ? [...product.attributes.collections]
+      : Array.isArray(product.collections)
+        ? [...product.collections]
+        : [];
+    setCollectionsInput(dupCollections);
+    setNewCollectionText('');
     setMetaTitle(product.attributes.meta_title || '');
     setMetaDescription(product.attributes.meta_description || '');
     setImageAltText(product.attributes.image_alt_text || '');
@@ -580,6 +661,9 @@ export default function ProductsPage() {
     setTags('');
     setProductType('Eau de Parfum');
     setBottleMaterial('Glass');
+    setProductForm('Spray');
+    setCollectionsInput([]);
+    setNewCollectionText('');
     setMetaTitle('');
     setMetaDescription('');
     setImageAltText('');
@@ -637,6 +721,14 @@ export default function ProductsPage() {
     setTags(Array.isArray(product.attributes.tags) ? product.attributes.tags.join(', ') : (product.attributes.tags || ''));
     setProductType(product.attributes.productType || 'Eau de Parfum');
     setBottleMaterial(product.attributes.bottle_material || 'Glass');
+    setProductForm(product.attributes.product_form || (product as any).product_form || 'Spray');
+    const initialCollections = Array.isArray(product.attributes?.collections)
+      ? [...product.attributes.collections]
+      : Array.isArray(product.collections)
+        ? [...product.collections]
+        : [];
+    setCollectionsInput(initialCollections);
+    setNewCollectionText('');
     setMetaTitle(product.attributes.meta_title || '');
     setMetaDescription(product.attributes.meta_description || '');
     setImageAltText(product.attributes.image_alt_text || '');
@@ -737,6 +829,8 @@ export default function ProductsPage() {
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       productType,
       bottle_material: bottleMaterial,
+      product_form: productForm,
+      collections: collectionsInput,
       meta_title: metaTitle,
       meta_description: metaDescription,
       image_alt_text: imageAltText,
@@ -827,7 +921,14 @@ export default function ProductsPage() {
     const matchesStock = !filterStock ||
       (filterStock === 'instock' && p.stock > 0) ||
       (filterStock === 'outofstock' && p.stock === 0);
-    return matchesSearch && matchesBrand && matchesStatus && matchesStock;
+    const matchesForm = !filterForm ||
+      (p.attributes?.product_form || (p as any).product_form || '').toLowerCase() === filterForm.toLowerCase();
+    const matchesCollection = !filterCollection || (
+      Array.isArray(p.attributes?.collections) && p.attributes.collections.some((c: string) => c.toLowerCase() === filterCollection.toLowerCase())
+    ) || (
+      Array.isArray((p as any).collections) && (p as any).collections.some((c: string) => c.toLowerCase() === filterCollection.toLowerCase())
+    );
+    return matchesSearch && matchesBrand && matchesStatus && matchesStock && matchesForm && matchesCollection;
   });
 
   if (modalOpen) {
@@ -1192,6 +1293,28 @@ export default function ProductsPage() {
                 </select>
               </div>
 
+              {/* Product Form */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">Product Form</label>
+                <select
+                  value={productForm}
+                  onChange={(e) => setProductForm(e.target.value)}
+                  className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground cursor-pointer"
+                >
+                  <option value="Spray">Spray</option>
+                  <option value="Liquid">Liquid</option>
+                  <option value="Roll-on">Roll-on</option>
+                  <option value="Oil">Oil / CPO</option>
+                  <option value="Solid">Solid</option>
+                  <option value="Mist">Mist</option>
+                  <option value="Cream">Cream</option>
+                  <option value="Balm">Balm</option>
+                  <option value="Stick">Stick</option>
+                  <option value="Gel">Gel</option>
+                  <option value="Aerosol">Aerosol</option>
+                </select>
+              </div>
+
               {/* Status */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase">Status</label>
@@ -1390,6 +1513,91 @@ export default function ProductsPage() {
                   className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground"
                 />
               </div>
+
+              {/* Manual Collections Assignment */}
+              <div className="flex flex-col gap-2.5 md:col-span-2 pt-2 border-t border-border/20">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+                    <FolderPlus className="w-3.5 h-3.5 text-primary" />
+                    <span>Collections (Add Manually)</span>
+                  </label>
+                  <span className="text-[11px] text-muted-foreground/70">
+                    e.g. New Launches, Trending Perfumes, Best Sellers
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2.5 w-full">
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={newCollectionText}
+                      onChange={(e) => setNewCollectionText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCollection();
+                        }
+                      }}
+                      placeholder="Type collection name (e.g. New Launches) and press Add or Enter..."
+                      className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground placeholder:text-muted-foreground/60"
+                    />
+                  </div>
+
+                  {availableCollections.length > 0 && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          handleAddCollection(val);
+                        }
+                      }}
+                      className="w-48 sm:w-52 flex-shrink-0 px-3.5 py-2.5 neu-input rounded-2xl text-xs text-foreground cursor-pointer bg-card font-medium"
+                    >
+                      <option value="">+ Existing Collection</option>
+                      {availableCollections.map((col) => (
+                        <option key={col.id || col.slug} value={col.title}>
+                          {col.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleAddCollection()}
+                    className="flex-shrink-0 px-5 py-2.5 neu-btn text-primary font-bold rounded-2xl text-xs cursor-pointer hover:text-foreground transition whitespace-nowrap"
+                  >
+                    + Add
+                  </button>
+                </div>
+
+                {/* Selected Collections Badges */}
+                {collectionsInput.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    {collectionsInput.map((colName) => (
+                      <span
+                        key={colName}
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl neu-inset-sm text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm"
+                      >
+                        <span>📁 {colName}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCollection(colName)}
+                          className="hover:text-red-400 focus:outline-none cursor-pointer transition"
+                          title={`Remove from ${colName}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground/70 italic">
+                    No collections assigned yet. Type a collection name above or pick from existing collections to add this fragrance manually.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Description */}
@@ -1501,6 +1709,8 @@ export default function ProductsPage() {
                 
               </div>
             </div>
+
+
 
             {/* Submit Buttons */}
             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border/30">
@@ -1628,6 +1838,14 @@ export default function ProductsPage() {
               >
                 <span>Bulk Adjust ({selectedSlugs.length})</span>
               </button>
+              <button
+                type="button"
+                onClick={handleBulkAddToCollection}
+                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-emerald-500 font-semibold rounded-2xl cursor-pointer text-sm"
+              >
+                <FolderPlus className="w-4 h-4" />
+                <span>Add to Collection ({selectedSlugs.length})</span>
+              </button>
             </>
           )}
           <button
@@ -1713,13 +1931,53 @@ export default function ProductsPage() {
             </select>
           </div>
 
+          {/* Product Form Filter */}
+          <div className="flex items-center gap-2 neu-inset-sm px-3.5 py-2 rounded-2xl border border-border/20">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Form</span>
+            <select
+              value={filterForm}
+              onChange={(e) => setFilterForm(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Forms</option>
+              <option value="Spray" className="bg-card text-foreground">Spray</option>
+              <option value="Liquid" className="bg-card text-foreground">Liquid</option>
+              <option value="Roll-on" className="bg-card text-foreground">Roll-on</option>
+              <option value="Oil" className="bg-card text-foreground">Oil</option>
+              <option value="Solid" className="bg-card text-foreground">Solid</option>
+              <option value="Mist" className="bg-card text-foreground">Mist</option>
+              <option value="Cream" className="bg-card text-foreground">Cream</option>
+              <option value="Stick" className="bg-card text-foreground">Stick</option>
+              <option value="Gel" className="bg-card text-foreground">Gel</option>
+            </select>
+          </div>
+
+          {/* Collection Filter */}
+          <div className="flex items-center gap-2 neu-inset-sm px-3.5 py-2 rounded-2xl border border-border/20">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Collection</span>
+            <select
+              value={filterCollection}
+              onChange={(e) => setFilterCollection(e.target.value)}
+              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
+            >
+              <option value="" className="bg-card text-foreground">All Collections</option>
+              {availableCollections.map((col) => (
+                <option key={col.id || col.slug} value={col.title} className="bg-card text-foreground">
+                  {col.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Clear Filters Button */}
-          {(filterBrand || filterStatus || filterStock) && (
+          {(filterBrand || filterStatus || filterStock || filterForm || filterCollection) && (
             <button
               onClick={() => {
                 setFilterBrand('');
                 setFilterStatus('');
                 setFilterStock('');
+                setFilterForm('');
+                setFilterCollection('');
               }}
               className="text-xs font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer ml-1"
             >
@@ -1840,6 +2098,20 @@ export default function ProductsPage() {
                               {product.barcode || product.attributes?.barcode}
                             </span>
                           )}
+                          {(product.attributes?.product_form || (product as any).product_form) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-indigo-500 border border-indigo-500/20" title="Product Form">
+                              {product.attributes?.product_form || (product as any).product_form}
+                            </span>
+                          )}
+                          {((product.attributes?.collections || (product as any).collections) as string[] | undefined)?.map((col) => (
+                            <span
+                              key={col}
+                              className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              title={`Collection: ${col}`}
+                            >
+                              📁 {col}
+                            </span>
+                          ))}
                           {product.attributes?.shipping?.is_physical === false ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-muted-foreground border border-border/30">
                               Digital

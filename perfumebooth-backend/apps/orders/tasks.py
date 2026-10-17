@@ -116,7 +116,9 @@ def process_payment_outbox():
             entry = PaymentOutbox.objects.select_for_update().get(pk=entry_id)
             if entry.status != 'pending':
                 continue
-            if entry.order.payment_status != Order.PaymentStatus.PAID or entry.order.status not in (Order.Status.PAID, Order.Status.PROCESSING):
+            is_valid_paid = (entry.order.payment_status == Order.PaymentStatus.PAID and entry.order.status in (Order.Status.PAID, Order.Status.PROCESSING))
+            is_valid_cod = (entry.order.payment_method == Order.PaymentMethod.COD and entry.order.status == Order.Status.PROCESSING)
+            if not (is_valid_paid or is_valid_cod):
                 entry.status = 'review'
                 entry.last_error = 'Order state changed before dispatch; operator review required'
                 entry.save(update_fields=['status', 'last_error', 'updated_at'])

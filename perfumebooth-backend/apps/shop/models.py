@@ -177,6 +177,12 @@ class ProductImportJob(models.Model):
     variant_operations = models.JSONField(default=list)
     image_operations = models.JSONField(default=list)
     bulk_operations = models.JSONField(default=list)
+    column_mapping = models.JSONField(default=dict)
+    snapshot = models.JSONField(default=dict)
+    undone_at = models.DateTimeField(null=True, blank=True)
+    scheduled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    sale_ends_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    schedule_state = models.CharField(max_length=24, blank=True, default='', db_index=True)
     errors = models.JSONField(default=list)
     source_file = models.FileField(upload_to='catalog-imports/', null=True, blank=True)
     task_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
@@ -193,6 +199,17 @@ class ProductImportJob(models.Model):
         db_table = 'shop_product_import_job'
         ordering = ['-created_at']
 
+
+
+class ImportMapping(models.Model):
+    """Owner-scoped supplier column aliases; copied onto jobs at upload time."""
+    owner = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    columns = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'name'], name='import_mapping_owner_name')]
 
 
 class ProductImage(models.Model):

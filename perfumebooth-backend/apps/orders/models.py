@@ -277,6 +277,22 @@ class Coupon(models.Model):
         help_text='Global max redemptions allowed (null for unlimited)'
     )
     times_used = models.PositiveIntegerField(default=0)
+    per_customer_limit = models.PositiveIntegerField(
+        null=True, blank=True, default=1,
+        help_text='Maximum redemptions allowed per customer/email (null for unlimited)'
+    )
+    product_restrictions = models.JSONField(
+        default=list, blank=True,
+        help_text='List of product IDs/slugs allowed for this coupon. Empty means all products.'
+    )
+    category_restrictions = models.JSONField(
+        default=list, blank=True,
+        help_text='List of category names allowed for this coupon. Empty means all.'
+    )
+    customer_restrictions = models.JSONField(
+        default=list, blank=True,
+        help_text='List of customer emails allowed for this coupon. Empty means all.'
+    )
     is_active = models.BooleanField(default=True, db_index=True)
     first_order_only = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -290,4 +306,111 @@ class Coupon(models.Model):
 
     def __str__(self) -> str:
         return f"{self.code} ({self.discount_type}: {self.discount_value})"
+
+
+class CouponRedemption(models.Model):
+    """
+    Audit log of each individual coupon redemption per order and per customer.
+    Enforces per-customer usage limits and prevents coupon abuse.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coupon = models.ForeignKey(
+        Coupon, on_delete=models.CASCADE, related_name='redemptions', db_index=True
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='coupon_redemptions'
+    )
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='coupon_redemptions', null=True, blank=True
+    )
+    customer_email = models.EmailField(db_index=True)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'orders_coupon_redemption'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['coupon', 'customer_email'], name='coupon_email_idx'),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.coupon.code} used by {self.customer_email} (-₹{self.discount_amount})"
+
+
+class Promotion(models.Model):
+    """
+    Automated Storewide, Category, Brand, Product & Customer Group Promotions
+    Supports Scheduled Promotions, Flash Sales, and Combination Rules.
+    """
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'percentage', 'Percentage'
+        FIXED = 'fixed', 'Fixed Amount'
+
+    class TargetType(models.TextChoices):
+        ALL = 'all', 'Storewide (All Products)'
+        CATEGORY = 'category', 'Category'
+        BRAND = 'brand', 'Brand'
+        PRODUCT = 'product', 'Specific Products'
+        CUSTOMER_GROUP = 'customer_group', 'Customer Group / Tag'
+
+    class CombinationRule(models.TextChoices):
+        EXCLUSIVE = 'exclusive', 'Exclusive (Cannot combine with coupons)'
+        STACKABLE = 'stackable', 'Stackable (Can combine with coupons)'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200, db_index=True)
+    description = models.CharField(max_length=500, blank=True, default='')
+    discount_type = models.CharField(
+        max_length=20, choices=DiscountType.choices, default=DiscountType.PERCENTAGE
+    )
+    discount_value = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Percentage value (e.g. 20 for 20%) or Fixed amount (e.g. 500)'
+    )
+    target_type = models.CharField(
+        max_length=20, choices=TargetType.choices, default=TargetType.ALL, db_index=True
+    )
+    target_values = models.JSONField(
+        default=list, blank=True,
+        help_text='List of category names, brand names, product IDs/slugs, or customer tags targeted'
+    )
+    min_order_value = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text='Minimum cart subtotal required for this promotion'
+    )
+    max_discount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text='Maximum discount cap for percentage discounts'
+    )
+    start_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    end_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    priority = models.PositiveIntegerField(
+        default=0, db_index=True,
+        help_text='Higher number takes priority in conflict resolution'
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_flash_sale = models.BooleanField(
+        default=False, db_index=True,
+        help_text='Marks as a Flash Sale with urgent countdown timer'
+    )
+    combination_rule = models.CharField(
+        max_length=20, choices=CombinationRule.choices, default=CombinationRule.STACKABLE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'orders_promotion'
+        ordering = ['-priority', '-created_at']
+        verbose_name = 'Promotion'
+        verbose_name_plural = 'Promotions'
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.target_type}: {self.discount_type} {self.discount_value})"
+
 

@@ -19,6 +19,7 @@ interface Props {
     category?: string;
     occasion?: string;
     material?: string;
+    form?: string;
   };
 }
 
@@ -94,12 +95,13 @@ export default function ExpandableNarrative({ description, details }: Props) {
     { label: "Fragrance", value: details?.fragrance },
     { label: "Type", value: details?.type },
     { label: "Gender", value: details?.gender },
+    { label: "Bottle Material", value: details?.material },
+    { label: "Item Form", value: details?.form },
     { label: "Season", value: details?.season },
     { label: "Ideal for", value: details?.idealFor },
     { label: "Size", value: details?.size },
     { label: "Category", value: details?.category },
     { label: "Occasion", value: details?.occasion },
-    { label: "Material", value: details?.material },
   ].filter(field => field.value);
 
   return (

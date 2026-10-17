@@ -7,7 +7,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 
-TEMPLATE_VERSION = '8.0'
+TEMPLATE_VERSION = '9.0'
 MAX_DATA_ROW = 1001
 HEADERS = [
     'Handle', 'SKU', 'Title', 'Price', 'Compare At Price', 'Stock', 'Published',
@@ -28,7 +28,7 @@ IMAGE_HEADERS = [
     'Alt Text', 'Position', 'Primary', 'Validation Errors',
 ]
 BULK_ACTION_HEADERS = [
-    'Target Type', 'Identifier', 'Action', 'Value', 'Validation Errors',
+    'Target Type', 'Identifier', 'Action', 'Value', 'Field', 'Find', 'Replace', 'Validation Errors',
 ]
 
 
@@ -202,25 +202,27 @@ def _build_bulk_actions_sheet(sheet):
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         cell.protection = Protection(locked=True)
     sheet.freeze_panes = 'A2'
-    sheet.auto_filter.ref = f'A1:E{MAX_DATA_ROW}'
-    for index, width in enumerate([18, 28, 28, 48, 52], start=1):
+    sheet.auto_filter.ref = f'A1:H{MAX_DATA_ROW}'
+    for index, width in enumerate([18, 28, 28, 48, 24, 32, 32, 52], start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
     for row_number in range(2, MAX_DATA_ROW + 1):
-        for cell in sheet[row_number][:4]:
+        for cell in sheet[row_number][:7]:
             cell.protection = Protection(locked=False)
-        sheet.cell(row_number, 5).value = (
+        sheet.cell(row_number, 8).value = (
             f'=TEXTJOIN("; ",TRUE,IF(AND(COUNTA(A{row_number}:D{row_number})>0,A{row_number}=""),"Target Type required",""),'
             f'IF(AND(COUNTA(A{row_number}:D{row_number})>0,B{row_number}=""),"Identifier required",""),'
             f'IF(AND(COUNTA(A{row_number}:D{row_number})>0,C{row_number}=""),"Action required",""),'
-            f'IF(AND(COUNTA(A{row_number}:D{row_number})>0,D{row_number}=""),"Value required",""))'
+            f'IF(AND(COUNTA(A{row_number}:D{row_number})>0,C{row_number}<>"FIND_REPLACE",D{row_number}=""),"Value required",""),'
+            f'IF(AND(C{row_number}="FIND_REPLACE",OR(E{row_number}="",F{row_number}="")),"Field and Find required",""))'
         )
-        sheet.cell(row_number, 5).protection = Protection(locked=True)
+        sheet.cell(row_number, 8).protection = Protection(locked=True)
     _add_list_validation(sheet, 'A', ['PRODUCT', 'VARIANT'])
     _add_list_validation(sheet, 'C', [
         'PRICE_PERCENT', 'PRICE_DELTA', 'STOCK_DELTA', 'SET_STATUS',
         'ADD_TAGS', 'REMOVE_TAGS', 'ADD_COLLECTION', 'REMOVE_COLLECTION',
+        'PRICE_SET', 'SET_BRAND', 'SET_CATEGORY', 'SET_TAGS', 'FIND_REPLACE',
     ])
-    sheet.conditional_formatting.add(f'E2:E{MAX_DATA_ROW}', FormulaRule(formula=['LEN(E2)>0'], fill=PatternFill('solid', fgColor='FCE8E6')))
+    sheet.conditional_formatting.add(f'H2:H{MAX_DATA_ROW}', FormulaRule(formula=['LEN(H2)>0'], fill=PatternFill('solid', fgColor='FCE8E6')))
     sheet.protection.sheet = True
     sheet.protection.password = 'catalog'
     sheet.protection.autoFilter = False
@@ -279,7 +281,11 @@ def build_product_import_template(mode='UPDATE_ONLY'):
     instructions['A24'] = 'Products: commerce, description, perfume attributes, SEO, shipping and internal cost data. Variants: options, price, stock and status.'
     instructions['A26'] = 'Important'
     instructions['A26'].font = Font(bold=True, color='C00000')
-    instructions['A27'] = 'Do not rename headers. Yellow headers are required.'
+    instructions['A27'] = 'Use standard headers or select a saved Products-sheet mapping. Yellow headers are required (Value is optional for FIND_REPLACE).'
+    instructions['A29'] = 'Phase 7: PRICE_SET sets an absolute price; PRICE_DELTA and STOCK_DELTA accept signed values. PRICE_PERCENT accepts signed percentages.'
+    instructions['A30'] = 'SET_BRAND / SET_CATEGORY / SET_TAGS assign values. FIND_REPLACE uses Field, Find, Replace (literal, case-sensitive; blank Replace removes text).'
+    instructions['A31'] = 'Schedule a price-only preview in MPS. Optional sale end restores the snapshot unless a later price change conflicts. Times use your browser timezone.'
+    instructions['A32'] = 'Undo supports existing product/variant updates and bulk actions, not creates/deletes/image changes. Conflicts or reservations block the entire undo.'
     instructions.column_dimensions['A'].width = 115
     instructions.column_dimensions['B'].width = 18
     instructions.freeze_panes = 'A5'

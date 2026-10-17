@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, FileText, Loader2, Upload, X } from 'lucide-react';
 import { apiDownload, apiFetch } from '@/lib/api';
+import AdvancedImportControls, { AdvancedJob } from './AdvancedImportControls';
 
 interface CatalogImportModalProps { isOpen: boolean; onClose: () => void; onSuccess: () => void; }
 type ImportMode = 'UPDATE_ONLY' | 'CREATE_ONLY' | 'UPSERT';
@@ -13,7 +14,7 @@ interface ImportCreate { row: number; slug: string; sku: string; title: string; 
 interface VariantOperation { row: number; action: 'ADD' | 'UPDATE' | 'DELETE'; product_handle: string; sku: string; title?: string; changes?: Record<string, unknown>; }
 interface ImageOperation { row: number; action: 'ADD' | 'REPLACE' | 'DELETE'; product_handle: string; variant_sku?: string; image_id?: string; url?: string; is_primary: boolean; }
 interface BulkOperation { row: number; target_type: 'PRODUCT' | 'VARIANT'; identifier: string; action: string; old_value: unknown; new_value: unknown; }
-interface Preview { job_id: string; status: string; operation: 'preview' | 'apply'; progress: { current: number; total: number }; error_message?: string; summary: ImportSummary; changes: ImportChange[]; creates: ImportCreate[]; variants: VariantOperation[]; images: ImageOperation[]; bulk_actions: BulkOperation[]; errors: ImportError[]; }
+interface Preview extends AdvancedJob { job_id: string; status: string; operation: 'preview' | 'apply'; progress: { current: number; total: number }; error_message?: string; summary: ImportSummary; changes: ImportChange[]; creates: ImportCreate[]; variants: VariantOperation[]; images: ImageOperation[]; bulk_actions: BulkOperation[]; errors: ImportError[]; }
 
 const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const PENDING_JOB_KEY = 'perfumebooth.catalogImportJob';
@@ -26,6 +27,7 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
   const [success, setSuccess] = useState<string | null>(null);
   const [mode, setMode] = useState<ImportMode>('UPDATE_ONLY');
   const [draftDefault, setDraftDefault] = useState(true);
+  const [mappingId, setMappingId] = useState('');
   useEffect(() => {
     if (!isOpen) return;
     const jobId = window.localStorage.getItem(PENDING_JOB_KEY);
@@ -77,6 +79,7 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
     setBusy(true); setError(null);
     try {
       const formData = new FormData(); formData.append('file', file); formData.append('mode', mode); formData.append('draft_default', String(draftDefault));
+      if (mappingId) formData.append('mapping_id', mappingId);
       const queued = await apiFetch<Preview>('/shop/products/excel-import/', { method: 'POST', body: formData });
       window.localStorage.setItem(PENDING_JOB_KEY, queued.job_id);
       setPreview(queued);
@@ -150,6 +153,7 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
         <button aria-label="Close" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
       </div>
       <div className="flex flex-col gap-4 overflow-y-auto p-6">
+        <AdvancedImportControls job={preview} disabled={busy} mappingId={mappingId} onMapping={setMappingId} onJobChanged={(updated: AdvancedJob) => { setPreview(current => current ? { ...current, ...updated } : current); onSuccess(); }} />
         <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-300"><span>Products match by <b>Handle</b> or <b>SKU</b>. Manage variants on the Variants sheet with explicit <b>ADD</b>, <b>UPDATE</b>, or <b>DELETE</b>. Blank cells keep current values.</span><button onClick={downloadTemplate} className="flex shrink-0 items-center gap-1 rounded-lg border border-blue-400/30 px-3 py-2 font-semibold hover:bg-blue-400/10"><Download className="h-4 w-4" />Download template</button></div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-semibold">Import mode<select value={mode} onChange={(e) => { setMode(e.target.value as ImportMode); setPreview(null); setSuccess(null); }} className="mt-1 w-full rounded-xl border border-border bg-secondary px-3 py-2 text-sm"><option value="UPDATE_ONLY">Update existing only</option><option value="CREATE_ONLY">Create new only</option><option value="UPSERT">Create new + update existing</option></select></label>
@@ -176,7 +180,7 @@ export default function CatalogImportModal({ isOpen, onClose, onSuccess }: Catal
       <div className="flex justify-end gap-3 border-t border-border bg-muted/20 px-6 py-4">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-semibold">Close</button>
         {!preview && <button disabled={!file || busy} onClick={makePreview} className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Preview changes'}</button>}
-        {preview?.status === 'preview_ready' && !success && <button disabled={busy || preview.errors.length > 0 || (preview.summary.changed_fields === 0 && preview.summary.created_products === 0 && preview.variants.length === 0 && preview.images.length === 0 && preview.bulk_actions.length === 0)} onClick={applyChanges} className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Apply ${preview.summary.created_products + preview.summary.updated_products} products + ${preview.variants.length} variants + ${preview.images.length} images + ${preview.bulk_actions.length} actions`}</button>}
+        {preview?.status === 'preview_ready' && !preview.schedule_state && !success && <button disabled={busy || preview.errors.length > 0 || (preview.summary.changed_fields === 0 && preview.summary.created_products === 0 && preview.variants.length === 0 && preview.images.length === 0 && preview.bulk_actions.length === 0)} onClick={applyChanges} className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Apply ${preview.summary.created_products + preview.summary.updated_products} products + ${preview.variants.length} variants + ${preview.images.length} images + ${preview.bulk_actions.length} actions`}</button>}
         {preview?.status === 'failed' && <button disabled={busy} onClick={retryJob} className="rounded-xl bg-amber-500 px-5 py-2 text-sm font-semibold text-black disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Retry failed job'}</button>}
       </div>
     </div>

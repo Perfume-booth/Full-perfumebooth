@@ -84,6 +84,7 @@ IMAGE_HEADER_MAP = {
 BULK_HEADER_MAP = {
     'target type': 'target_type', 'identifier': 'identifier',
     'action': 'action', 'value': 'value',
+    'field': 'field', 'find': 'find', 'replace': 'replace',
 }
 
 
@@ -158,9 +159,14 @@ def _preview_bulk_actions(rows, mapped, product_changes, variant_operations, err
     allowed = {
         'PRICE_PERCENT', 'PRICE_DELTA', 'STOCK_DELTA', 'SET_STATUS',
         'ADD_TAGS', 'REMOVE_TAGS', 'ADD_COLLECTION', 'REMOVE_COLLECTION',
+        'SET_BRAND', 'SET_CATEGORY', 'SET_TAGS', 'FIND_REPLACE', 'PRICE_SET',
     }
     for row_number, row in enumerate(rows, start=2):
         values = {field: _cell(row.get(original)) for field, original in mapped.items()}
+        for field in ('find', 'replace'):
+            if field in mapped:
+                raw = row.get(mapped[field])
+                values[field] = '' if raw is None else str(raw)
         if not any(values.values()):
             continue
         target_type = values.get('target_type', '').upper()
@@ -175,9 +181,15 @@ def _preview_bulk_actions(rows, mapped, product_changes, variant_operations, err
         target = Product.objects.filter(slug=slugify(identifier)).first() if target_type == 'PRODUCT' else ProductVariant.objects.filter(sku=identifier).select_related('product').first()
         if not target:
             errors.append({'sheet': 'Bulk Actions', 'row': row_number, 'column': 'Identifier', 'message': 'Target product handle or variant SKU was not found.'}); row_error = True
-        if target_type == 'VARIANT' and action in {'ADD_TAGS', 'REMOVE_TAGS', 'ADD_COLLECTION', 'REMOVE_COLLECTION'}:
+        if target_type == 'VARIANT' and action in {'ADD_TAGS', 'REMOVE_TAGS', 'SET_TAGS', 'SET_BRAND', 'SET_CATEGORY', 'FIND_REPLACE', 'ADD_COLLECTION', 'REMOVE_COLLECTION'}:
             errors.append({'sheet': 'Bulk Actions', 'row': row_number, 'column': 'Action', 'message': 'Tags and collections are product-only actions.'}); row_error = True
         logical_field = 'price' if action.startswith('PRICE_') else 'stock' if action == 'STOCK_DELTA' else ('is_active' if target_type == 'VARIANT' else 'is_online') if action == 'SET_STATUS' else 'tags' if action.endswith('_TAGS') else f'collection:{slugify(value)}'
+        if action in {'SET_BRAND', 'SET_CATEGORY'}:
+            logical_field = action[4:].lower()
+        if action == 'FIND_REPLACE':
+            logical_field = HEADER_MAP.get(values.get('field', '').lower(), '')
+            if logical_field not in {'title', 'description', 'brand', 'category', 'seo_title', 'seo_description', 'short_description'}:
+                errors.append({'sheet': 'Bulk Actions', 'row': row_number, 'column': 'Field', 'message': 'Choose Title, Description, Brand, Category, SEO Title, SEO Description or Short Description.'}); row_error = True
         target_id = str(target.pk) if target else ''
         dedupe_key = (target_type, target_id, logical_field)
         if dedupe_key in seen:
@@ -189,30 +201,44 @@ def _preview_bulk_actions(rows, mapped, product_changes, variant_operations, err
         old_value = new_value = None
         collection = None
         try:
-            if target and action in {'PRICE_PERCENT', 'PRICE_DELTA'}:
+            if target and action in {'PRICE_PERCENT', 'PRICE_DELTA', 'PRICE_SET'}:
                 amount = Decimal(value)
+                if not amount.is_finite():
+                    raise ValueError('Price adjustment must be finite.')
                 old_decimal = target.price
-                new_decimal = old_decimal * (Decimal('1') + amount / Decimal('100')) if action == 'PRICE_PERCENT' else old_decimal + amount
+                new_decimal = amount if action == 'PRICE_SET' else old_decimal * (Decimal('1') + amount / Decimal('100')) if action == 'PRICE_PERCENT' else old_decimal + amount
                 new_decimal = new_decimal.quantize(Decimal('0.01'))
-                if new_decimal < 0:
-                    raise ValueError('Resulting price cannot be negative.')
+                if not new_decimal.is_finite() or not 0 <= new_decimal <= Decimal('99999999.99'):
+                    raise ValueError('Resulting price must be between 0 and 99999999.99.')
                 old_value, new_value = str(old_decimal), str(new_decimal)
             elif target and action == 'STOCK_DELTA':
                 delta = int(value)
                 stock = target.inventory.stock_level if target_type == 'PRODUCT' else target.stock_level
                 reserved = target.inventory.reserved_stock if target_type == 'PRODUCT' else target.reserved_stock
-                if stock + delta < reserved:
-                    raise ValueError('Resulting stock cannot be below reserved stock.')
+                if not reserved <= stock + delta <= 2147483647:
+                    raise ValueError('Resulting stock cannot be below reserved stock or exceed a 32-bit integer.')
                 old_value, new_value = stock, stock + delta
             elif target and action == 'SET_STATUS':
                 new_value = _parse('is_online', value)
                 old_value = target.is_online if target_type == 'PRODUCT' else target.is_active
-            elif target and action in {'ADD_TAGS', 'REMOVE_TAGS'}:
+            elif target and action in {'SET_BRAND', 'SET_CATEGORY'}:
+                if not value:
+                    raise ValueError('Assignment value is required.')
+                old_value, new_value = _current(target, logical_field), _parse(logical_field, value)
+            elif target and action == 'FIND_REPLACE' and not row_error:
+                find = values.get('find', '')
+                if not find:
+                    raise ValueError('Find cannot be blank. Replacement is literal and case-sensitive.')
+                old_value = _current(target, logical_field)
+                new_value = _parse(logical_field, (old_value or '').replace(find, values.get('replace', '')))
+            elif target and action in {'ADD_TAGS', 'REMOVE_TAGS', 'SET_TAGS'}:
                 requested = [item.strip() for item in value.split(',') if item.strip()]
                 if not requested:
                     raise ValueError('Enter at least one tag.')
                 old_value = list((target.attributes or {}).get('tags') or [])
-                if action == 'ADD_TAGS':
+                if action == 'SET_TAGS':
+                    new_value = list(dict.fromkeys(requested))
+                elif action == 'ADD_TAGS':
                     new_value = old_value + [item for item in requested if item not in old_value]
                 else:
                     remove = {item.lower() for item in requested}
@@ -248,8 +274,8 @@ def _bulk_current(operation, target):
         return target.inventory.stock_level if operation['target_type'] == 'PRODUCT' else target.stock_level
     if field in {'is_online', 'is_active'}:
         return target.is_online if operation['target_type'] == 'PRODUCT' else target.is_active
-    if field == 'tags':
-        return list((target.attributes or {}).get('tags') or [])
+    if field in ATTRIBUTE_KEYS or field in {'title', 'description'}:
+        return _current(target, field)
     collection = Collection.objects.get(pk=operation['collection_id'])
     return collection.products.filter(pk=target.pk).exists()
 
@@ -483,10 +509,13 @@ def _preview_variants(rows, mapped, product_creates, errors, invalid_rows):
     return operations
 
 
-def _normalise_headers(headers):
+def _normalise_headers(headers, aliases=None):
     mapped, errors = {}, []
+    for source in aliases or {}:
+        if source not in {_cell(header) for header in headers}:
+            errors.append({'row': 1, 'column': source, 'message': 'Saved mapping source column is missing from this file.'})
     for original in headers:
-        canonical = HEADER_MAP.get(_cell(original).lower())
+        canonical = (aliases or {}).get(_cell(original)) or HEADER_MAP.get(_cell(original).lower())
         if canonical:
             if canonical in mapped:
                 errors.append({'row': 1, 'column': original, 'message': f'Duplicate column for {canonical}.'})
@@ -508,16 +537,16 @@ def _parse(field, value):
             parsed = Decimal(value).quantize(Decimal('0.01'))
         except (InvalidOperation, ValueError):
             raise ValueError('Enter a valid decimal number.')
-        if parsed < 0:
-            raise ValueError('Value cannot be negative.')
+        if not parsed.is_finite() or not 0 <= parsed <= Decimal('99999999.99'):
+            raise ValueError('Value must be between 0 and 99999999.99.')
         return str(parsed)
     if field == 'stock':
         try:
             parsed = int(value)
         except (ValueError, TypeError):
             raise ValueError('Enter a whole number.')
-        if parsed < 0:
-            raise ValueError('Stock cannot be negative.')
+        if not 0 <= parsed <= 2147483647:
+            raise ValueError('Stock must be between 0 and 2147483647.')
         return parsed
     if field == 'is_online':
         lowered = value.lower()
@@ -603,7 +632,7 @@ def create_preview(file_obj, user, mode='UPDATE_ONLY', draft_default=True, job=N
     raw, headers, rows, variant_headers, variant_rows, image_headers, image_rows, bulk_headers, bulk_rows = read_rows(file_obj)
     if progress_callback:
         progress_callback(0, 4)
-    mapped, errors = _normalise_headers(headers)
+    mapped, errors = _normalise_headers(headers, job.column_mapping if job else None)
     variant_mapped, variant_header_errors = _normalise_variant_headers(variant_headers)
     errors.extend(variant_header_errors)
     image_mapped, image_header_errors = _normalise_image_headers(image_headers)
@@ -776,8 +805,10 @@ def apply_preview(job_id, user, progress_callback=None):
 
 
 @transaction.atomic
-def _apply_preview_records(job_id, user, downloaded_images, total_downloads, failed_images=None, progress_callback=None):
+def _apply_preview_records(job_id, user, downloaded_images, total_downloads, failed_images=None, progress_callback=None, scheduled=False):
     job = ProductImportJob.objects.select_for_update().get(pk=job_id)
+    if job.schedule_state and not scheduled:
+        raise ValueError('This job is managed by its schedule. Create a new preview to apply manually.')
     if job.created_by_id != user.id and not user.is_superuser:
         raise PermissionError('You can only apply your own import preview.')
     if job.status == ProductImportJob.Status.APPLIED:
@@ -796,6 +827,10 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
     bulk_products = {str(p.pk): p for p in Product.objects.select_for_update().filter(pk__in=bulk_product_ids)}
     bulk_variants = {str(v.pk): v for v in ProductVariant.objects.select_for_update().filter(pk__in=bulk_variant_ids)}
     bulk_inventory = {str(i.product_id): i for i in Inventory.objects.select_for_update().filter(product_id__in=bulk_product_ids)}
+    # Share in-memory instances when sheets touch different fields of one record.
+    bulk_products.update({key: value for key, value in products.items() if key in bulk_products})
+    bulk_variants.update({key: value for key, value in variants.items() if key in bulk_variants})
+    bulk_inventory.update({key: value for key, value in inventories.items() if key in bulk_inventory})
     collection_ids = [item['collection_id'] for item in job.bulk_operations if item.get('collection_id')]
     list(Collection.objects.select_for_update().filter(pk__in=collection_ids))
 
@@ -803,6 +838,8 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
         product = products.get(change['product_id'])
         if not product or _current(product, change['field']) != change['old_value']:
             raise ValueError(f"Product {change['handle']} changed after preview. Preview the file again.")
+        if change['field'] == 'stock' and change['new_value'] < (inventories[change['product_id']].reserved_stock if change['product_id'] in inventories else 0):
+            raise ValueError('Stock cannot be below current reservations.')
     for payload in job.creates:
         if Product.objects.filter(slug=payload['slug']).exists() or Product.objects.filter(sku=payload['sku']).exists():
             raise ValueError(f"Handle or SKU for row {payload['row']} now exists. Preview the file again.")
@@ -817,6 +854,8 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
         if operation['action'] == 'UPDATE':
             if any(_variant_current(variant, field) != old for field, old in operation['old_values'].items()):
                 raise ValueError(f"Variant {operation['sku']} changed after preview. Preview the file again.")
+            if operation['changes'].get('stock', variant.stock_level) < variant.reserved_stock:
+                raise ValueError('Variant stock cannot be below current reservations.')
         elif variant.reserved_stock > 0 or InventoryReservation.objects.select_for_update().filter(
             variant=variant, status=InventoryReservation.Status.ACTIVE
         ).exists():
@@ -831,6 +870,13 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
         target = targets.get(operation['target_id'])
         if not target or _bulk_current(operation, target) != operation['old_value']:
             raise ValueError(f"Bulk action target {operation['identifier']} changed after preview. Preview again.")
+        if operation['field'] == 'stock':
+            reserved = bulk_inventory[operation['target_id']].reserved_stock if operation['target_type'] == 'PRODUCT' else target.reserved_stock
+            if operation['new_value'] < reserved:
+                raise ValueError('Bulk stock cannot be below current reservations.')
+
+    from .advanced_imports import build_snapshot
+    job.snapshot = build_snapshot(job)
 
     if progress_callback:
         progress_callback(total_downloads + 1, total_downloads + 5)
@@ -1029,12 +1075,20 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
             attribute = 'is_online' if operation['target_type'] == 'PRODUCT' else 'is_active'
             setattr(target, attribute, new_value)
             target.save(update_fields=[attribute, 'updated_at'])
-        elif field == 'tags':
+        elif field in ATTRIBUTE_KEYS:
             attributes = dict(target.attributes or {})
-            attributes['tags'] = new_value
+            if new_value is None:
+                attributes.pop(ATTRIBUTE_KEYS[field], None)
+            else:
+                attributes[ATTRIBUTE_KEYS[field]] = new_value
             target.attributes = attributes
             target.updated_by = user
             target.save(update_fields=['attributes', 'updated_by', 'updated_at'])
+            CollectionSyncService.syncProductCollections(target)
+        elif field in {'title', 'description'}:
+            setattr(target, field, new_value)
+            target.updated_by = user
+            target.save(update_fields=[field, 'updated_by', 'updated_at'])
             CollectionSyncService.syncProductCollections(target)
         else:
             collection = Collection.objects.get(pk=operation['collection_id'])
@@ -1042,7 +1096,7 @@ def _apply_preview_records(job_id, user, downloaded_images, total_downloads, fai
                 collection.products.add(target)
             else:
                 collection.products.remove(target)
-    fields_to_update = ['status', 'applied_at', 'finished_at', 'progress_current', 'progress_total']
+    fields_to_update = ['status', 'applied_at', 'finished_at', 'progress_current', 'progress_total', 'snapshot']
     if failed_images:
         job.errors = list(job.errors or []) + failed_images
         fields_to_update.append('errors')

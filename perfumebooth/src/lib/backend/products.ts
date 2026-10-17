@@ -1,5 +1,5 @@
 import { Product, unwrapApiData, ensureArray } from './types';
-import { cleanImageUrl } from '../transformers';
+import { cleanImageUrl, cleanCategoryName } from '../transformers';
 
 const isServer = typeof window === 'undefined';
 const isDocker = process.env.WATCHPACK_POLLING === "true";
@@ -39,7 +39,9 @@ export function mapDjangoProductToProduct(p: any): Product {
     availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
     vendor: p.vendor || p.brand || 'Perfume Booth',
     tags: p.tags || [],
-    productType: p.productType || p.category || '',
+    productType: cleanCategoryName(p.productType || p.category || ''),
+    category: cleanCategoryName(p.category || p.attributes?.category || p.productType || ''),
+    gender: p.gender || p.attributes?.gender || '',
     priceRange: {
       minVariantPrice: { amount: priceVal, currencyCode: "INR" }
     },

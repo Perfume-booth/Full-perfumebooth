@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from .services import verify_razorpay_signature, process_payment_webhook, calculate_coupon
 from .tasks import send_order_email_receipt
-from .models import Order, OrderItem, Shipment, AbandonedCart, Coupon
+from .models import Order, OrderItem, Shipment, AbandonedCart, Coupon, CouponRedemption, Promotion
 from apps.shop.models import Product, ProductVariant, Inventory
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
@@ -25,6 +25,20 @@ from apps.inventory.services import InventoryReservationService
 logger = logging.getLogger(__name__)
 
 
+def check_is_merchant(user):
+    """Checks whether the user has administrative/merchant permissions."""
+    if not user or not user.is_authenticated:
+        return False
+    if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
+        return True
+    if hasattr(user, 'roles'):
+        return any(
+            role in ['Super Admin', 'Admin', 'E-commerce Executive'] 
+            for role in user.roles.values_list('role__name', flat=True)
+        )
+    return False
+
+
 class CouponValidationView(APIView):
     """Validate a coupon and calculate its server-authoritative discount."""
     permission_classes = [permissions.AllowAny]
@@ -34,7 +48,8 @@ class CouponValidationView(APIView):
             subtotal = float(request.data.get('subtotal', 0))
         except (TypeError, ValueError):
             return Response({'detail': 'Invalid subtotal.'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(calculate_coupon(request.data.get('code', ''), subtotal, user=request.user))
+        email = request.data.get('email')
+        return Response(calculate_coupon(request.data.get('code', ''), subtotal, user=request.user, customer_email=email))
 
 
 class OrderListView(APIView):
@@ -51,10 +66,7 @@ class OrderListView(APIView):
         return super().get_throttles()
 
     def get(self, request):
-        is_merchant = any(
-            role in ['Super Admin', 'Admin', 'E-commerce Executive'] 
-            for role in request.user.roles.values_list('role__name', flat=True)
-        )
+        is_merchant = check_is_merchant(request.user)
 
         orders_query = Order.objects.prefetch_related('items', 'shipments').all()
         if not is_merchant:
@@ -78,13 +90,21 @@ class OrderListView(APIView):
             elif order.status == 'Processing':
                 fulfillment_status = "Processing"
 
+            cust_name = (
+                order.user.full_name if (order.user and hasattr(order.user, 'full_name') and order.user.full_name)
+                else (
+                    f"{shipping.get('first_name', '')} {shipping.get('last_name', '')}".strip()
+                    or (order.customer_email or (order.user.email if order.user else 'Guest Customer'))
+                )
+            )
+
             data.append({
                 'id': str(order.id),
                 'order_number': order.order_number,
                 'status': order.status,
                 'total': str(order.total),
                 'created_at': order.created_at,
-                'customer_name': order.user.full_name if order.user else 'N/A',
+                'customer_name': cust_name,
                 'customer_email': order.customer_email or (order.user.email if order.user else 'N/A'),
                 'customer_phone': order.customer_phone,
                 'payment_status': order.payment_status,
@@ -119,10 +139,7 @@ class OrderDetailView(APIView):
         except Order.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        is_merchant = any(
-            role in ['Super Admin', 'Admin', 'E-commerce Executive'] 
-            for role in request.user.roles.values_list('role__name', flat=True)
-        )
+        is_merchant = check_is_merchant(request.user)
         if not is_merchant and order.user != request.user:
             return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -170,6 +187,15 @@ class OrderDetailView(APIView):
             'delivered_at': shipment.delivered_at,
         } for shipment in order.shipments.all()]
 
+        shipping_info = order.shipping_address or {}
+        cust_name = (
+            order.user.full_name if (order.user and hasattr(order.user, 'full_name') and order.user.full_name)
+            else (
+                f"{shipping_info.get('first_name', '')} {shipping_info.get('last_name', '')}".strip()
+                or (order.customer_email or (order.user.email if order.user else 'Guest Customer'))
+            )
+        )
+
         return Response({
             'id': str(order.id),
             'order_number': order.order_number,
@@ -188,15 +214,12 @@ class OrderDetailView(APIView):
             'items': items_data,
             'customer_email': order.customer_email or (order.user.email if order.user else 'N/A'),
             'customer_phone': order.customer_phone,
-            'customer_name': order.user.full_name if order.user else 'N/A',
+            'customer_name': cust_name,
             'shipments': shipments,
         })
 
     def put(self, request, pk: str):
-        is_merchant = any(
-            role in ['Super Admin', 'Admin', 'E-commerce Executive'] 
-            for role in request.user.roles.values_list('role__name', flat=True)
-        )
+        is_merchant = check_is_merchant(request.user)
         if not is_merchant:
             return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -210,10 +233,23 @@ class OrderDetailView(APIView):
                         return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
                     order.status = status_val
                     if status_val == Order.Status.REFUNDED:
+                        InventoryReservationService.restore_order(order, reason='Order refunded by admin')
                         order.payment_status = Order.PaymentStatus.REFUNDED
-                    elif status_val == Order.Status.CANCELLED and order.payment_status == Order.PaymentStatus.PENDING:
-                        InventoryReservationService.release_order(order)
-                        order.payment_status = Order.PaymentStatus.CANCELLED
+                    elif status_val == Order.Status.CANCELLED:
+                        InventoryReservationService.restore_order(order, reason='Order cancelled by admin')
+                        if order.payment_status == Order.PaymentStatus.PAID:
+                            order.payment_status = Order.PaymentStatus.REFUNDED
+                        else:
+                            order.payment_status = Order.PaymentStatus.CANCELLED
+
+                payment_status_val = request.data.get('payment_status')
+                if payment_status_val:
+                    if payment_status_val not in Order.PaymentStatus.values:
+                        return Response({'detail': 'Invalid payment status.'}, status=status.HTTP_400_BAD_REQUEST)
+                    order.payment_status = payment_status_val
+                    if payment_status_val == Order.PaymentStatus.REFUNDED and order.status != Order.Status.REFUNDED:
+                        order.status = Order.Status.REFUNDED
+                        InventoryReservationService.restore_order(order, reason='Order refunded by admin')
 
                 tracking_number = request.data.get('tracking_number')
                 carrier = request.data.get('shipping_carrier')
@@ -225,12 +261,70 @@ class OrderDetailView(APIView):
                         addr['shipping_carrier'] = carrier
                     order.shipping_address = addr
 
+                    shipment = order.shipments.first()
+                    if shipment is None:
+                        shipment = Shipment(order=order, provider=carrier or 'shiprocket')
+                    if tracking_number:
+                        shipment.awb_code = tracking_number
+                        if shipment.status == Shipment.Status.PENDING:
+                            shipment.status = Shipment.Status.AWB_ASSIGNED
+                    if carrier:
+                        shipment.courier_name = carrier
+                    shipment.save()
+
                 order.save()
         except Order.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         log_action(request.user, f"Updated Order #{order.order_number} (Status: {order.status})", request)
         return Response({'detail': 'Order updated successfully.'})
+
+
+class OrderCancelView(APIView):
+    """
+    POST /api/v1/orders/<pk>/cancel/
+    Allows customer (or merchant) to cancel an order before it has been shipped.
+    Restores inventory and sets status to CANCELLED (and payment_status to REFUNDED/CANCELLED).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk: str):
+        is_merchant = check_is_merchant(request.user)
+        try:
+            with transaction.atomic():
+                order = Order.objects.select_for_update().get(id=pk)
+                if not is_merchant and order.user != request.user:
+                    return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+                if order.status in [Order.Status.SHIPPED, Order.Status.DELIVERED]:
+                    return Response({'detail': 'Cannot cancel an order that has already shipped or been delivered.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if order.status == Order.Status.CANCELLED:
+                    return Response({'detail': 'Order is already cancelled.'}, status=status.HTTP_200_OK)
+
+                reason = request.data.get('reason', 'Cancelled by customer' if not is_merchant else 'Cancelled by admin')
+                InventoryReservationService.restore_order(order, reason=reason)
+
+                order.status = Order.Status.CANCELLED
+                if order.payment_status == Order.PaymentStatus.PAID:
+                    order.payment_status = Order.PaymentStatus.REFUNDED
+                else:
+                    order.payment_status = Order.PaymentStatus.CANCELLED
+
+                order.save(update_fields=['status', 'payment_status', 'updated_at'])
+
+                # Cancel any pending shipment
+                order.shipments.filter(status__in=[Shipment.Status.PENDING, Shipment.Status.AWB_ASSIGNED]).update(status=Shipment.Status.CANCELLED)
+
+                # Flag any pending outbox items
+                from .models import PaymentOutbox
+                PaymentOutbox.objects.filter(order=order, status='pending').update(status='review', last_error='Order cancelled before dispatch')
+
+        except Order.DoesNotExist:
+            return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        log_action(request.user, f"Cancelled Order #{order.order_number}", request)
+        return Response({'success': True, 'detail': 'Order cancelled successfully.', 'order_id': str(order.id), 'status': order.status})
 
 
 class RazorpayWebhookView(APIView):
@@ -482,6 +576,10 @@ class MerchantCouponListView(APIView):
                 'end_date': c.end_date.isoformat() if c.end_date else None,
                 'usage_limit': c.usage_limit,
                 'times_used': c.times_used,
+                'per_customer_limit': c.per_customer_limit,
+                'product_restrictions': c.product_restrictions or [],
+                'category_restrictions': c.category_restrictions or [],
+                'customer_restrictions': c.customer_restrictions or [],
                 'is_active': c.is_active,
                 'first_order_only': c.first_order_only,
                 'created_at': c.created_at.isoformat(),
@@ -540,6 +638,15 @@ class MerchantCouponListView(APIView):
         else:
             usage_limit = None
 
+        per_customer_limit = request.data.get('per_customer_limit')
+        if per_customer_limit is not None and per_customer_limit != '':
+            try:
+                per_customer_limit = int(per_customer_limit)
+            except (ValueError, TypeError):
+                per_customer_limit = None
+        else:
+            per_customer_limit = None
+
         coupon = Coupon.objects.create(
             code=code,
             description=request.data.get('description', '').strip(),
@@ -550,6 +657,10 @@ class MerchantCouponListView(APIView):
             start_date=request.data.get('start_date') or None,
             end_date=request.data.get('end_date') or None,
             usage_limit=usage_limit,
+            per_customer_limit=per_customer_limit,
+            product_restrictions=request.data.get('product_restrictions') or [],
+            category_restrictions=request.data.get('category_restrictions') or [],
+            customer_restrictions=request.data.get('customer_restrictions') or [],
             first_order_only=bool(request.data.get('first_order_only', False)),
             is_active=bool(request.data.get('is_active', True))
         )
@@ -588,6 +699,10 @@ class MerchantCouponDetailView(APIView):
             'end_date': c.end_date.isoformat() if c.end_date else None,
             'usage_limit': c.usage_limit,
             'times_used': c.times_used,
+            'per_customer_limit': c.per_customer_limit,
+            'product_restrictions': c.product_restrictions or [],
+            'category_restrictions': c.category_restrictions or [],
+            'customer_restrictions': c.customer_restrictions or [],
             'is_active': c.is_active,
             'first_order_only': c.first_order_only,
             'created_at': c.created_at.isoformat(),
@@ -624,6 +739,15 @@ class MerchantCouponDetailView(APIView):
         if 'usage_limit' in request.data:
             u_lim = request.data.get('usage_limit')
             coupon.usage_limit = int(u_lim) if u_lim not in [None, ''] else None
+        if 'per_customer_limit' in request.data:
+            pcl = request.data.get('per_customer_limit')
+            coupon.per_customer_limit = int(pcl) if pcl not in [None, ''] else None
+        if 'product_restrictions' in request.data:
+            coupon.product_restrictions = request.data.get('product_restrictions') or []
+        if 'category_restrictions' in request.data:
+            coupon.category_restrictions = request.data.get('category_restrictions') or []
+        if 'customer_restrictions' in request.data:
+            coupon.customer_restrictions = request.data.get('customer_restrictions') or []
         if 'first_order_only' in request.data:
             coupon.first_order_only = bool(request.data.get('first_order_only'))
         if 'is_active' in request.data:
@@ -669,4 +793,337 @@ class MerchantCouponToggleStatusView(APIView):
             'is_active': coupon.is_active,
             'detail': f'Coupon "{coupon.code}" {state}.'
         })
+
+
+class MerchantCouponBulkGenerateView(APIView):
+    """
+    POST /api/orders/merchant/coupons/bulk-generate/
+    Generates batches of unique promo/referral coupon codes with custom prefix.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def post(self, request):
+        import secrets
+        prefix = str(request.data.get('prefix', 'PROMO')).strip().upper()
+        try:
+            count = int(request.data.get('count', 10))
+            count = max(1, min(count, 500))
+        except (ValueError, TypeError):
+            count = 10
+
+        discount_type = request.data.get('discount_type', 'percentage')
+        try:
+            discount_value = float(request.data.get('discount_value', 10))
+        except (ValueError, TypeError):
+            discount_value = 10.0
+
+        try:
+            min_order_value = float(request.data.get('min_order_value', 0))
+        except (ValueError, TypeError):
+            min_order_value = 0.0
+
+        max_discount = request.data.get('max_discount')
+        max_discount = float(max_discount) if max_discount not in [None, ''] else None
+
+        usage_limit = request.data.get('usage_limit', 1)
+        usage_limit = int(usage_limit) if usage_limit not in [None, ''] else None
+
+        per_customer_limit = request.data.get('per_customer_limit', 1)
+        per_customer_limit = int(per_customer_limit) if per_customer_limit not in [None, ''] else None
+
+        start_date = request.data.get('start_date') or None
+        end_date = request.data.get('end_date') or None
+        first_order_only = bool(request.data.get('first_order_only', False))
+        product_restrictions = request.data.get('product_restrictions') or []
+        category_restrictions = request.data.get('category_restrictions') or []
+        customer_restrictions = request.data.get('customer_restrictions') or []
+
+        created_coupons = []
+        existing_codes = set(Coupon.objects.values_list('code', flat=True))
+        attempts = 0
+
+        while len(created_coupons) < count and attempts < count * 20:
+            attempts += 1
+            rand_suffix = secrets.token_hex(3).upper()
+            candidate = f"{prefix}-{rand_suffix}" if prefix else rand_suffix
+            if candidate in existing_codes:
+                continue
+            existing_codes.add(candidate)
+            created_coupons.append(
+                Coupon(
+                    code=candidate,
+                    description=request.data.get('description', f'Bulk generated code ({prefix})').strip(),
+                    discount_type=discount_type,
+                    discount_value=discount_value,
+                    min_order_value=min_order_value,
+                    max_discount=max_discount,
+                    start_date=start_date,
+                    end_date=end_date,
+                    usage_limit=usage_limit,
+                    per_customer_limit=per_customer_limit,
+                    first_order_only=first_order_only,
+                    product_restrictions=product_restrictions,
+                    category_restrictions=category_restrictions,
+                    customer_restrictions=customer_restrictions,
+                    is_active=True
+                )
+            )
+
+        Coupon.objects.bulk_create(created_coupons)
+        log_action(request.user, f"Bulk generated {len(created_coupons)} coupons with prefix {prefix}", request)
+
+        return Response({
+            'detail': f'Successfully generated {len(created_coupons)} coupon codes.',
+            'count': len(created_coupons),
+            'sample_codes': [c.code for c in created_coupons[:10]],
+            'codes': [c.code for c in created_coupons],
+        }, status=status.HTTP_201_CREATED)
+
+
+class MerchantPromotionListView(APIView):
+    """
+    GET /api/orders/merchant/promotions/ — List all promotions with stats.
+    POST /api/orders/merchant/promotions/ — Create a new promotion.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get(self, request):
+        from django.db.models import Q
+        search_q = request.query_params.get('q', '').strip()
+        status_filter = request.query_params.get('status', '').strip()
+        target_filter = request.query_params.get('target', '').strip()
+
+        qs = Promotion.objects.all().order_by('-priority', '-created_at')
+        if search_q:
+            qs = qs.filter(Q(name__icontains=search_q) | Q(description__icontains=search_q))
+        if status_filter == 'active':
+            qs = qs.filter(is_active=True)
+        elif status_filter == 'inactive':
+            qs = qs.filter(is_active=False)
+        if target_filter:
+            qs = qs.filter(target_type=target_filter)
+
+        promo_list = []
+        for p in qs:
+            promo_list.append({
+                'id': str(p.id),
+                'name': p.name,
+                'description': p.description,
+                'discount_type': p.discount_type,
+                'discount_value': str(p.discount_value),
+                'target_type': p.target_type,
+                'target_values': p.target_values or [],
+                'min_order_value': str(p.min_order_value),
+                'max_discount': str(p.max_discount) if p.max_discount else None,
+                'start_date': p.start_date.isoformat() if p.start_date else None,
+                'end_date': p.end_date.isoformat() if p.end_date else None,
+                'priority': p.priority,
+                'is_active': p.is_active,
+                'is_flash_sale': p.is_flash_sale,
+                'combination_rule': p.combination_rule,
+                'created_at': p.created_at.isoformat(),
+            })
+
+        metrics = {
+            'total_promotions': len(promo_list),
+            'active_promotions': sum(1 for p in promo_list if p['is_active']),
+            'flash_sales': sum(1 for p in promo_list if p['is_flash_sale'] and p['is_active']),
+        }
+        return Response({'metrics': metrics, 'promotions': promo_list})
+
+    def post(self, request):
+        name = str(request.data.get('name', '')).strip()
+        if not name:
+            return Response({'detail': 'Promotion name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        discount_type = request.data.get('discount_type', 'percentage')
+        try:
+            discount_value = float(request.data.get('discount_value', 0))
+        except (ValueError, TypeError):
+            discount_value = 0.0
+
+        try:
+            min_order_value = float(request.data.get('min_order_value', 0))
+        except (ValueError, TypeError):
+            min_order_value = 0.0
+
+        max_discount = request.data.get('max_discount')
+        max_discount = float(max_discount) if max_discount not in [None, ''] else None
+
+        try:
+            priority = int(request.data.get('priority', 0))
+        except (ValueError, TypeError):
+            priority = 0
+
+        target_type = request.data.get('target_type', 'all')
+        target_values = request.data.get('target_values') or []
+        combination_rule = request.data.get('combination_rule', 'stackable')
+
+        promotion = Promotion.objects.create(
+            name=name,
+            description=request.data.get('description', '').strip(),
+            discount_type=discount_type,
+            discount_value=discount_value,
+            target_type=target_type,
+            target_values=target_values,
+            min_order_value=min_order_value,
+            max_discount=max_discount,
+            start_date=request.data.get('start_date') or None,
+            end_date=request.data.get('end_date') or None,
+            priority=priority,
+            is_active=bool(request.data.get('is_active', True)),
+            is_flash_sale=bool(request.data.get('is_flash_sale', False)),
+            combination_rule=combination_rule,
+        )
+
+        log_action(request.user, f"Created promotion: {promotion.name}", request)
+        return Response({
+            'id': str(promotion.id),
+            'name': promotion.name,
+            'detail': 'Promotion created successfully.'
+        }, status=status.HTTP_201_CREATED)
+
+
+class MerchantPromotionDetailView(APIView):
+    """
+    GET, PUT, DELETE /api/orders/merchant/promotions/<uuid:pk>/
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def get(self, request, pk):
+        try:
+            p = Promotion.objects.get(id=pk)
+        except Promotion.DoesNotExist:
+            return Response({'detail': 'Promotion not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            'id': str(p.id),
+            'name': p.name,
+            'description': p.description,
+            'discount_type': p.discount_type,
+            'discount_value': str(p.discount_value),
+            'target_type': p.target_type,
+            'target_values': p.target_values or [],
+            'min_order_value': str(p.min_order_value),
+            'max_discount': str(p.max_discount) if p.max_discount else None,
+            'start_date': p.start_date.isoformat() if p.start_date else None,
+            'end_date': p.end_date.isoformat() if p.end_date else None,
+            'priority': p.priority,
+            'is_active': p.is_active,
+            'is_flash_sale': p.is_flash_sale,
+            'combination_rule': p.combination_rule,
+            'created_at': p.created_at.isoformat(),
+        })
+
+    def put(self, request, pk):
+        try:
+            p = Promotion.objects.get(id=pk)
+        except Promotion.DoesNotExist:
+            return Response({'detail': 'Promotion not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if 'name' in request.data:
+            p.name = str(request.data.get('name', '')).strip()
+        if 'description' in request.data:
+            p.description = str(request.data.get('description', '')).strip()
+        if 'discount_type' in request.data:
+            p.discount_type = request.data.get('discount_type')
+        if 'discount_value' in request.data:
+            p.discount_value = float(request.data.get('discount_value', 0))
+        if 'target_type' in request.data:
+            p.target_type = request.data.get('target_type')
+        if 'target_values' in request.data:
+            p.target_values = request.data.get('target_values') or []
+        if 'min_order_value' in request.data:
+            p.min_order_value = float(request.data.get('min_order_value', 0))
+        if 'max_discount' in request.data:
+            md = request.data.get('max_discount')
+            p.max_discount = float(md) if md not in [None, ''] else None
+        if 'start_date' in request.data:
+            p.start_date = request.data.get('start_date') or None
+        if 'end_date' in request.data:
+            p.end_date = request.data.get('end_date') or None
+        if 'priority' in request.data:
+            p.priority = int(request.data.get('priority', 0))
+        if 'is_active' in request.data:
+            p.is_active = bool(request.data.get('is_active'))
+        if 'is_flash_sale' in request.data:
+            p.is_flash_sale = bool(request.data.get('is_flash_sale'))
+        if 'combination_rule' in request.data:
+            p.combination_rule = request.data.get('combination_rule')
+
+        p.save()
+        log_action(request.user, f"Updated promotion: {p.name}", request)
+        return Response({'detail': 'Promotion updated successfully.'})
+
+    def delete(self, request, pk):
+        try:
+            p = Promotion.objects.get(id=pk)
+        except Promotion.DoesNotExist:
+            return Response({'detail': 'Promotion not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        name = p.name
+        p.delete()
+        log_action(request.user, f"Deleted promotion: {name}", request)
+        return Response({'detail': f'Promotion "{name}" deleted successfully.'})
+
+
+class MerchantPromotionToggleStatusView(APIView):
+    """
+    POST /api/orders/merchant/promotions/<uuid:pk>/toggle/
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
+
+    def post(self, request, pk):
+        try:
+            p = Promotion.objects.get(id=pk)
+        except Promotion.DoesNotExist:
+            return Response({'detail': 'Promotion not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        p.is_active = not p.is_active
+        p.save(update_fields=['is_active'])
+
+        state = "activated" if p.is_active else "deactivated"
+        log_action(request.user, f"{state.capitalize()} promotion: {p.name}", request)
+        return Response({
+            'id': str(p.id),
+            'is_active': p.is_active,
+            'detail': f'Promotion "{p.name}" {state}.'
+        })
+
+
+class PublicActivePromotionsView(APIView):
+    """
+    GET /api/orders/promotions/active/
+    Public endpoint providing active promotional campaigns, discounts, and flash sales for storefront display.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .promotions import PromotionService
+        active_promos = PromotionService.get_active_promotions()
+
+        data = [
+            {
+                'id': str(p.id),
+                'name': p.name,
+                'description': p.description,
+                'discount_type': p.discount_type,
+                'discount_value': float(p.discount_value),
+                'target_type': p.target_type,
+                'target_values': p.target_values or [],
+                'min_order_value': float(p.min_order_value),
+                'max_discount': float(p.max_discount) if p.max_discount else None,
+                'start_date': p.start_date.isoformat() if p.start_date else None,
+                'end_date': p.end_date.isoformat() if p.end_date else None,
+                'is_flash_sale': p.is_flash_sale,
+                'priority': p.priority,
+                'combination_rule': p.combination_rule,
+            }
+            for p in active_promos
+        ]
+        return Response({'promotions': data})
 

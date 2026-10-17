@@ -117,10 +117,31 @@ export async function getCollection(
   // 2. Fallback to virtual collections
   const allProducts = await getProducts(200);
   
-  let products = allProducts;
-  const PASSTHROUGH_HANDLES = ["all", "home-hero", "trending-perfumes", "new-launches", "best-sellers"];
+  const NEW_HANDLES = ["new", "new-launches", "new-arrivals"];
+  const TRENDING_HANDLES = ["trending", "trending-perfumes"];
+  const BESTSELLER_HANDLES = ["best-sellers", "best-selling-perfumes", "bestsellers"];
+  const PASSTHROUGH_HANDLES = ["all", "home-hero", ...NEW_HANDLES, ...TRENDING_HANDLES, ...BESTSELLER_HANDLES];
   
-  if (!PASSTHROUGH_HANDLES.includes(handle)) {
+  let products = allProducts;
+  if (NEW_HANDLES.includes(handle.toLowerCase())) {
+    const tagged = allProducts.filter(p => 
+      p.tags?.some((t: string) => ['new', 'new arrival', 'new-arrival', 'new launch', 'new-launch', 'new launches'].includes(t.toLowerCase().trim())) ||
+      (p as any).collections?.some((c: string) => ['new', 'new arrival', 'new-arrival', 'new launches', 'new launch'].includes(c.toLowerCase().trim()))
+    );
+    products = tagged.length > 0 ? tagged : allProducts;
+  } else if (TRENDING_HANDLES.includes(handle.toLowerCase())) {
+    const tagged = allProducts.filter(p => 
+      p.tags?.some((t: string) => ['trending', 'trend', 'popular', 'viral'].includes(t.toLowerCase().trim())) ||
+      (p as any).collections?.some((c: string) => ['trending', 'trend', 'trending perfumes'].includes(c.toLowerCase().trim()))
+    );
+    products = tagged.length > 0 ? tagged : allProducts;
+  } else if (BESTSELLER_HANDLES.includes(handle.toLowerCase())) {
+    const tagged = allProducts.filter(p => 
+      p.tags?.some((t: string) => ['bestseller', 'best seller', 'best-seller', 'top-seller'].includes(t.toLowerCase().trim())) ||
+      (p as any).collections?.some((c: string) => ['bestseller', 'best seller', 'best-seller', 'best selling perfumes'].includes(c.toLowerCase().trim()))
+    );
+    products = tagged.length > 0 ? tagged : allProducts;
+  } else if (!PASSTHROUGH_HANDLES.includes(handle)) {
     const term = handle.toLowerCase();
     
     products = allProducts.filter(p => {

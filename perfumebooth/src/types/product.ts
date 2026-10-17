@@ -30,6 +30,8 @@ export interface Product {
     tag?: string;
     vendor?: string;
     productType: string;
+    product_form?: string;
+    bottle_material?: string;
     ideal_for?: string;
     fragrance_type?: string;
     origin_country?: string;

@@ -210,25 +210,84 @@ class CollectionListCreateView(APIView):
             except ValidationError as ve:
                 return Response({'detail': ve.detail if isinstance(ve.detail, str) else ve.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Handle excluded products list in post method
+        excluded_products_raw = request.data.get('excluded_products')
+        excluded_products = []
+        if excluded_products_raw:
+            try:
+                parsed = json.loads(excluded_products_raw)
+                if isinstance(parsed, list):
+                    excluded_products = parsed
+            except:
+                excluded_products = request.data.getlist('excluded_products')
+        else:
+            excluded_products = request.data.getlist('excluded_products')
+
+        excluded_products = [
+            item for item in excluded_products
+            if item and item != '[]' and item != ''
+        ]
+
+        # Extract and validate products if manual collection
+        product_ids = []
+        if match_type == 'manual':
+            products_raw = request.data.get('products')
+            if products_raw:
+                try:
+                    parsed = json.loads(products_raw)
+                    if isinstance(parsed, list):
+                        product_ids = parsed
+                    else:
+                        product_ids = [str(parsed)]
+                except:
+                    product_ids = request.data.getlist('products')
+            else:
+                product_ids = request.data.getlist('products')
+
+            # Clean product_ids list (handle case where getlist contained a JSON string)
+            cleaned_product_ids = []
+            for item in product_ids:
+                if not item or item == '[]' or item == '':
+                    continue
+                if isinstance(item, str) and item.startswith('[') and item.endswith(']'):
+                    try:
+                        sub_parsed = json.loads(item)
+                        if isinstance(sub_parsed, list):
+                            cleaned_product_ids.extend([str(x) for x in sub_parsed if x])
+                            continue
+                    except:
+                        pass
+                cleaned_product_ids.append(str(item))
+
+            product_ids = cleaned_product_ids
+
+            if not product_ids:
+                return Response({'detail': 'A manual collection must contain at least 1 product.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check for slug collision before creating
+        if AutoCollection.objects.filter(slug=slug).exists():
+            return Response({'detail': f"A collection with slug '{slug}' already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
         collection = AutoCollection.objects.create(
             name=title,
             slug=slug,
             description=description,
             collection_type=match_type,
             status=status_val,
-            image=image
+            image=image,
+            excluded_products=excluded_products
         )
 
         if match_type == 'manual':
-            product_ids = request.data.getlist('products')
-            if not product_ids and 'products' in request.data:
+            import uuid
+            valid_uuids = []
+            for pid in product_ids:
                 try:
-                    product_ids = json.loads(request.data.get('products'))
-                except:
+                    uuid.UUID(str(pid))
+                    valid_uuids.append(pid)
+                except (ValueError, AttributeError):
                     pass
-            if not product_ids:
-                return Response({'detail': 'A manual collection must contain at least 1 product.'}, status=status.HTTP_400_BAD_REQUEST)
-            products = Product.objects.filter(id__in=product_ids)
+            products = Product.objects.filter(id__in=valid_uuids)
             collection.products.set(products)
 
         cache.clear()
@@ -250,9 +309,28 @@ class CollectionDetailView(APIView):
 
     def get_collection(self, slug):
         if '/' in slug:
-            return AutoCollection.objects.filter(slug=slug).first()
-        return AutoCollection.objects.filter(slug=slug).first() or \
-               AutoCollection.objects.filter(slug__endswith=f"/{slug}").first()
+            col = AutoCollection.objects.filter(slug=slug).first()
+            if col:
+                return col
+        col = AutoCollection.objects.filter(slug=slug).first() or \
+              AutoCollection.objects.filter(slug__endswith=f"/{slug}").first()
+        if col:
+            return col
+        # Alias matching for common special collections (new launches, trending, bestsellers)
+        clean = slug.lower().strip()
+        if clean in ['new', 'new-arrivals', 'new-launches']:
+            return AutoCollection.objects.filter(
+                slug__in=['manual/new-launches', 'manual/new', 'manual/new-arrivals', 'new-launches', 'new', 'new-arrivals']
+            ).first() or AutoCollection.objects.filter(name__icontains='New Launch').first()
+        if clean in ['trending', 'trending-perfumes']:
+            return AutoCollection.objects.filter(
+                slug__in=['manual/trending-perfumes', 'manual/trending', 'trending', 'trending-perfumes']
+            ).first() or AutoCollection.objects.filter(name__icontains='Trending').first()
+        if clean in ['best-sellers', 'best-selling-perfumes', 'bestsellers']:
+            return AutoCollection.objects.filter(
+                slug__in=['manual/best-selling-perfumes', 'manual/best-sellers', 'best-selling-perfumes', 'best-sellers']
+            ).first() or AutoCollection.objects.filter(name__icontains='Best Seller').first()
+        return None
 
     def get(self, request, slug):
         col = self.get_collection(slug)
@@ -687,7 +765,13 @@ class CartValidationAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        cart_items = request.data.get('items', request.data)
+        if isinstance(request.data, dict):
+            cart_items = request.data.get('items', [])
+        elif isinstance(request.data, list):
+            cart_items = request.data
+        else:
+            return Response({'detail': 'Expected array of cart items'}, status=status.HTTP_400_BAD_REQUEST)
+
         if not isinstance(cart_items, list):
             return Response({'detail': 'Expected array of cart items'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -889,10 +973,17 @@ class ProductExcelImportView(APIView):
         if mode not in {'UPDATE_ONLY', 'CREATE_ONLY', 'UPSERT'}:
             return Response({'detail': 'Invalid import mode.'}, status=status.HTTP_400_BAD_REQUEST)
         draft_default = str(request.data.get('draft_default', 'true')).lower() in {'true', '1', 'yes'}
+        column_mapping = {}
+        if request.data.get('mapping_id'):
+            from .models import ImportMapping
+            try:
+                column_mapping = ImportMapping.objects.get(pk=request.data['mapping_id'], owner=request.user).columns
+            except (ImportMapping.DoesNotExist, ValueError, TypeError):
+                return Response({'detail': 'Saved mapping not found.'}, status=400)
         job = ProductImportJob.objects.create(
             created_by=request.user, filename=file_obj.name[:255], file_sha256='',
             mode=mode, status=ProductImportJob.Status.QUEUED,
-            operation='preview',
+            operation='preview', column_mapping=column_mapping,
             summary={'draft_default': draft_default}, source_file=file_obj,
             progress_current=0, progress_total=1,
         )
@@ -922,6 +1013,9 @@ def _catalog_import_payload(job, detail=None):
         'summary': job.summary, 'changes': job.changes[:200], 'creates': job.creates[:200],
         'variants': job.variant_operations[:200], 'images': job.image_operations[:200],
         'bulk_actions': job.bulk_operations[:200], 'errors': job.errors[:200],
+        'can_undo': bool(job.snapshot) and job.status == 'applied' and not job.undone_at,
+        'undone_at': job.undone_at, 'scheduled_at': job.scheduled_at,
+        'sale_ends_at': job.sale_ends_at, 'schedule_state': job.schedule_state,
     }
 
 
@@ -1019,6 +1113,8 @@ class ProductExcelImportApplyView(APIView):
                     raise PermissionError('You can only apply your own import preview.')
                 if job.status != ProductImportJob.Status.PREVIEW_READY or job.errors:
                     raise ValueError('Only a valid preview can be queued for application.')
+                if job.schedule_state:
+                    raise ValueError('This preview is managed by a schedule. Create a new preview to apply manually.')
                 job.status = ProductImportJob.Status.APPLY_QUEUED
                 job.operation = 'apply'
                 job.progress_current = 0

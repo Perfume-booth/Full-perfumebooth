@@ -55,6 +55,17 @@ def sanitized_exception_handler(exc, context):
         response['X-Request-ID'] = request_id
         return response
 
+    # Convert Django's ValidationError into DRF's ValidationError
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    if isinstance(exc, DjangoValidationError):
+        if hasattr(exc, 'message_dict'):
+            detail = exc.message_dict
+        elif hasattr(exc, 'messages'):
+            detail = exc.messages
+        else:
+            detail = list(exc)
+        exc = ValidationError(detail)
+
     response = exception_handler(exc, context)
 
     # If DRF didn't handle the exception, it is an unexpected server error (500)
@@ -64,10 +75,12 @@ def sanitized_exception_handler(exc, context):
 
         # Do not interpolate exception messages: database/provider errors can contain secrets.
         logger.error(
-            "Unhandled server exception in %s on %s (type=%s)",
+            "Unhandled server exception in %s on %s (type=%s): %s",
             view_name,
             path,
             type(exc).__name__,
+            str(exc),
+            exc_info=True,
         )
 
         response = Response(

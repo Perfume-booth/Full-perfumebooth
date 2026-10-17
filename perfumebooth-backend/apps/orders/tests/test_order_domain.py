@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 
 from apps.checkout.services.checkout_service import CheckoutService
 from apps.checkout.validators import CartItemInput, CheckoutInput
-from apps.orders.models import Order, OrderItem, Shipment
+from apps.orders.models import Coupon, Order, OrderItem, Shipment
 from apps.orders.services import process_payment_webhook
 from apps.shop.models import Inventory, Product, ProductVariant
 
@@ -46,6 +46,12 @@ class OrderDomainTests(TestCase):
             'phone': '+919999999999',
             'email': 'checkout@example.com',
         }
+        Coupon.objects.create(
+            code='SAVE10',
+            discount_type=Coupon.DiscountType.PERCENTAGE,
+            discount_value=10,
+            is_active=True
+        )
 
     def checkout(self):
         return CheckoutService.process_checkout(

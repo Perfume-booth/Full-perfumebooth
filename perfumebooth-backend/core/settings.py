@@ -58,6 +58,7 @@ DJANGO_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
 ]
 
 THIRD_PARTY_APPS = [
@@ -196,6 +197,7 @@ CELERY_TASK_ROUTES = {
 }
 
 CELERY_BEAT_SCHEDULE = {
+    'scheduled-catalog-prices': {'task': 'apps.shop.tasks.run_scheduled_imports', 'schedule': 30.0},
     'payment-outbox': {'task': 'apps.orders.tasks.process_payment_outbox', 'schedule': 15.0},
     'payment-reconciliation': {'task': 'apps.orders.tasks.reconcile_payments', 'schedule': 60.0},
     'release-expired-inventory-reservations': {

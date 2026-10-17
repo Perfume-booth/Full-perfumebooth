@@ -50,12 +50,14 @@ interface OrderDetail {
   items: OrderItem[];
   customer_email: string;
   customer_name: string;
+  payment_method?: string;
+  payment_status?: string;
 }
 
 function DeliveryProcessStepper({ order }: { order: OrderDetail }) {
   const status = order.status;
   const isCancelled = status === 'Cancelled';
-  const isPaid = status === 'Paid' || status === 'Processing' || status === 'Shipped' || status === 'Delivered';
+  const isPaid = (order.payment_status === 'Paid') || status === 'Paid' || status === 'Processing' || status === 'Shipped' || status === 'Delivered';
   const isProcessing = status === 'Processing' || status === 'Shipped' || status === 'Delivered';
   const isShipped = status === 'Shipped' || status === 'Delivered';
   const isDelivered = status === 'Delivered';
@@ -169,6 +171,7 @@ export default function OrderDetailPage() {
 
   // Status & Shipping form state
   const [orderStatus, setOrderStatus] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [carrier, setCarrier] = useState('');
   const [saveLoading, setSaveLoading] = useState(false);
@@ -182,6 +185,7 @@ export default function OrderDetailPage() {
       const data: OrderDetail = await apiFetch(`/orders/${orderId}/`);
       setOrderDetail(data);
       setOrderStatus(data.status);
+      setPaymentStatus(data.payment_status || 'Pending');
       setTrackingNumber(data.shipping_address?.tracking_number || '');
       setCarrier(data.shipping_address?.shipping_carrier || '');
     } catch (err: any) {
@@ -207,6 +211,7 @@ export default function OrderDetailPage() {
         method: 'PUT',
         body: JSON.stringify({
           status: orderStatus,
+          payment_status: paymentStatus,
           tracking_number: trackingNumber,
           shipping_carrier: carrier
         })
@@ -422,7 +427,7 @@ export default function OrderDetailPage() {
               <Truck className="w-5 h-5 text-primary" /> Fulfillment Status & Logistics (Shiprocket)
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
               {/* Order Status */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -438,6 +443,25 @@ export default function OrderDetailPage() {
                   <option value="Processing">Processing</option>
                   <option value="Shipped">Shipped</option>
                   <option value="Delivered">Delivered</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              {/* Payment Status */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Payment Status
+                </label>
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  className="w-full px-4 py-3 neu-input rounded-2xl text-xs font-semibold text-foreground cursor-pointer"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Authorized">Authorized</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Failed">Failed</option>
+                  <option value="Refunded">Refunded</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
@@ -548,18 +572,27 @@ export default function OrderDetailPage() {
               <div className="flex justify-between items-center text-muted-foreground font-medium">
                 <span>Payment Method</span>
                 <span className="font-bold uppercase text-[11px] px-2.5 py-1 neu-inset-sm rounded-md text-foreground">
-                  {shippingAddr.payment_method || 'COD'}
+                  {orderDetail.payment_method || shippingAddr.payment_method || 'COD'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-muted-foreground font-medium">
                 <span>Payment Status</span>
-                <span className={`font-bold uppercase text-[11px] px-2.5 py-1 neu-inset-sm rounded-full ${
-                  orderDetail.status === 'Paid'
-                    ? 'text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10'
-                    : 'text-amber-800 dark:text-amber-300 border border-amber-500/30 bg-amber-500/10'
-                }`}>
-                  {orderDetail.status === 'Paid' ? 'Paid' : 'Pending'}
-                </span>
+                {(() => {
+                  const currentPayStatus = orderDetail.payment_status || (orderDetail.status === 'Paid' ? 'Paid' : 'Pending');
+                  const isPaid = currentPayStatus.toLowerCase() === 'paid';
+                  const isNegative = ['failed', 'cancelled', 'refunded'].includes(currentPayStatus.toLowerCase());
+                  return (
+                    <span className={`font-bold uppercase text-[11px] px-2.5 py-1 neu-inset-sm rounded-full ${
+                      isPaid
+                        ? 'text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10'
+                        : isNegative
+                        ? 'text-rose-700 dark:text-rose-300 border border-rose-500/30 bg-rose-500/10'
+                        : 'text-amber-800 dark:text-amber-300 border border-amber-500/30 bg-amber-500/10'
+                    }`}>
+                      {currentPayStatus}
+                    </span>
+                  );
+                })()}
               </div>
               <div className="flex justify-between items-center text-muted-foreground font-medium">
                 <span>Delivery Method</span>

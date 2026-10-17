@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { AnimatedUser } from "@/components/ui/icons/AnimatedUser";
@@ -18,6 +19,26 @@ interface AccountSidebarProps {
 export default function AccountSidebar({ ordersCount }: AccountSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError("");
+    try {
+      const res = await logoutAction();
+      if (res && res.error) {
+        setLogoutError(res.error);
+        return;
+      }
+      window.location.href = "/";
+    } catch {
+      setLogoutError("Logout could not be confirmed. Please retry.");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   const menuItems = [
     {
@@ -101,16 +122,19 @@ export default function AccountSidebar({ ordersCount }: AccountSidebarProps) {
         ))}
 
         {/* Sign Out */}
-        <form action={async () => { await logoutAction(); window.location.href = "/"; }}>
-          <button
-            type="submit"
-            className="w-full flex items-center gap-3 px-5 py-3.5 text-sm font-medium transition-all"
-            style={{ color: "var(--color-sale)" }}
-          >
-            <AnimatedLogOut size={16} className="flex-shrink-0" />
-            <span className="flex-1 text-left">Sign Out</span>
-          </button>
-        </form>
+        {logoutError && (
+          <p role="alert" className="px-5 py-1 text-xs text-red-500 font-medium">{logoutError}</p>
+        )}
+        <button
+          type="button"
+          disabled={loggingOut}
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-5 py-3.5 text-sm font-medium transition-all cursor-pointer"
+          style={{ color: "var(--color-sale)" }}
+        >
+          <AnimatedLogOut size={16} className="flex-shrink-0" />
+          <span className="flex-1 text-left">{loggingOut ? "Signing Out…" : "Sign Out"}</span>
+        </button>
       </div>
     </aside>
   );

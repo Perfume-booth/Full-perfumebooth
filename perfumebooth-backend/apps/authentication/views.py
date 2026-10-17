@@ -25,12 +25,12 @@ class HasRolePermission(permissions.BasePermission):
     """
 
     def has_permission(self, request, view) -> bool:
-        if not request.user or not request.user.is_authenticated:
+        if not request.user or not getattr(request.user, 'is_authenticated', False) or not getattr(request.user, 'is_active', False):
             return False
 
         allowed_roles = getattr(view, 'allowed_roles', [])
         if not allowed_roles:
-            return True  # No role restriction on this view
+            return False  # Misconfigured role-protected endpoints fail closed.
 
         user_roles = request.user.roles.values_list('role__name', flat=True)
         return any(role in allowed_roles for role in user_roles)
@@ -80,15 +80,28 @@ class LoginView(APIView):
         })
 
 
+from rest_framework.authentication import SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
 class LogoutView(APIView):
     """
     POST /api/auth/logout/ — Invalidate session and clear session cookies.
     """
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        session_key = getattr(request.session, 'session_key', None)
+        if hasattr(request, 'session'):
+            request.session.flush()
         logout(request)
-        return Response({'detail': 'Successfully logged out.'})
+        if session_key:
+            from django.contrib.sessions.models import Session
+            Session.objects.filter(session_key=session_key).delete()
+        response = Response({'detail': 'Successfully logged out.'})
+        response.delete_cookie('sessionid')
+        return response
 
 
 class MeView(APIView):
