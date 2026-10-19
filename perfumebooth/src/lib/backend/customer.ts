@@ -122,6 +122,25 @@ export async function getCustomerOrder(token: string, orderId: string) {
   return mapOrder(unwrapApiData(rawOrder));
 }
 
+export async function getGuestOrder(orderIdOrNumber: string, email: string) {
+  if (!orderIdOrNumber || !email) return null;
+  try {
+    const params = new URLSearchParams({
+      order_id: orderIdOrNumber.trim(),
+      email: email.trim(),
+    });
+    const response = await fetch(`${API_URL}/api/orders/track/?${params.toString()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const rawOrder = await response.json();
+    return mapOrder(unwrapApiData(rawOrder));
+  } catch (err) {
+    console.error("getGuestOrder error:", err);
+    return null;
+  }
+}
+
 export async function updateCustomer(token: string, input: any) {
   if (!token) return { customer: null, customerUserErrors: [{ message: "Not authenticated" }] };
   try {

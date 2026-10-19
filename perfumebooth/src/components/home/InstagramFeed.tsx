@@ -6,15 +6,27 @@ import Carousel from "@/components/ui/Carousel";
 
 import { INSTAGRAM_POSTS } from "@/lib/constants";
 
-export default function InstagramFeed() {
+export default function InstagramFeed({
+  posts,
+  title = "Follow Us On",
+  italicPart = "Instagram",
+  viewAllLink = "https://www.instagram.com/perfumeboothindia?igsh=ZXNydDBpcnM4Nnlz"
+}: {
+  posts?: any[];
+  title?: string;
+  italicPart?: string;
+  viewAllLink?: string;
+} = {}) {
+  const displayPosts = posts && posts.length > 0 ? posts : INSTAGRAM_POSTS;
+
   return (
     <section className="py-4 md:py-10 bg-[var(--color-bg)] overflow-hidden">
       <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
         
         <SectionHeader 
-          title="Follow Us On" 
-          italicPart="Instagram" 
-          viewAllLink="https://www.instagram.com/perfumeboothindia?igsh=ZXNydDBpcnM4Nnlz"
+          title={title} 
+          italicPart={italicPart} 
+          viewAllLink={viewAllLink}
         />
 
         <div className="mt-8">
@@ -23,10 +35,10 @@ export default function InstagramFeed() {
             slideClassName="basis-[208px] md:basis-[256px]"
             options={{ align: "start", containScroll: "trimSnaps", dragFree: true }}
           >
-            {INSTAGRAM_POSTS.map((post) => (
+            {displayPosts.map((post: any) => (
               <a
                 key={post.id}
-                href="https://www.instagram.com/perfumebooth"
+                href={post.link || "https://www.instagram.com/perfumeboothindia/"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block relative aspect-[9/12] overflow-hidden group/post border border-[var(--color-border)] shadow-md hover:shadow-2xl transition-all duration-700"
@@ -53,4 +65,4 @@ export default function InstagramFeed() {
       </div>
     </section>
   );
-}0
+}

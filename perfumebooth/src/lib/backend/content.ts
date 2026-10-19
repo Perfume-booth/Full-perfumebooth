@@ -106,12 +106,23 @@ export async function getCMSPage(slug: string) {
     let bodyHtml = '';
     let contactInfo = { email: '', phone: '', hours: '', address: '' };
     let faqs: { q: string; a: string }[] = [];
+    let hero = { title: '', subtitle: '', desktopSrc: '', mobileSrc: '', buttonText: '', buttonLink: '', slides: [] as any[] };
 
     if (Array.isArray(data.sections)) {
       data.sections.forEach((sec: any) => {
         if (!sec.is_visible) return;
 
-        if (sec.type === 'RichText' && sec.content) {
+        if (sec.type === 'HeroBanner' && sec.content) {
+          hero = {
+            title: sec.content.title || '',
+            subtitle: sec.content.subtitle || '',
+            desktopSrc: sec.content.desktopSrc || sec.content.imageUrl || sec.content.desktopImage || '',
+            mobileSrc: sec.content.mobileSrc || sec.content.mobileImageUrl || sec.content.mobileImage || '',
+            buttonText: sec.content.buttonText || '',
+            buttonLink: sec.content.buttonLink || '',
+            slides: sec.content.slides || []
+          };
+        } else if (sec.type === 'RichText' && sec.content) {
           if (sec.content.body) {
             bodyHtml += sec.content.body;
           }
@@ -142,9 +153,12 @@ export async function getCMSPage(slug: string) {
 
     return {
       title: data.title || '',
+      meta_title: data.meta_title || '',
+      meta_description: data.meta_description || '',
       body: bodyHtml,
       contactInfo,
       faqs,
+      hero,
       sections: data.sections || []
     };
   } catch (err) {
@@ -153,67 +167,93 @@ export async function getCMSPage(slug: string) {
   }
 }
 
-export async function getAboutUs() {
+export interface CMSPageData {
+  title: string;
+  meta_title?: string;
+  meta_description?: string;
+  body: string;
+  contactInfo?: { email: string; phone: string; hours: string; address: string };
+  faqs?: { q: string; a: string }[];
+  hero?: {
+    title: string;
+    subtitle: string;
+    desktopSrc: string;
+    mobileSrc: string;
+    buttonText: string;
+    buttonLink: string;
+    slides: any[];
+  };
+  sections?: any[];
+}
+
+const createFallbackPage = (title: string, body: string = ''): CMSPageData => ({
+  title,
+  meta_title: title,
+  meta_description: '',
+  body,
+  contactInfo: { email: 'admin@perfumebooth.com', phone: '+91 9266030909 / 011-46604937', hours: 'Mon to Sat, 10am to 6pm', address: '70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015' },
+  faqs: [],
+  hero: { title, subtitle: '', desktopSrc: '', mobileSrc: '', buttonText: '', buttonLink: '', slides: [] },
+  sections: []
+});
+
+export async function getAboutUs(): Promise<CMSPageData> {
   const page = await getCMSPage('info/about-us');
-  return page || {
-    title: "About Us",
-    body: "<p>Welcome to Perfume Booth. We are your premium destination for exquisite fragrances.</p>"
-  };
+  return page || createFallbackPage(
+    "About Us",
+    "<p>Welcome to Perfume Booth. We are your premium destination for exquisite fragrances.</p>"
+  );
 }
 
-export async function getContactUs() {
+export async function getContactUs(): Promise<CMSPageData> {
   const page = await getCMSPage('info/contact-us');
-  return page || {
-    title: "Contact Us",
-    body: "",
-    contactInfo: { email: 'admin@perfumebooth.com', phone: '+91 9266030909 / 011-46604937', hours: 'Mon to Sat, 10am to 6pm', address: '70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015' }
-  };
+  return page || createFallbackPage("Contact Us", "");
 }
 
-export async function getDisclaimers() {
+export async function getDisclaimers(): Promise<CMSPageData> {
   const page = await getCMSPage('info/disclaimers');
-  return page || {
-    title: "Disclaimers",
-    body: "<p>Fragrance notes represent olfactory profiles and are meant as product guidelines only.</p>"
-  };
+  return page || createFallbackPage(
+    "Disclaimers",
+    "<p>Fragrance notes represent olfactory profiles and are meant as product guidelines only.</p>"
+  );
 }
 
-export async function getFaq() {
+export async function getFaq(): Promise<CMSPageData> {
   const page = await getCMSPage('info/faq');
-  return page || {
-    title: "Frequently Asked Questions",
-    body: "<p>Find answers to common questions about shipping, payments, returns, and scent longevity.</p>"
-  };
+  return page || createFallbackPage(
+    "Frequently Asked Questions",
+    "<p>Find answers to common questions about shipping, payments, returns, and scent longevity.</p>"
+  );
 }
 
-export async function getPrivacyPolicy() {
+export async function getPrivacyPolicy(): Promise<CMSPageData> {
   const page = await getCMSPage('info/policies/privacy');
-  return page || {
-    title: "Privacy Policy",
-    body: "<p>Your privacy is important to us. Read how we protect and manage your personal data.</p>"
-  };
+  return page || createFallbackPage(
+    "Privacy Policy",
+    "<p>Your privacy is important to us. Read how we protect and manage your personal data.</p>"
+  );
 }
 
-export async function getRefundPolicy() {
+export async function getRefundPolicy(): Promise<CMSPageData> {
   const page = await getCMSPage('info/policies/refund');
-  return page || {
-    title: "Refund Policy",
-    body: "<p>We offer hassle-free refunds and exchanges within 14 days of delivery for qualifying items.</p>"
-  };
+  return page || createFallbackPage(
+    "Refund Policy",
+    "<p>We offer hassle-free refunds and exchanges within 14 days of delivery for qualifying items.</p>"
+  );
 }
 
-export async function getShippingPolicy() {
+export async function getShippingPolicy(): Promise<CMSPageData> {
   const page = await getCMSPage('info/policies/shipping');
-  return page || {
-    title: "Shipping Policy",
-    body: "<p>Complimentary standard shipping is provided for all orders of ₹999 or above.</p>"
-  };
+  return page || createFallbackPage(
+    "Shipping Policy",
+    "<p>Complimentary standard shipping is provided for all orders of ₹999 or above.</p>"
+  );
 }
 
-export async function getTermsAndConditions() {
+export async function getTermsAndConditions(): Promise<CMSPageData> {
   const page = await getCMSPage('info/policies/terms');
-  return page || {
-    title: "Terms and Conditions",
-    body: "<p>Please review our terms of service, payment policies, and order cancellation guidelines.</p>"
-  };
+  return page || createFallbackPage(
+    "Terms and Conditions",
+    "<p>Please review our terms of service, payment policies, and order cancellation guidelines.</p>"
+  );
 }

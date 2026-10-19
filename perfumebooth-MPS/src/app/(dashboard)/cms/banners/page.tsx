@@ -10,7 +10,8 @@ import {
   Save,
   ImageIcon,
   Layout,
-  Edit
+  Edit,
+  Folder
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -173,6 +174,13 @@ export default function BannersPage() {
         >
           <ImageIcon className="w-4 h-4" />
           <span>Header Banners & Slideshows</span>
+        </button>
+        <button
+          onClick={() => router.push('/cms/media')}
+          className="px-5 py-2.5 font-bold text-xs text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-2xl neu-btn transition-colors cursor-pointer"
+        >
+          <Folder className="w-4 h-4" />
+          <span>Media Library & Folders</span>
         </button>
       </div>
 

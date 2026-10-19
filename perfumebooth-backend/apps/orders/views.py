@@ -129,6 +129,149 @@ class OrderListView(APIView):
 
 
 
+def serialize_order_detail(order):
+    """Formats full order details for customer/admin/guest tracking."""
+    items_data = []
+    for item in order.items.all():
+        prod_img = None
+        if item.product:
+            if item.product.image:
+                try:
+                    prod_img = item.product.image.url
+                except Exception:
+                    prod_img = str(item.product.image)
+            elif hasattr(item.product, 'images'):
+                first_img_obj = item.product.images.first()
+                if first_img_obj and first_img_obj.image:
+                    try:
+                        prod_img = first_img_obj.image.url
+                    except Exception:
+                        prod_img = str(first_img_obj.image)
+
+        items_data.append({
+            'id': str(item.id),
+            'product_id': str(item.product.id) if item.product else None,
+            'product_slug': item.product.slug if item.product else None,
+            'product_image': prod_img,
+            'product_title': item.product_title or (item.product.title if item.product else 'Deleted Product'),
+            'variant_id': str(item.variant_id) if item.variant_id else None,
+            'variant_title': item.variant_title,
+            'sku': item.sku or (item.product.sku if item.product else 'N/A'),
+            'quantity': item.quantity,
+            'unit_price': str(item.unit_price),
+            'line_total': str(item.line_total),
+        })
+
+    shipments = [{
+        'id': str(shipment.id),
+        'provider': shipment.provider,
+        'provider_order_id': shipment.provider_order_id,
+        'provider_shipment_id': shipment.provider_shipment_id,
+        'awb_code': shipment.awb_code,
+        'courier_name': shipment.courier_name,
+        'tracking_url': shipment.tracking_url,
+        'status': shipment.status,
+        'shipped_at': shipment.shipped_at,
+        'delivered_at': shipment.delivered_at,
+    } for shipment in order.shipments.all()]
+
+    shipping_info = order.shipping_address or {}
+    first_shipment = shipments[0] if shipments else {}
+    cust_name = (
+        order.user.full_name if (order.user and hasattr(order.user, 'full_name') and order.user.full_name)
+        else (
+            f"{shipping_info.get('first_name', '')} {shipping_info.get('last_name', '')}".strip()
+            or (order.customer_email or (order.user.email if order.user else 'Guest Customer'))
+        )
+    )
+
+    return {
+        'id': str(order.id),
+        'order_number': order.order_number,
+        'status': order.status,
+        'subtotal': str(order.subtotal),
+        'discount_amount': str(order.discount_amount),
+        'shipping_amount': str(order.shipping_amount),
+        'tax': str(order.tax_amount),
+        'tax_amount': str(order.tax_amount),
+        'total': str(order.total),
+        'currency': order.currency,
+        'payment_method': order.payment_method,
+        'payment_status': order.payment_status,
+        'shipping_address': order.shipping_address,
+        'created_at': order.created_at,
+        'items': items_data,
+        'customer_email': order.customer_email or (order.user.email if order.user else 'N/A'),
+        'customer_phone': order.customer_phone,
+        'customer_name': cust_name,
+        'shipments': shipments,
+        'awb_code': first_shipment.get('awb_code'),
+        'courier_name': first_shipment.get('courier_name'),
+        'tracking_url': first_shipment.get('tracking_url'),
+    }
+
+
+class GuestOrderTrackView(APIView):
+    """
+    GET /api/orders/track/?order_id=...&email=...
+    Allows non-authenticated guests and customers to track an order securely.
+    Requires matching order identifier (UUID or order number) and verified email.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        order_query = (request.query_params.get('order_id') or request.query_params.get('order_number') or '').strip()
+        email = (request.query_params.get('email') or '').strip().lower()
+
+        if not order_query or not email:
+            return Response(
+                {'detail': 'Both order identifier and email are required for tracking.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        clean_id = order_query.lstrip('#')
+        order = None
+
+        try:
+            parsed_uuid = uuid.UUID(clean_id)
+            order = Order.objects.prefetch_related('items__product', 'items__variant', 'shipments').filter(id=parsed_uuid).first()
+        except (ValueError, AttributeError):
+            pass
+
+        if not order:
+            from django.db.models import Q
+            order = Order.objects.prefetch_related('items__product', 'items__variant', 'shipments').filter(
+                Q(order_number__iexact=order_query) |
+                Q(order_number__iexact=clean_id) |
+                Q(order_number__iexact=f"PB-{clean_id}") |
+                Q(order_number__iexact=f"#{clean_id}")
+            ).first()
+
+        if not order:
+            return Response(
+                {'detail': 'Order not found or email does not match.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Enforce email verification to prevent order enumeration
+        shipping_addr = order.shipping_address or {}
+        candidate_emails = {
+            (order.customer_email or '').strip().lower(),
+            str(shipping_addr.get('email', '')).strip().lower(),
+        }
+        if order.user and order.user.email:
+            candidate_emails.add(order.user.email.strip().lower())
+        candidate_emails.discard('')
+
+        if email not in candidate_emails:
+            return Response(
+                {'detail': 'Order not found or email does not match.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(serialize_order_detail(order))
+
+
 class OrderDetailView(APIView):
     """GET, PUT /api/orders/<id>/ — Detailed order access & status/tracking updates."""
     permission_classes = [permissions.IsAuthenticated]
@@ -143,80 +286,7 @@ class OrderDetailView(APIView):
         if not is_merchant and order.user != request.user:
             return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
-        items_data = []
-        for item in order.items.all():
-            prod_img = None
-            if item.product:
-                if item.product.image:
-                    try:
-                        prod_img = item.product.image.url
-                    except Exception:
-                        prod_img = str(item.product.image)
-                elif hasattr(item.product, 'images'):
-                    first_img_obj = item.product.images.first()
-                    if first_img_obj and first_img_obj.image:
-                        try:
-                            prod_img = first_img_obj.image.url
-                        except Exception:
-                            prod_img = str(first_img_obj.image)
-
-            items_data.append({
-                'id': str(item.id),
-                'product_id': str(item.product.id) if item.product else None,
-                'product_slug': item.product.slug if item.product else None,
-                'product_image': prod_img,
-                'product_title': item.product_title or (item.product.title if item.product else 'Deleted Product'),
-                'variant_id': str(item.variant_id) if item.variant_id else None,
-                'variant_title': item.variant_title,
-                'sku': item.sku or (item.product.sku if item.product else 'N/A'),
-                'quantity': item.quantity,
-                'unit_price': str(item.unit_price),
-                'line_total': str(item.line_total),
-            })
-
-        shipments = [{
-            'id': str(shipment.id),
-            'provider': shipment.provider,
-            'provider_order_id': shipment.provider_order_id,
-            'provider_shipment_id': shipment.provider_shipment_id,
-            'awb_code': shipment.awb_code,
-            'courier_name': shipment.courier_name,
-            'tracking_url': shipment.tracking_url,
-            'status': shipment.status,
-            'shipped_at': shipment.shipped_at,
-            'delivered_at': shipment.delivered_at,
-        } for shipment in order.shipments.all()]
-
-        shipping_info = order.shipping_address or {}
-        cust_name = (
-            order.user.full_name if (order.user and hasattr(order.user, 'full_name') and order.user.full_name)
-            else (
-                f"{shipping_info.get('first_name', '')} {shipping_info.get('last_name', '')}".strip()
-                or (order.customer_email or (order.user.email if order.user else 'Guest Customer'))
-            )
-        )
-
-        return Response({
-            'id': str(order.id),
-            'order_number': order.order_number,
-            'status': order.status,
-            'subtotal': str(order.subtotal),
-            'discount_amount': str(order.discount_amount),
-            'shipping_amount': str(order.shipping_amount),
-            'tax': str(order.tax_amount),
-            'tax_amount': str(order.tax_amount),
-            'total': str(order.total),
-            'currency': order.currency,
-            'payment_method': order.payment_method,
-            'payment_status': order.payment_status,
-            'shipping_address': order.shipping_address,
-            'created_at': order.created_at,
-            'items': items_data,
-            'customer_email': order.customer_email or (order.user.email if order.user else 'N/A'),
-            'customer_phone': order.customer_phone,
-            'customer_name': cust_name,
-            'shipments': shipments,
-        })
+        return Response(serialize_order_detail(order))
 
     def put(self, request, pk: str):
         is_merchant = check_is_merchant(request.user)

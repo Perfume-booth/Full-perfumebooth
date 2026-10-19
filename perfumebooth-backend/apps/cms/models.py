@@ -49,11 +49,24 @@ class CMSSection(models.Model):
 
     class SectionType(models.TextChoices):
         HERO_BANNER        = 'HeroBanner',        'Hero Banner'
+        TOP_CATEGORIES     = 'TopCategories',     'Top Categories'
+        GENDER_SECTION     = 'GenderSection',     'Gender Section'
+        VIDEO_SECTION      = 'VideoSection',      'Video Section'
+        NEW_LAUNCHES       = 'NewLaunches',       'New Launches'
+        SCENT_GRID         = 'ScentGrid',         'Scent Grid'
+        TRENDING_SECTION   = 'TrendingSection',   'Trending Section'
+        BEST_SELLER_SECTION= 'BestSellerSection', 'Best Seller Section'
+        RECENTLY_VIEWED    = 'RecentlyViewed',    'Recently Viewed'
+        BRAND_SLIDER       = 'BrandSlider',       'Brand Slider'
+        BLOG_SECTION       = 'BlogSection',       'Blog Section'
+        INSTAGRAM_FEED     = 'InstagramFeed',      'Instagram Feed'
         PRODUCT_CAROUSEL   = 'ProductCarousel',   'Product Carousel'
         TEXT_BLOCK         = 'TextBlock',          'Text Block'
         BRAND_LOGOS        = 'BrandLogos',         'Brand Logos'
-        INSTAGRAM_FEED     = 'InstagramFeed',      'Instagram Feed'
         TESTIMONIAL_SLIDER = 'TestimonialSlider',  'Testimonial Slider'
+        RICH_TEXT          = 'RichText',          'Rich Text'
+        CONTACT_CARD       = 'ContactCard',       'Contact Card'
+        FAQ_LIST           = 'FaqList',           'FAQ List'
         CUSTOM             = 'Custom',             'Custom'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -100,4 +113,102 @@ class BlogPost(models.Model):
     def __str__(self) -> str:
         status = '✓' if self.is_published else '✗'
         return f'[{status}] {self.title} (/blog/{self.slug})'
+
+
+class ContactSubmission(models.Model):
+    """
+    Durable storage for customer inquiries submitted via contact and help forms.
+    """
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        READ = 'read', 'Read'
+        REPLIED = 'replied', 'Replied'
+        ARCHIVED = 'archived', 'Archived'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    email = models.EmailField(db_index=True)
+    phone = models.CharField(max_length=50, blank=True, default='')
+    subject = models.CharField(max_length=255, blank=True, default='General Inquiry')
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'cms_contact_submission'
+        ordering = ['-created_at']
+        verbose_name = 'Contact Submission'
+        verbose_name_plural = 'Contact Submissions'
+
+    def __str__(self) -> str:
+        return f"{self.name} <{self.email}> — {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class NewsletterSubscriber(models.Model):
+    """
+    Durable storage for newsletter subscribers in PostgreSQL.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    source = models.CharField(max_length=100, default='website_footer')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'cms_newsletter_subscriber'
+        ordering = ['-created_at']
+        verbose_name = 'Newsletter Subscriber'
+        verbose_name_plural = 'Newsletter Subscribers'
+
+    def __str__(self) -> str:
+        status = 'Active' if self.is_active else 'Unsubscribed'
+        return f"{self.email} ({status})"
+
+
+class MediaFolder(models.Model):
+    """
+    Folder categorization for CMS media assets (Laravel Filament style).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'cms_media_folder'
+        ordering = ['name']
+        verbose_name = 'Media Folder'
+        verbose_name_plural = 'Media Folders'
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class MediaAsset(models.Model):
+    """
+    Media Library Asset representing uploaded photos, banners, logos, and graphics.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    file = models.FileField(upload_to='media_library/%Y/%m/')
+    name = models.CharField(max_length=255)
+    folder = models.CharField(max_length=100, default='general', db_index=True)
+    file_type = models.CharField(max_length=100, blank=True)
+    file_size = models.PositiveIntegerField(default=0)
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    alt_text = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'cms_media_asset'
+        ordering = ['-created_at']
+        verbose_name = 'Media Asset'
+        verbose_name_plural = 'Media Assets'
+
+    def __str__(self) -> str:
+        return f"[{self.folder}] {self.name}"
 

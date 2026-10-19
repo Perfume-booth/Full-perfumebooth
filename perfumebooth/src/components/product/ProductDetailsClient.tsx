@@ -46,7 +46,7 @@ interface Props {
 
 export default function ProductDetailsClient({ product }: Props) {
   const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(product.variants?.[0] ?? null);
 
   useEffect(() => {
     if (product.variants && product.variants.length > 0) {
@@ -55,9 +55,10 @@ export default function ProductDetailsClient({ product }: Props) {
   }, [product.variants]);
 
   const activePrice = selectedVariant ? selectedVariant.price : product.price;
-  const activeComparePrice = selectedVariant ? (selectedVariant.compare_at_price || product.compare_at_price) : product.compare_at_price;
-  const activeStock = selectedVariant ? selectedVariant.stock : product.stock_count;
-  const isSoldOut = activeStock === 0 || product.availableForSale === false;
+  const activeComparePrice = selectedVariant ? selectedVariant.compareAtPrice : product.compare_at_price;
+  const activeStock = Math.max(0, Number(selectedVariant ? selectedVariant.quantityAvailable : product.stock_count) || 0);
+  const isSoldOut = activeStock <= 0 || selectedVariant?.availableForSale === false || product.availableForSale === false;
+  useEffect(() => { setQuantity(1); }, [selectedVariant?.id]);
 
   const { isInWishlist, addItem, removeItem } = useWishlist();
   const { addToCart, openCart, items, buyNow, clearBuyNow } = useCartStore();
@@ -213,7 +214,7 @@ export default function ProductDetailsClient({ product }: Props) {
   };
 
   const handleBuyNow = async () => {
-    if (isSoldOut) return;
+    if (isSoldOut || quantity > activeStock) return;
     setIsBuyingNow(true);
 
     const variantId = selectedVariant?.id || product.variants?.[0]?.id;
@@ -268,7 +269,7 @@ export default function ProductDetailsClient({ product }: Props) {
       router.push("/cart");
       return;
     }
-    if (isSoldOut || isAdding) return;
+    if (isSoldOut || isAdding || quantity > activeStock) return;
     setIsAdding(true);
     try {
       const variantId = selectedVariant?.id || product.variants?.[0]?.id;
@@ -285,7 +286,7 @@ export default function ProductDetailsClient({ product }: Props) {
     }
   };
 
-  const maxQuantity = product.stock_count || 50;
+  const maxQuantity = activeStock;
   const increaseQuantity = () => setQuantity((prev) => (prev < maxQuantity ? prev + 1 : prev));
   const decreaseQuantity = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 

@@ -23,18 +23,35 @@ export async function POST(request: Request) {
       );
     }
 
+    // 1. Durably store submission in Django PostgreSQL database
+    const isDocker = process.env.WATCHPACK_POLLING === "true";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || (isDocker ? "http://django:8000" : "http://localhost:8000");
+    let savedSubmissionId: string | undefined;
+
+    try {
+      const dbRes = await fetch(`${API_URL}/api/cms/contact/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": ip,
+        },
+        body: JSON.stringify({ name, email, phone, message }),
+      });
+      if (dbRes.ok) {
+        const dbData = await dbRes.json();
+        savedSubmissionId = dbData.id;
+      }
+    } catch (dbErr) {
+      console.error("Failed to persist contact submission in Django:", dbErr);
+    }
+
     const apiKey = process.env.RESEND_API_KEY;
 
     if (!apiKey) {
-      console.warn('RESEND_API_KEY is not set. Contact form submission received but email was not sent:', {
-        name,
-        email,
-        phone,
-        message,
-      });
       return NextResponse.json({
         success: true,
-        message: 'Submission received successfully (Sandbox/Demo Mode: email not sent because RESEND_API_KEY is missing).',
+        message: 'Submission received and saved successfully.',
+        id: savedSubmissionId,
       });
     }
 

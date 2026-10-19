@@ -13,16 +13,28 @@ const extractProducts = (collection: any, limit: number = 15): Product[] => {
     ?.slice(0, limit) || [];
 };
 
-export default async function BestSellerSection() {
-    const bestSellersCol = await getCollection("best-selling-perfumes", 15);
-    const bestSellers = extractProducts(bestSellersCol, 15);
+export default async function BestSellerSection({
+  title = "Our",
+  italicPart = "Best Sellers",
+  viewAllLink = "/best-selling-perfumes",
+  collectionHandle = "best-selling-perfumes",
+  limit = 15
+}: {
+  title?: string;
+  italicPart?: string;
+  viewAllLink?: string;
+  collectionHandle?: string;
+  limit?: number;
+} = {}) {
+    const bestSellersCol = await getCollection(collectionHandle, limit);
+    const bestSellers = extractProducts(bestSellersCol, limit);
     
     return (
       <ProductCarousel
         products={bestSellers}
-        title="Our"
-        italicPart="Best Sellers"
-        viewAllLink="/best-selling-perfumes"
+        title={title}
+        italicPart={italicPart}
+        viewAllLink={viewAllLink}
       />
     );
 }

@@ -1,10 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Image, { getImageProps } from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
-import { AnimatedChevronLeft } from "@/components/ui/icons/AnimatedChevronLeft";
-import { AnimatedChevronRight } from "@/components/ui/icons/AnimatedChevronRight";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+const AUTOPLAY_DELAY_MS = 3000;
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeToReducedMotion(onStoreChange: () => void) {
+  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+  mediaQuery.addEventListener("change", onStoreChange);
+  return () => mediaQuery.removeEventListener("change", onStoreChange);
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getReducedMotionServerSnapshot() {
+  return false;
+}
 
 export interface HeroSlide {
   id: number | string;
@@ -17,47 +33,42 @@ export interface HeroSlide {
 interface HeroBannerProps {
   title?: string;
   subtitle?: string;
-  image?: string; 
-  imageUrl?: string; 
-  slides?: HeroSlide[]; 
+  imageUrl?: string;
+  slides?: HeroSlide[];
 }
 
-function ResponsiveHeroImage({ slide, current }: { slide: HeroSlide, current: number }) {
-  const isPriority = current === 0;
-  const common = {
-    alt: slide.alt_text || `Perfume banner ${current + 1}`,
-    fill: true,
-    priority: isPriority,
-    quality: 85,
-    sizes: "100vw",
-  };
+function ResponsiveHeroImage({ slide, eager }: { slide: HeroSlide; eager: boolean }) {
+  const alt = slide.alt_text || "Featured fragrance collection";
 
-  // If no separate mobile image, just use standard Next/Image
   if (!slide.mobileImage || slide.mobileImage === slide.image) {
     return (
-      // eslint-disable-next-line jsx-a11y/alt-text
-      <Image 
-        src={slide.image} 
-        {...common} 
-        fetchPriority={isPriority ? "high" : "auto"} 
-        className="object-cover object-center w-full h-full" 
+      <Image
+        src={slide.image}
+        alt={alt}
+        fill
+        priority={eager}
+        fetchPriority={eager ? "high" : "auto"}
+        quality={85}
+        sizes="100vw"
+        className="object-cover object-center"
       />
     );
   }
 
-  // Art Direction: Prevent double downloading/preloading on mobile
-  const { props: desktop } = getImageProps({ ...common, src: slide.image });
-  const { props: mobile } = getImageProps({ ...common, src: slide.mobileImage });
-
+  // Native art direction makes the exact LCP URL discoverable in the initial
+  // HTML and prevents a desktop image from downloading before mobile JS runs.
   return (
-      <picture className="absolute inset-0 w-full h-full">
-      <source media="(min-width: 1024px)" srcSet={desktop.srcSet || desktop.src} />
-      <source media="(max-width: 1023px)" srcSet={mobile.srcSet || mobile.src} />
-      {/* eslint-disable-next-line jsx-a11y/alt-text */}
-      <img 
-        {...desktop} 
-        className="object-cover object-center w-full h-full" 
-        fetchPriority={isPriority ? "high" : "auto"} 
+    <picture className="absolute inset-0 block h-full w-full">
+      <source media="(max-width: 1023px)" srcSet={slide.mobileImage} />
+      <img
+        src={slide.image}
+        alt={alt}
+        width={1920}
+        height={1080}
+        loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : "auto"}
+        decoding="async"
+        className="h-full w-full object-center"
       />
     </picture>
   );
@@ -65,167 +76,103 @@ function ResponsiveHeroImage({ slide, current }: { slide: HeroSlide, current: nu
 
 export default function HeroBanner({ title, subtitle, imageUrl, slides = [] }: HeroBannerProps) {
   const [current, setCurrent] = useState(0);
-  const [, setDirection] = useState(1);
-  const [isHovered, setIsHovered] = useState(false);
-
-  const activeSlides = slides;
-
-  const goTo = useCallback((index: number, dir: number) => {
-    if (activeSlides.length === 0) return;
-    setDirection(dir);
-    setCurrent(index);
-  }, [activeSlides.length]);
+  const [isInteractionPaused, setIsInteractionPaused] = useState(false);
+  const [autoplayPreference, setAutoplayPreference] = useState<boolean | null>(null);
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotionSnapshot,
+    getReducedMotionServerSnapshot,
+  );
+  const isAutoplaying = autoplayPreference ?? !prefersReducedMotion;
 
   const next = useCallback(() => {
-    if (activeSlides.length === 0) return;
-    goTo((current + 1) % activeSlides.length, 1);
-  }, [current, goTo, activeSlides.length]);
+    setCurrent((index) => (slides.length ? (index + 1) % slides.length : 0));
+  }, [slides.length]);
 
   const prev = useCallback(() => {
-    if (activeSlides.length === 0) return;
-    goTo((current - 1 + activeSlides.length) % activeSlides.length, -1);
-  }, [current, goTo, activeSlides.length]);
+    setCurrent((index) => (slides.length ? (index - 1 + slides.length) % slides.length : 0));
+  }, [slides.length]);
+
+  const goTo = useCallback((index: number) => {
+    setCurrent(index);
+  }, []);
 
   useEffect(() => {
-    if (imageUrl || activeSlides.length <= 1 || isHovered) return;
-    const timer = setInterval(next, 8000);
-    return () => clearInterval(timer);
-  }, [next, imageUrl, activeSlides.length, isHovered]);
+    if (slides.length < 2 || !isAutoplaying || isInteractionPaused) return;
 
-  const slide = activeSlides[current];
-
-  if (!imageUrl && activeSlides.length === 0) return null;
+    const timer = window.setTimeout(next, AUTOPLAY_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [current, isAutoplaying, isInteractionPaused, next, slides.length]);
 
   if (imageUrl) {
     return (
-      <section className="pt-20 lg:pt-28">
-        <div className="relative w-full h-[38svh] md:h-[70svh] lg:h-[89svh] overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0">
-            {imageUrl && imageUrl !== "" && (
-              <Image
-                src={imageUrl}
-                alt={title || "Premium Perfume Banner"}
-                fill
-                priority
-                quality={90}
-                className="object-cover object-center w-full h-full"
-                sizes="100vw"
-              />
-            )}
-            {(title || subtitle) && (
-              <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-white text-center p-4">
-                {title && (
-                  <motion.h1 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-2xl md:text-6xl lg:text-7xl font-serif mb-4"
-                  >
-                    {title}
-                  </motion.h1>
-                )}
-                {subtitle && (
-                  <motion.p 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="text-sm md:text-xl font-light tracking-widest uppercase"
-                  >
-                    {subtitle}
-                  </motion.p>
-                )}
-              </div>
-            )}
-          </div>
+      <section className="pt-20 lg:pt-28" aria-label={title || "Featured collection"}>
+        <div className="relative flex h-[38svh] w-full items-center justify-center overflow-hidden md:h-[70svh] lg:h-[89svh]">
+          <Image src={imageUrl} alt={title || "Premium perfume banner"} fill priority quality={85} sizes="100vw" className="object-cover object-center" />
+          {(title || subtitle) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 p-4 text-center text-white">
+              {title && <h1 className="mb-4 font-serif text-2xl md:text-6xl lg:text-7xl">{title}</h1>}
+              {subtitle && <p className="text-sm font-light uppercase tracking-widest md:text-xl">{subtitle}</p>}
+            </div>
+          )}
         </div>
       </section>
     );
   }
 
+  const slide = slides[current];
+  if (!slide) return null;
+
   return (
-    <section className="pt-20 lg:pt-28">
-      {/* HERO */}
-      <div 
-        className="relative w-full h-[38svh] md:h-[70svh] lg:h-[89svh] overflow-hidden flex items-center justify-center select-none"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
+    <section
+      className="pt-20 lg:pt-28"
+      aria-label="Featured collections"
+      aria-roledescription="carousel"
+      onMouseEnter={() => setIsInteractionPaused(true)}
+      onMouseLeave={() => setIsInteractionPaused(false)}
+      onFocusCapture={() => setIsInteractionPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsInteractionPaused(false);
+        }
+      }}
+    >
+      <div className="relative flex h-[38svh] w-full select-none items-center justify-center overflow-hidden md:h-[70svh] lg:h-[89svh]">
+        <Link key={slide.id} href={slide.href || "/all"} className="hero-slide-enter absolute inset-0 block" aria-label={slide.alt_text || "View featured collection"}>
+          <ResponsiveHeroImage slide={slide} eager={current === 0} />
+        </Link>
 
-        <AnimatePresence initial={false}>
-          <motion.div
-            key={slide.id}
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 1 }}
-            className="absolute inset-0 flex overflow-hidden"
-          >
-            {Array.from({ length: 6 }).map((_, i) => {
-              const sliceWidth = 100 / 6;
-              const directionFactor = i % 2 === 0 ? 1 : -1;
-              
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ y: directionFactor * -100 + "%", opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: directionFactor * 100 + "%", opacity: 0 }}
-                  transition={{
-                    y: { type: "tween", ease: [0.25, 1, 0.5, 1], duration: 0.75, delay: i * 0.05 },
-                    opacity: { duration: 0.6, delay: i * 0.03 }
-                  }}
-                  className="relative h-full overflow-hidden"
-                  style={{ width: `${sliceWidth}%` }}
-                >
-                  <motion.div
-                    className="absolute top-0 bottom-0 h-full transform-gpu will-change-transform"
-                    initial={{ scale: 1.12 }}
-                    animate={{ scale: 1.02 }}
-                    transition={{ duration: 8, ease: "easeOut" }}
-                    style={{ 
-                      width: `${600}%`,
-                      left: `-${i * 100}%` 
-                    }}
+        {slides.length > 1 && (
+          <>
+            <button type="button" onClick={prev} aria-label="Previous featured collection" className="absolute left-3 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white shadow-lg transition-colors hover:bg-black/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:left-4 sm:size-12">
+              <ChevronLeft size={22} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={next} aria-label="Next featured collection" className="absolute right-3 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white shadow-lg transition-colors hover:bg-black/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:right-4 sm:size-12">
+              <ChevronRight size={22} aria-hidden="true" />
+            </button>
+
+            <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center sm:bottom-4" aria-label="Choose featured collection">
+              {slides.map((item, index) => {
+                const isActive = index === current;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => goTo(index)}
+                    aria-label={`Show slide ${index + 1}: ${item.alt_text || "Featured fragrance collection"}`}
+                    aria-current={isActive ? "true" : undefined}
+                    className="group/dot flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-[-7px] focus-visible:outline-white"
                   >
-                    <a href={slide.href || "#"} className="block w-full h-full relative">
-                      <ResponsiveHeroImage slide={slide} current={current} />
-                    </a>
-                  </motion.div>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        </AnimatePresence>
+                    <span
+                      aria-hidden="true"
+                      className={`block rounded-full shadow-[0_1px_5px_rgba(0,0,0,0.55)] transition-[width,height,background-color,transform] duration-300 ${isActive ? "size-2.5 scale-100 bg-white" : "size-2 scale-90 bg-white/55 group-hover/dot:bg-white/85"}`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* Arrows */}
-        <button
-          onClick={prev}
-          suppressHydrationWarning
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 size-10 sm:size-12 bg-black/30 border border-white/10 hover:border-[var(--color-gold)] backdrop-blur-md hover:bg-black/50 rounded-full flex items-center justify-center text-white hover:text-[var(--color-gold)] hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer shadow-lg group"
-        >
-          <AnimatedChevronLeft size={22} animateOn="hover" />
-        </button>
-
-        <button
-          onClick={next}
-          suppressHydrationWarning
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 size-10 sm:size-12 bg-black/30 border border-white/10 hover:border-[var(--color-gold)] backdrop-blur-md hover:bg-black/50 rounded-full flex items-center justify-center text-white hover:text-[var(--color-gold)] hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer shadow-lg group"
-        >
-          <AnimatedChevronRight size={22} animateOn="hover" />
-        </button>
-
-        {/* Auto-slide Progress Bar */}
-        {activeSlides.length > 1 && (
-          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/10 z-20 overflow-hidden">
-            <div
-              className="h-full bg-[var(--color-gold)] shadow-[0_0_8px_var(--color-gold)] transition-transform"
-              style={{
-                width: '100%',
-                transformOrigin: 'left',
-                animation: 'hero-progress 8s linear infinite',
-                animationPlayState: isHovered ? 'paused' : 'running',
-              }}
-              key={current}
-            />
-          </div>
+          </>
         )}
       </div>
     </section>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import InfoHero from '@/components/layout/InfoHero';
+import ContactForm from '@/app/help/ContactForm';
 import { getContactUs } from '@/lib/catalog';
 
 export const metadata: Metadata = {
@@ -23,8 +24,8 @@ export default async function ContactUsPage() {
       {/* ── Editorial Hero Section ── */}
       <InfoHero 
         title={page?.title || "We're Here For You"} 
-        desktopSrc="/images/fallback-luxury.svg"
-        mobileSrc="/images/fallback-luxury.svg"
+        desktopSrc={(page as any)?.hero?.desktopSrc || "/images/fallback-luxury.svg"}
+        mobileSrc={(page as any)?.hero?.mobileSrc || (page as any)?.hero?.desktopSrc || "/images/fallback-luxury.svg"}
         pillText="Get In Touch" 
         description="Elevate your senses. Whether it's a question about a fragrance note or your recent order, our bespoke service team awaits."
       />
@@ -106,82 +107,7 @@ export default async function ContactUsPage() {
               Fill out the form below with your inquiries, and one of our dedicated fragrance specialists will be in touch shortly.
             </p>
 
-            <form className="max-w-xl w-full flex flex-col gap-10">
-              
-              {/* Modern Minimal Inputs */}
-              <div className="relative">
-                <input
-                  type="text"
-                  id="name"
-                  placeholder=" "
-                  required
-                  className="block w-full pt-4 pb-2 text-sm text-[var(--color-text-primary)] bg-transparent border-0 border-b border-[var(--color-border)] appearance-none focus:outline-none focus:ring-0 focus:border-[var(--color-gold)] peer transition-colors"
-                />
-                <label 
-                  htmlFor="name" 
-                  className="absolute text-sm text-[var(--color-text-muted)] duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:text-[var(--color-gold)]"
-                >
-                  Your Full Name *
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="relative">
-                  <input
-                    type="email"
-                    id="email"
-                    placeholder=" "
-                    required
-                    className="block w-full pt-4 pb-2 text-sm text-[var(--color-text-primary)] bg-transparent border-0 border-b border-[var(--color-border)] appearance-none focus:outline-none focus:ring-0 focus:border-[var(--color-gold)] peer transition-colors"
-                  />
-                  <label 
-                    htmlFor="email" 
-                    className="absolute text-sm text-[var(--color-text-muted)] duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:text-[var(--color-gold)]"
-                  >
-                    Email Address *
-                  </label>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="tel"
-                    id="phone"
-                    placeholder=" "
-                    className="block w-full pt-4 pb-2 text-sm text-[var(--color-text-primary)] bg-transparent border-0 border-b border-[var(--color-border)] appearance-none focus:outline-none focus:ring-0 focus:border-[var(--color-gold)] peer transition-colors"
-                  />
-                  <label 
-                    htmlFor="phone" 
-                    className="absolute text-sm text-[var(--color-text-muted)] duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:text-[var(--color-gold)]"
-                  >
-                    Phone Number
-                  </label>
-                </div>
-              </div>
-
-              <div className="relative mt-2">
-                <textarea
-                  id="message"
-                  required
-                  rows={4}
-                  placeholder=" "
-                  className="block w-full pt-4 pb-2 text-sm text-[var(--color-text-primary)] bg-transparent border-0 border-b border-[var(--color-border)] appearance-none focus:outline-none focus:ring-0 focus:border-[var(--color-gold)] peer transition-colors resize-none"
-                />
-                <label 
-                  htmlFor="message" 
-                  className="absolute text-sm text-[var(--color-text-muted)] duration-300 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:text-[var(--color-gold)]"
-                >
-                  Your Message *
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="mt-6 w-full sm:w-auto self-start bg-[var(--color-gold)] hover:bg-[var(--color-gold-dark)]  px-12 py-4 text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-500 hover:shadow-xl hover:shadow-[var(--color-gold)]/20"
-              >
-                Submit Inquiry
-              </button>
-
-            </form>
+            <ContactForm />
 
             {/* Social Media Links */}
             <div className="mt-16 pt-8 border-t border-[var(--color-border)] w-full">

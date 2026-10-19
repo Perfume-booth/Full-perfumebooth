@@ -135,7 +135,7 @@ class CatalogService:
 
         stock_val = 0
         if hasattr(product, 'inventory') and product.inventory:
-            stock_val = product.inventory.stock_level
+            stock_val = product.inventory.available_stock
 
         return {
             'id': str(product.id),

@@ -11,14 +11,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    // Save to JSON DB (for tracking all signups)
-    const subscribers = await readJsonDb<any>('subscribers.json');
-    if (!subscribers.some((s: any) => s.email.toLowerCase() === email.toLowerCase())) {
-        const newSubscriber = {
-            email: email.toLowerCase(),
-            subscribedAt: new Date().toISOString()
-        };
-        await appendToJsonDb('subscribers.json', newSubscriber);
+    // Persist subscriber durably in Django PostgreSQL database
+    const isDocker = process.env.WATCHPACK_POLLING === "true";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || (isDocker ? "http://django:8000" : "http://localhost:8000");
+
+    const backendRes = await fetch(`${API_URL}/api/cms/newsletter/subscribe/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.toLowerCase(), source: "website_footer" }),
+    });
+
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errData.error || errData.detail || 'Subscription failed.' },
+        { status: backendRes.status }
+      );
     }
 
     return NextResponse.json({ success: true, message: 'Subscribed successfully' });

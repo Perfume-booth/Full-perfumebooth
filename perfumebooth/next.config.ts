@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'cdn.shopify.com',
+        pathname: '/s/files/1/0718/5786/4996/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'pub-940ccf6255b54fa799a9b01050e6c227.r2.dev',
       },
       {

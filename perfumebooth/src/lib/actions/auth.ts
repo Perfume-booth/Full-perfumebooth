@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
@@ -295,10 +295,15 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
   }
 
   try {
+    const headerList = await headers();
+    const host = headerList.get("x-forwarded-host") || headerList.get("host") || "localhost:3000";
+    const proto = headerList.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`;
+
     const res = await fetch(`${BACKEND_URL}/api/auth/customer/password-reset/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, frontend_url: siteUrl }),
     });
 
     const data = await res.json();

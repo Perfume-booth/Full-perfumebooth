@@ -19,6 +19,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+!perfumebooth/src/lib/
+perfumebooth/src/lib/*
+!perfumebooth/src/lib/catalog-availability.ts
 lib64/
 parts/
 sdist/

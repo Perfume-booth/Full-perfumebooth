@@ -66,6 +66,39 @@ class CustomerRegisterView(APIView):
             is_staff=False
         )
 
+        # Send welcome email asynchronously / fail-safe
+        try:
+            name_display = user.first_name or "Valued Customer"
+            subject = "Welcome to PerfumeBooth"
+            message = (
+                f"Hello {name_display},\n\n"
+                f"Welcome to PerfumeBooth! Your account has been successfully created.\n"
+                f"Discover our curated selection of luxury fragrances, discovery sets, and exclusive member privileges.\n\n"
+                f"Best regards,\nThe PerfumeBooth Team"
+            )
+            html_message = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+                <h2 style="color: #5B0612;">Welcome to PerfumeBooth</h2>
+                <p>Hello {name_display},</p>
+                <p>Thank you for creating an account with us. We are delighted to accompany you on your fragrance journey.</p>
+                <p>Explore our curated catalog of authentic international designer perfumes, luxury discovery boxes, and bespoke scents.</p>
+                <p style="margin: 25px 0;">
+                    <a href="https://perfumebooth.com/products" style="background-color: #5B0612; color: #ffffff; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Start Exploring</a>
+                </p>
+                <p style="font-size: 12px; color: #999; margin-top: 30px;">If you have any questions or need recommendations, our specialists are available at online@beverly-in.com.</p>
+            </div>
+            """
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'PerfumeBooth <onboarding@resend.dev>'),
+                recipient_list=[user.email],
+                html_message=html_message,
+                fail_silently=True
+            )
+        except Exception as e:
+            logger.warning(f"Could not send welcome email to {user.email}: {e}")
+
         tokens = get_tokens_for_user(user)
         return Response({
             'user': {
@@ -530,7 +563,17 @@ class CustomerPasswordResetRequestView(APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
             # Determine frontend URL
-            frontend_url = request.data.get('frontend_url') or request.headers.get('Origin') or 'http://localhost:3000'
+            raw_url = request.data.get('frontend_url') or request.headers.get('Origin') or request.headers.get('Referer')
+            if raw_url:
+                from urllib.parse import urlparse
+                parsed = urlparse(raw_url)
+                if parsed.scheme and parsed.netloc:
+                    frontend_url = f"{parsed.scheme}://{parsed.netloc}"
+                else:
+                    frontend_url = raw_url.rstrip('/')
+            else:
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+
             reset_url = f"{frontend_url.rstrip('/')}/account/reset/{uid}/{token}"
 
             subject = "Reset Your Password — PerfumeBooth"

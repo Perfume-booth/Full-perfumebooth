@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    OrderListView, OrderDetailView, OrderCancelView, RazorpayWebhookView, ShippingRatesAPIView, 
+    OrderListView, OrderDetailView, OrderCancelView, GuestOrderTrackView, RazorpayWebhookView, ShippingRatesAPIView, 
     ShiprocketWebhookView, AbandonedCartAPIView, AbandonedCartRecoverView,
     CouponValidationView,
     MerchantCouponListView,
@@ -15,6 +15,7 @@ from .views import (
 
 urlpatterns = [
     path('', OrderListView.as_view(), name='order-list'),
+    path('track/', GuestOrderTrackView.as_view(), name='order-track'),
     path('<uuid:pk>/cancel/', OrderCancelView.as_view(), name='order-cancel'),
     path('<uuid:pk>/', OrderDetailView.as_view(), name='order-detail'),
     path('shipping-rates/', ShippingRatesAPIView.as_view(), name='shipping-rates'),

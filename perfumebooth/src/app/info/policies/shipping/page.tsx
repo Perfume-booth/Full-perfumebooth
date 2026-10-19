@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 import InfoHero from "@/components/layout/InfoHero";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | PerfumeBooth",
+  title: "Shipping Policy | PerfumeBooth",
   description:
-    "Read PerfumeBooth's Privacy Policy to understand how we collect, use, and protect your personal information.",
+    "Information on shipping times, domestic courier dispatch, and express perfume delivery across India.",
 };
 
 export default async function ShippingPolicyPage() {
@@ -21,8 +21,8 @@ export default async function ShippingPolicyPage() {
 
       <InfoHero 
         title={policy.title} 
-        desktopSrc="/images/fallback-luxury.svg"
-        mobileSrc="/images/fallback-luxury.svg"
+        desktopSrc={policy.hero?.desktopSrc || "/images/fallback-luxury.svg"}
+        mobileSrc={policy.hero?.mobileSrc || policy.hero?.desktopSrc || "/images/fallback-luxury.svg"}
         pillText="PerfumeBooth Official Policy" 
         effectiveDate="09.08.2024" 
       />

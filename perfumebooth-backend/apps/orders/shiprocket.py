@@ -9,8 +9,8 @@ from .models import Shipment
 logger = logging.getLogger(__name__)
 
 SHIPROCKET_BASE_URL = getattr(settings, 'SHIPROCKET_API_URL', 'https://apiv2.shiprocket.in/v1/external')
-SHIPROCKET_EMAIL = getattr(settings, 'SHIPROCKET_EMAIL', '')
-SHIPROCKET_PASSWORD = getattr(settings, 'SHIPROCKET_PASSWORD', '')
+SHIPROCKET_EMAIL = getattr(settings, 'SHIPROCKET_EMAIL', '') or getattr(settings, 'SHIPROCKET_API_EMAIL', '')
+SHIPROCKET_PASSWORD = getattr(settings, 'SHIPROCKET_PASSWORD', '') or getattr(settings, 'SHIPROCKET_API_PASSWORD', '')
 SHIPROCKET_PICKUP_PINCODE = getattr(settings, 'SHIPROCKET_PICKUP_PINCODE', '110001')
 SHIPROCKET_PICKUP_LOCATION = getattr(settings, 'SHIPROCKET_PICKUP_LOCATION', 'Primary Warehouse')
 

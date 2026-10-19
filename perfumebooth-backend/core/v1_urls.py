@@ -29,7 +29,7 @@ from apps.shop.views import (
 
 # Orders & Checkout Views
 from apps.orders.views import (
-    OrderListView, OrderDetailView, OrderCancelView, CouponValidationView,
+    OrderListView, OrderDetailView, OrderCancelView, GuestOrderTrackView, CouponValidationView,
     ShippingRatesAPIView, RazorpayWebhookView, ShiprocketWebhookView,
     AbandonedCartAPIView, AbandonedCartRecoverView, PaymentInitializeView, PaymentVerifyView
 )
@@ -80,6 +80,7 @@ checkout_patterns = [
 
 orders_patterns = [
     path('', OrderListView.as_view(), name='v1-order-list'),
+    path('track/', GuestOrderTrackView.as_view(), name='v1-order-track'),
     path('<path:pk>/cancel/', OrderCancelView.as_view(), name='v1-order-cancel'),
     path('<path:pk>/', OrderDetailView.as_view(), name='v1-order-detail'),
 ]

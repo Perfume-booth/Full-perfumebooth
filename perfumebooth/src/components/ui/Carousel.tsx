@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { EmblaOptionsType, EmblaPluginType } from "embla-carousel";
 import Autoplay from "embla-carousel-autoplay";
-import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +21,12 @@ interface CarouselProps {
   onSelect?: (index: number) => void;
 }
 
+const NO_PLUGINS: EmblaPluginType[] = [];
+
 export default function Carousel({
   children,
   options = { align: "start", containScroll: "trimSnaps" },
-  plugins = [],
+  plugins = NO_PLUGINS,
   autoplay = false,
   autoplayDelay = 4000,
   showArrows = true,
@@ -35,11 +36,15 @@ export default function Carousel({
   slideClassName,
   onSelect,
 }: CarouselProps) {
-  const defaultPlugins = [WheelGesturesPlugin()];
-  const allPlugins = [...defaultPlugins, ...plugins];
-  if (autoplay) {
-    allPlugins.push(Autoplay({ delay: autoplayDelay, stopOnInteraction: false }) as any);
-  }
+  // Plugin instances hold state. Recreating them on every render forces Embla to
+  // do unnecessary teardown/setup work on the main thread.
+  const allPlugins = useMemo(() => {
+    if (!autoplay) return plugins;
+    return [
+      ...plugins,
+      Autoplay({ delay: autoplayDelay, stopOnInteraction: false }) as EmblaPluginType,
+    ];
+  }, [autoplay, autoplayDelay, plugins]);
 
   const [emblaRef, emblaApi] = useEmblaCarousel(options, allPlugins);
 
@@ -67,6 +72,10 @@ export default function Carousel({
     setScrollSnaps(emblaApi.scrollSnapList());
     emblaApi.on("select", onSelectHandler);
     emblaApi.on("reInit", onSelectHandler);
+    return () => {
+      emblaApi.off("select", onSelectHandler);
+      emblaApi.off("reInit", onSelectHandler);
+    };
   }, [emblaApi, onSelectHandler]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {

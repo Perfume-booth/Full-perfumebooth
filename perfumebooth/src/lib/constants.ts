@@ -47,37 +47,37 @@ export const TOP_CATEGORIES = [
   {
     label: "Perfumes",
     title: " Exclusive Perfumes",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/perfume.png?v=1778139272",
     href: "/perfumes",
   },
   {
     label: "Attars",
     title: "Pure Attars",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/attar.png?v=1778139272",
     href: "/attars",
   },
   {
     label: "Deodorants",
     title: "Fresh Deodorants",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/deo_888a2919-741e-4acc-a2d1-692e69d8e819.png?v=1778139272",
     href: "/deodorants",
   },
   {
     label: "Gift Sets",
     title: "Perfect Gift Sets",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/gift-sets.png?v=1778139271",
     href: "/gift-sets",
   },
   {
     label: "Scent Shots",
     title: "Try More Fragrances ",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/scent.png?v=1778139274",
     href: "/scent-shot",
   },
   {
     label: "Body Mists",
     title: "Refreshing Mists",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mist.png?v=1778139272",
     href: "/mist",
   },
 ];
@@ -140,11 +140,10 @@ export const SORT_OPTIONS = [
 ];
 
 export const INSTAGRAM_POSTS = [
-  { id: "ig-1", image: "/images/fallback-luxury.svg", alt: "Exclusive woody fragrance notes" },
-  { id: "ig-3", image: "/images/fallback-luxury.svg", alt: "Bright citrus perfume vibes" },
-  { id: "ig-4", image: "/images/fallback-luxury.svg", alt: "Grounded earthy woody notes" },
-  { id: "ig-5", image: "/images/fallback-luxury.svg", alt: "Cool aquatic fragrance lifestyle" },
-  { id: "ig-6", image: "/images/fallback-luxury.svg", alt: "Bold and intriguing spicy scents" },
-  { id: "ig-7", image: "/images/fallback-luxury.svg", alt: "Bold and intriguing spicy scents" },
-
+  { id: "ig-1", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/1_937d780d-e810-458e-959a-db88b913959b.webp?v=1778479565", alt: "Exclusive woody fragrance notes", link: "https://www.instagram.com/p/CjK2gGnPStj/" },
+  { id: "ig-3", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/16.webp?v=1778479565", alt: "Bright citrus perfume vibes", link: "https://www.instagram.com/p/Bzc9V8wB8sX/" },
+  { id: "ig-4", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/15.webp?v=1778479566", alt: "Grounded earthy woody notes", link: "https://www.instagram.com/p/B2-7YyYFKpG/" },
+  { id: "ig-5", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/2_24d003cb-398d-4149-bfaa-626d30dc7dfc.webp?v=1778479565", alt: "Cool aquatic fragrance lifestyle", link: "https://www.instagram.com/p/CZ8uCIJlK7z/" },
+  { id: "ig-6", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/17.webp?v=1778479565", alt: "Bold and intriguing spicy scents", link: "https://www.instagram.com/perfumeboothindia/" },
+  { id: "ig-7", image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/New_NB_Red_A_Premium_Quality_Perfume_WithFragrance-_Lemon_Rose_Orange_Blossom_Amber_Wood.webp?v=1782801488", alt: "Bold and intriguing spicy scents", link: "https://www.instagram.com/p/CfVzjYxlesn/" },
 ];

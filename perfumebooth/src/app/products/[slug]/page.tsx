@@ -6,6 +6,7 @@ import { stripHtml } from '@/lib/utils';
 import { METAFIELD_MAPPINGS } from '@/lib/product-fields.config';
 import { parseRating, getBrandFromTags, cleanMetafieldValue } from '@/lib/transformers';
 import { cleanImageUrl as normalizeMediaUrl } from '@/lib/media-url';
+import { availableUnits, catalogAvailable } from '@/lib/catalog-availability';
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductDetailsClient from "@/components/product/ProductDetailsClient";
 import ProductReviews from "@/components/product/ProductReviews";
@@ -143,8 +144,8 @@ async function getProduct(slug: string): Promise<Product | null> {
             ...p,
             image: cleanImageUrl(p.image) || (images.length > 0 ? images[0].image : null),
             images: images,
-            stock_count: p.stock_count ?? p.stock ?? 50,
-            availableForSale: p.is_online && (p.stock > 0 || p.stock_count > 0),
+            stock_count: availableUnits(p),
+            availableForSale: catalogAvailable(p),
             rating: p.rating || 4.5,
             rating_count: p.rating_count || 0,
             reviewsHtml: '',
@@ -163,13 +164,13 @@ async function getProduct(slug: string): Promise<Product | null> {
                 weight: variant.weight,
                 dimensions: variant.dimensions,
                 is_default: Boolean(variant.is_default),
-                availableForSale: Number(variant.stock_level ?? variant.stock) > 0,
-                quantityAvailable: Number(variant.stock_level ?? variant.stock ?? 0),
+                availableForSale: Boolean(p.is_online) && variant.is_active !== false && availableUnits(variant) > 0,
+                quantityAvailable: availableUnits(variant),
                 requiresShipping: true
             })) : [{
                 id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
-                availableForSale: p.is_online && (p.stock > 0 || p.stock_count > 0),
-                quantityAvailable: p.stock_count ?? p.stock ?? 0, requiresShipping: true
+                availableForSale: catalogAvailable(p),
+                quantityAvailable: availableUnits(p), requiresShipping: true
             }],
             coupons: []
         };

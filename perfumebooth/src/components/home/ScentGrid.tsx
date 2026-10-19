@@ -10,63 +10,77 @@ const SCENT_JOURNEY_DATA = [
   {
     label: "Oud",
     mood: "Deep, Mystical, Regal",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/woody.webp?v=1784546288",
     href: "/oud",
   },
   {
     label: "Floral",
     mood: "Elegant, Blooming, Romantic",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/floral.webp?v=1784546289",
     href: "/floral",
   },
   {
     label: "Citrus",
     mood: "Zesty, Energetic, Bright",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh-citrus.webp?v=1784546288",
     href: "/citrus",
   },
   {
     label: "Woody",
     mood: "Earthy, Grounded, Warm",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/earthy-woody.webp?v=1784546291",
     href: "/woody",
   },
   {
     label: "Aquatic",
     mood: "Cool, Serene, Breathless",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/aquatic_1.webp?v=1784546289",
     href: "/aquatic",
   },
   {
     label: "Spicy",
     mood: "Bold, Intriguing, Fiery",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/spicy_1.webp?v=1784546289",
     href: "/spicy",
   },
   {
     label: "Oriental",
     mood: "Exotic, Rich, Enchanting",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/oriental_1.webp?v=1784546289",
     href: "/oriental",
   },
   {
     label: "Fresh",
     mood: "Clean, Crisp, Vital",
-    image: "/images/fallback-luxury.svg",
+    image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/fresh.webp?v=1784546288",
     href: "/fresh",
   },
 ];
 
-export default function ScentGrid() {
+export default function ScentGrid({
+  items,
+  title = "The",
+  italicPart = "Art",
+  suffix = "of Scent Notes",
+  viewAllLink = "/all"
+}: {
+  items?: any[];
+  title?: string;
+  italicPart?: string;
+  suffix?: string;
+  viewAllLink?: string;
+} = {}) {
+  const displayItems = items && items.length > 0 ? items : SCENT_JOURNEY_DATA;
+
   return (
     <section className="py-4 md:py-10 bg-[var(--color-bg)] overflow-hidden">
       <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
         
         <SectionHeader 
-          title="The" 
-          italicPart="Art" 
-          suffix="of Scent Notes" 
-          viewAllLink="/all"
+          title={title} 
+          italicPart={italicPart} 
+          suffix={suffix} 
+          viewAllLink={viewAllLink}
         />
 
         <div className="mt-8">
@@ -76,7 +90,7 @@ export default function ScentGrid() {
             options={{ align: "start", containScroll: "trimSnaps", dragFree: true }}
             showDots={true}
           >
-            {SCENT_JOURNEY_DATA.map((note, index) => (
+            {displayItems.map((note: any, index: number) => (
               <motion.div
                 key={note.label}
                 initial={{ opacity: 0, y: 30 }}

@@ -66,7 +66,12 @@ class CollectionSyncService:
                     })
 
         # Identify currently linked collections
-        current_links = ProductCollection.objects.filter(product=product).select_related('collection')
+        # Synchronize only generated taxonomy links; manual merchandising is
+        # owned by the collection editor and must survive ordinary product edits.
+        current_links = ProductCollection.objects.filter(
+            product=product,
+            collection__collection_type__in=[entry['type'] for entry in registry],
+        ).select_related('collection')
         current_slugs = {link.collection.slug for link in current_links}
         target_slugs = {tc['slug'] for tc in target_collections}
 

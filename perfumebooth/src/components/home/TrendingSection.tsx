@@ -13,16 +13,28 @@ const extractProducts = (collection: any, limit: number = 15): Product[] => {
     ?.slice(0, limit) || [];
 };
 
-export default async function TrendingSection() {
-    const trendingCol = await getCollection("trending-perfumes", 15);
-    const trendingProducts = extractProducts(trendingCol, 15);
+export default async function TrendingSection({
+  title = "Trending",
+  italicPart = "Perfumes",
+  viewAllLink = "/trending-perfumes",
+  collectionHandle = "trending-perfumes",
+  limit = 15
+}: {
+  title?: string;
+  italicPart?: string;
+  viewAllLink?: string;
+  collectionHandle?: string;
+  limit?: number;
+} = {}) {
+    const trendingCol = await getCollection(collectionHandle, limit);
+    const trendingProducts = extractProducts(trendingCol, limit);
     
     return (
       <ProductCarousel
         products={trendingProducts}
-        title="Trending"
-        italicPart="Perfumes"
-        viewAllLink="/trending-perfumes"
+        title={title}
+        italicPart={italicPart}
+        viewAllLink={viewAllLink}
       />
     );
 }

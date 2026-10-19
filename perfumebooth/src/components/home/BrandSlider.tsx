@@ -1,61 +1,84 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+import { motion } from "framer-motion";
 import SectionHeader from "@/components/ui/SectionHeader";
+import CircleRevealSection from "@/components/ui/CircleRevealSection";
 import Carousel from "@/components/ui/Carousel";
+import BrandCard from "@/components/brand/BrandCard";
 
 const FEATURED_BRANDS = [
-  { name: "Otoori", logo: "/images/fallback-luxury.svg", href: "/otoori" },
-  { name: "New NB", logo: "/images/fallback-luxury.svg", href: "/new-nb" },
-  { name: "Lomani", logo: "/images/fallback-luxury.svg", href: "/lomani" },
-  { name: "MPF", logo: "/images/fallback-luxury.svg", href: "/mpf" },
-  { name: "Prestige Arabiyat", logo: "/images/fallback-luxury.svg", href: "/arabiyat-prestige" },
-  { name: "Lattaffa", logo: "/images/fallback-luxury.svg", href: "/lattaffa" },
-  { name: "Swiss Arabian", logo: "/images/fallback-luxury.svg", href: "/swiss-arabian" },
+  { name: "Otoori", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/otoori-logo-beverly-web.jpg?v=1787650165", href: "/otoori" },
+  { name: "New NB", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/new-nb-logo-beverly-web.jpg?v=1787650165", href: "/new-nb" },
+  { name: "Lomani", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/lomani-logo-beverly-web.jpg?v=1787650165", href: "/lomani" },
+  { name: "MPF", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/mpf-logo-beverly-web.jpg?v=1787650165", href: "/mpf" },
+  { name: "Arabiyat Prestige", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/arabiyat-prestige-logo-beverly-web.jpg?v=1787650165", href: "/arabiyat-prestige" },
+  { name: "Al Haramain", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/al-haramain-logo-beverly-web.jpg?v=1787650166", href: "/al-haramain" },
+  { name: "Anfar", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/anfar-logo-beverly-web.jpg?v=1787650165", href: "/anfar" },
+  { name: "Caneza", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/caneza-logo-beverly-web.jpg?v=1787650165", href: "/caneza" },
+  { name: "Al Wataniyah", logo: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/an-wataniah-logo-beverly-web.jpg?v=1787650166", href: "/al-watania" },
 ];
 
-export default function BrandSlider() {
+export default function BrandSlider({
+  brands,
+  title = "Global",
+  italicPart = "Brands"
+}: {
+  brands?: any[];
+  title?: string;
+  italicPart?: string;
+} = {}) {
+  const luxuryEase = [0.16, 1, 0.3, 1] as const;
+  const displayBrands = brands && brands.length > 0 ? brands : FEATURED_BRANDS;
+
   return (
-    <section className="py-4 md:py-10 border-y border-[var(--color-border)] bg-[var(--color-bg)] overflow-hidden">
-      <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
+    <CircleRevealSection origin="arch" className="bg-[var(--color-bg)] relative z-10">
+      <section className="pt-10 pb-8 md:pt-14 md:pb-12 border-y border-[var(--color-border)] overflow-hidden">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-12 lg:px-16">
+          <SectionHeader
+            align="center"
+            title={title}
+            italicPart={italicPart}
+          />
 
-        <SectionHeader
-          title="Global"
-          italicPart="Brands"
-          viewAllLink="/brands"
-          viewAllText="Explore All"
-        />
-
-        <div className="mt-8">
-          <Carousel 
-            containerClassName="gap-4 md:gap-6 md:justify-center"
-            slideClassName="basis-[33%] sm:basis-[25%] md:basis-[176px]"
-            options={{ align: "start", containScroll: "trimSnaps", dragFree: true, loop: true }}
-            autoplay={true}
-            autoplayDelay={3000}
-            showArrows={true}
+          <motion.div 
+            initial={{ opacity: 0, y: 35 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "0px" }}
+            transition={{ duration: 0.9, delay: 0.15, ease: luxuryEase }}
+            className="mt-8 will-change-transform"
           >
-            {FEATURED_BRANDS.map((brand) => (
-              <Link key={brand.name} href={brand.href || "#"} className="group/brand block">
-                <div className="relative aspect-square bg-[var(--color-bg-subtle)] border border-[var(--color-border)] shadow-sm group-hover/brand:shadow-md group-hover/brand:border-[var(--color-gold)] transition-all duration-500 overflow-hidden rounded-xl">
-                  <div className="absolute inset-0 bg-gradient-to-br from-transparent to-[var(--color-gold)]/5 opacity-0 group-hover/brand:opacity-100 transition-opacity duration-700" />
-                  <Image
-                    src={brand.logo}
-                    alt={brand.name}
-                    fill
-                    className="p-4 md:p-6 object-contain transition-all duration-700 filter group-hover/brand:scale-110"
-                    sizes="(max-width: 768px) 112px, 176px"
+            <Carousel 
+              containerClassName="-ml-4 md:-ml-6"
+              slideClassName="pl-4 md:pl-6 basis-[75%] sm:basis-[48%] md:basis-[300px] lg:basis-[330px]"
+              options={{ align: "start", containScroll: "trimSnaps", dragFree: true, loop: true }}
+              autoplay={true}
+              autoplayDelay={3500}
+              showArrows={true}
+            >
+              {displayBrands.map((brand: any, idx: number) => (
+                <motion.div
+                  key={brand.name}
+                  initial={{ opacity: 0, y: 25 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "0px" }}
+                  transition={{
+                    duration: 0.75,
+                    delay: 0.1 + (idx % 4) * 0.08,
+                    ease: luxuryEase
+                  }}
+                  className="w-full h-full will-change-transform"
+                >
+                  <BrandCard
+                    name={brand.name}
+                    logo={brand.logo}
+                    href={brand.href || "#"}
                   />
-                </div>
-                <p className="mt-4 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-text-muted)] text-center opacity-0 group-hover/brand:opacity-100 transition-all duration-500 transform translate-y-2 group-hover/brand:translate-y-0">
-                  {brand.name}
-                </p>
-              </Link>
-            ))}
-          </Carousel>
+                </motion.div>
+              ))}
+            </Carousel>
+          </motion.div>
         </div>
-      </div>
-    </section>
+      </section>
+    </CircleRevealSection>
   );
 }

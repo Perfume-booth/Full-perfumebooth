@@ -21,8 +21,8 @@ export default async function FaqPage() {
 
       <InfoHero 
         title={policy.title} 
-        desktopSrc="/images/fallback-luxury.svg"
-        mobileSrc="/images/fallback-luxury.svg"
+        desktopSrc={policy.hero?.desktopSrc || "/images/fallback-luxury.svg"}
+        mobileSrc={policy.hero?.mobileSrc || policy.hero?.desktopSrc || "/images/fallback-luxury.svg"}
         pillText="PerfumeBooth Official Policy" 
         effectiveDate="09.08.2024" 
       />

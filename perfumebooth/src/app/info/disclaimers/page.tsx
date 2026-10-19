@@ -6,7 +6,7 @@ import InfoHero from "@/components/layout/InfoHero";
 export const metadata: Metadata = {
   title: "Disclaimers | PerfumeBooth",
   description:
-    "Read our disclaimers to understand the terms and conditions of using our website and products.",
+    "Important legal and product disclaimers regarding PerfumeBooth products and services.",
 };
 
 export default async function DisclaimersPage() {
@@ -21,8 +21,8 @@ export default async function DisclaimersPage() {
 
       <InfoHero 
         title={policy.title} 
-        desktopSrc="/images/fallback-luxury.svg"
-        mobileSrc="/images/fallback-luxury.svg"
+        desktopSrc={policy.hero?.desktopSrc || "/images/fallback-luxury.svg"}
+        mobileSrc={policy.hero?.mobileSrc || policy.hero?.desktopSrc || "/images/fallback-luxury.svg"}
         pillText="PerfumeBooth Official Policy" 
         effectiveDate="09.08.2024" 
       />

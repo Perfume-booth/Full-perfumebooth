@@ -92,6 +92,12 @@ class CatalogServiceTests(TestCase):
         self.assertEqual(serialized['stock'], 15)
         self.assertTrue(serialized['is_online'])
 
+    def test_public_stock_excludes_reservations(self):
+        inventory = self.p1.inventory
+        inventory.reserved_stock = 12
+        inventory.save()
+        self.assertEqual(CatalogService.serialize_product(self.p1)['stock'], 3)
+
     def test_get_products_online_filtering(self):
         # Non-merchant should only see online products (p1, p2)
         products = CatalogService.get_products(is_merchant=False)

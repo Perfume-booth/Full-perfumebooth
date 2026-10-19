@@ -85,7 +85,7 @@ class StandardJSONRenderer(renderers.JSONRenderer):
 
             # If response is an error (HTTP 4xx / 5xx)
             if status_code >= 400:
-                if isinstance(data, dict) and 'error' in data:
+                if isinstance(data, dict) and isinstance(data.get('error'), dict):
                     # Already in standard error format
                     if 'request_id' not in data['error'] or not data['error']['request_id']:
                         data['error']['request_id'] = request_id
@@ -112,6 +112,9 @@ class StandardJSONRenderer(renderers.JSONRenderer):
                         if 'detail' in data:
                             message = str(data['detail'])
                             fields = {k: v for k, v in data.items() if k != 'detail'}
+                        elif 'error' in data:
+                            message = str(data['error'])
+                            fields = {k: v for k, v in data.items() if k != 'error'}
                         else:
                             fields = data
                             message = "Validation failed for one or more fields."

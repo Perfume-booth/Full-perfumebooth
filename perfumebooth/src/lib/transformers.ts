@@ -260,7 +260,7 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
         // Legacy edge-based data structure
         sellingPrice = parsePrice(product.priceRange.minVariantPrice?.amount);
         const cap = product.compareAtPriceRange?.minVariantPrice?.amount;
-        comparePrice = cap ? parsePrice(cap) : Math.round(sellingPrice * 1.25);
+        comparePrice = cap ? parsePrice(cap) : 0;
     } else {
         // Flattened or Legacy structure
         const pPrice = parsePrice(product.price);
@@ -279,20 +279,25 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
             }
         } else {
             sellingPrice = pPrice;
-            comparePrice = Math.round(pPrice * 1.25);
+            comparePrice = parsePrice(product.compare_at_price);
         }
     }
 
-    const discountPct = (comparePrice > sellingPrice) 
-        ? Math.round(((comparePrice - sellingPrice) / comparePrice) * 100) 
-        : 0;
-
-    const firstVariant = product.variants?.edges?.[0]?.node || product.variants?.[0];
+    const variants = product.variants?.edges?.map((edge: any) => edge.node) || product.variants || [];
+    const firstVariant = variants.find((v: any) => v.id === product.selectedVariantId)
+        || variants.find((v: any) => v.availableForSale && v.quantityAvailable > 0)
+        || variants[0];
+    if (firstVariant) {
+        sellingPrice = parsePrice(firstVariant.price);
+        comparePrice = parsePrice(firstVariant.compareAtPrice ?? firstVariant.compare_at_price);
+    }
+    const discountPct = comparePrice > sellingPrice
+        ? Math.round(((comparePrice - sellingPrice) / comparePrice) * 100) : 0;
     const stock_count = firstVariant && typeof firstVariant.quantityAvailable === 'number'
         ? firstVariant.quantityAvailable
         : (product.stock_count !== undefined 
             ? product.stock_count 
-            : (product.availableForSale !== false ? 50 : 0));
+            : 0);
 
     const isSoldOut = product.availableForSale === false || (stock_count === 0);
 
@@ -370,7 +375,7 @@ export function normalizeProduct(product: any, passedDeliveryDate?: string): Nor
         base_notes: cleanMetafieldValue(getMeta('base_notes')),
         gender: cleanMetafieldValue(getMeta('gender') || getMeta('ideal_for')),
         size_ml: cleanMetafieldValue(getMeta('size_ml') || getMeta('size')),
-        selectedVariantId: product.selectedVariantId || product.variants?.edges?.[0]?.node?.id || product.variants?.[0]?.id || "",
+        selectedVariantId: product.selectedVariantId || firstVariant?.id || "",
         stock_count,
         productType: cleanCategoryName(product.productType || product.product_type || product.category || ""),
         product_form: product.product_form || product.attributes?.product_form || "",

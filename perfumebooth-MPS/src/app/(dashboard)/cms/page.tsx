@@ -8,11 +8,30 @@ import {
   Loader2, 
   Save, 
   Layout,
-  ExternalLink,
-  PlusCircle,
-  Trash2,
-  Image as ImageIcon
+  ExternalLink, 
+  PlusCircle, 
+  Trash2, 
+  Image as ImageIcon, 
+  ChevronUp, 
+  ChevronDown, 
+  Eye, 
+  EyeOff, 
+  Layers, 
+  Sparkles, 
+  Folder, 
+  GripVertical, 
+  Film, 
+  Users, 
+  Compass, 
+  Tag, 
+  Camera, 
+  ShoppingBag, 
+  Plus, 
+  FileText,
+  ChevronsUpDown
 } from 'lucide-react';
+import ImageUploadPicker from '@/components/cms/ImageUploadPicker';
+import AccordionItem from '@/components/cms/AccordionItem';
 
 const CKEditorWrapper = dynamic(() => import('@/components/cms/CKEditorWrapper'), {
   ssr: false,
@@ -20,8 +39,8 @@ const CKEditorWrapper = dynamic(() => import('@/components/cms/CKEditorWrapper')
 });
 
 interface CMSSection {
-  id: string;
-  type: 'HeroBanner' | 'ProductGrid' | 'Testimonials' | 'RichText' | 'FaqList' | 'ContactCard';
+  id?: string;
+  type: string;
   sort_order: number;
   content: Record<string, any>;
   is_visible: boolean;
@@ -29,94 +48,136 @@ interface CMSSection {
 
 export default function CMSBuilderPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [selectedSlug, setSelectedSlug] = useState<string>('info/about-us');
   
-  // Page Edit States
-  const [pageTitle, setPageTitle] = useState('');
+  // Homepage Sections State
+  const [pageTitle, setPageTitle] = useState('Home');
   const [sections, setSections] = useState<CMSSection[]>([]);
   const [pageLoading, setPageLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeSectionIdx, setActiveSectionIdx] = useState<number>(0);
+
+  // Drag and Drop States for Sections
+  const [draggedSectionIdx, setDraggedSectionIdx] = useState<number | null>(null);
+  const [dragOverSectionIdx, setDragOverSectionIdx] = useState<number | null>(null);
+
+  // Accordion Expand/Collapse Map for Repeater Items (Slide, Card, Note, Clip, etc.)
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   useEffect(() => {
-    handleLoadPage('info/about-us');
+    handleLoadHomepage();
   }, []);
 
-  const handleLoadPage = async (slug: string) => {
-    setSelectedSlug(slug);
+  const handleLoadHomepage = async () => {
     setPageLoading(true);
+    setActiveSectionIdx(0);
+    setExpandedIndex(0);
     try {
-      const data = await apiFetch(`/cms/pages/${slug}/`);
-      setPageTitle(data.title);
-      
-      let loadedSecs: CMSSection[] = data.sections || [];
-      // Ensure page has appropriate editor section if empty
-      if (loadedSecs.length === 0) {
-        if (slug === 'info/faq') {
-          loadedSecs = [{
-            id: `temp-${Date.now()}`,
-            type: 'FaqList',
-            sort_order: 0,
-            content: { title: 'Frequently Asked Questions', faqs: [] },
-            is_visible: true
-          }];
-        } else if (slug === 'info/contact-us') {
-          loadedSecs = [{
-            id: `temp-${Date.now()}`,
-            type: 'ContactCard',
-            sort_order: 0,
-            content: { email: '', phone: '', hours: '', address: '' },
-            is_visible: true
-          }];
-        } else {
-          loadedSecs = [{
-            id: `temp-${Date.now()}`,
-            type: 'RichText',
-            sort_order: 0,
-            content: { title: data.title, body: '' },
-            is_visible: true
-          }];
-        }
-      }
-      setSections(loadedSecs);
+      const data = await apiFetch('/cms/pages/home/');
+      setPageTitle(data.title || 'Home');
+      setSections(data.sections || []);
     } catch (err) {
       console.error(err);
     } finally {
       setPageLoading(false);
-      setLoading(false);
     }
   };
 
-  const getMainSectionIndex = (): number => {
-    if (sections.length === 0) return -1;
-    if (selectedSlug === 'info/faq') {
-      const idx = sections.findIndex(s => s.type === 'FaqList');
-      return idx >= 0 ? idx : 0;
-    }
-    if (selectedSlug === 'info/contact-us') {
-      const idx = sections.findIndex(s => s.type === 'ContactCard');
-      return idx >= 0 ? idx : 0;
-    }
-    const idx = sections.findIndex(s => s.type === 'RichText');
-    return idx >= 0 ? idx : 0;
+  /* ═══════════════════════════════════════════════════════════════════
+     DRAG AND DROP HANDLERS FOR SECTIONS
+     ═══════════════════════════════════════════════════════════════════ */
+  const handleSectionDragStart = (idx: number) => {
+    setDraggedSectionIdx(idx);
   };
 
-  const handleUpdateContent = (field: string, value: any) => {
-    const mainIdx = getMainSectionIndex();
-    if (mainIdx < 0) return;
+  const handleSectionDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (draggedSectionIdx === null || draggedSectionIdx === idx) return;
+    setDragOverSectionIdx(idx);
+  };
+
+  const handleSectionDrop = (dropIdx: number) => {
+    if (draggedSectionIdx === null || draggedSectionIdx === dropIdx) {
+      setDraggedSectionIdx(null);
+      setDragOverSectionIdx(null);
+      return;
+    }
+
     const list = [...sections];
-    list[mainIdx].content = {
-      ...list[mainIdx].content,
+    const draggedItem = list[draggedSectionIdx];
+    list.splice(draggedSectionIdx, 1);
+    list.splice(dropIdx, 0, draggedItem);
+
+    // Re-index sort_order
+    list.forEach((s, i) => { s.sort_order = i; });
+    setSections(list);
+    setActiveSectionIdx(dropIdx);
+    setDraggedSectionIdx(null);
+    setDragOverSectionIdx(null);
+  };
+
+  /* ═══════════════════════════════════════════════════════════════════
+     REPEATER REORDER & ACCORDION HELPERS
+     ═══════════════════════════════════════════════════════════════════ */
+  const handleRepeaterReorder = (field: string, fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) return;
+    const list = [...sections];
+    const items = [...(list[activeSectionIdx].content[field] || [])];
+    if (toIdx >= items.length) return;
+
+    const item = items.splice(fromIdx, 1)[0];
+    items.splice(toIdx, 0, item);
+
+    list[activeSectionIdx].content = {
+      ...list[activeSectionIdx].content,
+      [field]: items
+    };
+    setSections(list);
+    setExpandedIndex(toIdx);
+  };
+
+  const handleToggleVisibility = (idx: number) => {
+    const list = [...sections];
+    list[idx].is_visible = !list[idx].is_visible;
+    setSections(list);
+  };
+
+  const handleMoveSection = (idx: number, dir: 'up' | 'down') => {
+    const newIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sections.length) return;
+    const list = [...sections];
+    const item = list.splice(idx, 1)[0];
+    list.splice(newIdx, 0, item);
+    list.forEach((s, i) => { s.sort_order = i; });
+    setSections(list);
+    setActiveSectionIdx(newIdx);
+  };
+
+  const handleDeleteSection = (idx: number) => {
+    if (!confirm('Are you sure you want to remove this section?')) return;
+    const list = [...sections];
+    list.splice(idx, 1);
+    list.forEach((s, i) => { s.sort_order = i; });
+    setSections(list);
+    if (activeSectionIdx >= list.length) {
+      setActiveSectionIdx(Math.max(0, list.length - 1));
+    }
+  };
+
+  const handleUpdateSectionContent = (idx: number, field: string, value: any) => {
+    const list = [...sections];
+    list[idx].content = {
+      ...list[idx].content,
       [field]: value
     };
     setSections(list);
   };
 
   const handleSaveLayout = async () => {
-    if (!selectedSlug) return;
     setSaveLoading(true);
+    setSaveSuccess(false);
     try {
-      await apiFetch(`/cms/pages/${selectedSlug}/`, {
+      await apiFetch('/cms/pages/home/', {
         method: 'PUT',
         body: JSON.stringify({
           title: pageTitle,
@@ -125,258 +186,1143 @@ export default function CMSBuilderPage() {
           sections: sections
         })
       });
-      alert('Page text content saved successfully!');
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to save page content.');
+      alert(err.message || 'Failed to save homepage layout.');
     } finally {
       setSaveLoading(false);
     }
   };
 
-  const mainIdx = getMainSectionIndex();
-  const mainSec = mainIdx >= 0 ? sections[mainIdx] : null;
+  const activeSec = sections[activeSectionIdx];
+
+  const getSectionIcon = (type: string) => {
+    switch (type) {
+      case 'HeroBanner': return <ImageIcon className="w-4 h-4 text-amber-500" />;
+      case 'VideoSection': return <Film className="w-4 h-4 text-purple-500" />;
+      case 'GenderSection': return <Users className="w-4 h-4 text-blue-500" />;
+      case 'ScentGrid': return <Sparkles className="w-4 h-4 text-rose-500" />;
+      case 'BrandSlider': return <Tag className="w-4 h-4 text-emerald-500" />;
+      case 'InstagramFeed': return <Camera className="w-4 h-4 text-pink-500" />;
+      case 'TopCategories': return <Compass className="w-4 h-4 text-indigo-500" />;
+      case 'TrendingSection':
+      case 'BestSellerSection':
+      case 'NewLaunches':
+      case 'ProductCarousel': return <ShoppingBag className="w-4 h-4 text-amber-500" />;
+      default: return <Layers className="w-4 h-4 text-primary" />;
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-6 h-[calc(100vh-140px)] max-w-7xl mx-auto w-full">
-      {/* Top Navigation Sub-Tabs */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => router.push('/cms')}
-          className="px-5 py-2.5 font-bold text-xs neu-inset-sm text-primary flex items-center gap-2 rounded-2xl"
-        >
-          <Layout className="w-4 h-4" />
-          <span>Info Pages Content Editor</span>
-        </button>
-        <button
-          onClick={() => router.push('/cms/banners')}
-          className="px-5 py-2.5 font-bold text-xs text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-2xl neu-btn transition-colors cursor-pointer"
-        >
-          <ImageIcon className="w-4 h-4" />
-          <span>Header Banners & Slideshows</span>
-        </button>
-      </div>
+    <div className="flex flex-col gap-5 h-[calc(100vh-130px)] max-w-7xl mx-auto w-full text-foreground">
+      {/* ─────────────────────────────────────────────────────────────────────────────
+         TOP NAVIGATION BAR: 3 CLEAR PRIMARY MODES
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-card neu-extruded px-6 py-4 rounded-3xl border border-border/10">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Tab 1: Home (Active on /cms) */}
+          <button
+            type="button"
+            className="px-5 py-2.5 font-bold text-xs rounded-2xl flex items-center gap-2.5 neu-inset-sm text-primary ring-1 ring-primary/20 transition-all cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>Home</span>
+          </button>
 
-      {/* Top Header Bar Controls */}
-      <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 bg-card neu-extruded p-6 rounded-3xl border border-border/10">
-        <div>
-          <h1 className="text-xl font-extrabold text-foreground">Page Text Editor</h1>
-          <p className="text-muted-foreground text-xs mt-0.5">Select any info page to edit its text, policy paragraphs, and details directly</p>
+          {/* Tab 2: Pages */}
+          <button
+            type="button"
+            onClick={() => router.push('/cms/pages')}
+            className="px-5 py-2.5 font-bold text-xs rounded-2xl flex items-center gap-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-blue-500" />
+            <span>Pages</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/10 text-blue-500">
+              8
+            </span>
+          </button>
+
+          {/* Tab 3: Media Library */}
+          <button
+            type="button"
+            onClick={() => router.push('/cms/media')}
+            className="px-5 py-2.5 font-bold text-xs rounded-2xl flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all cursor-pointer"
+          >
+            <Folder className="w-4 h-4 text-emerald-500" />
+            <span>Media Library (R2)</span>
+          </button>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider mb-1">Select Page to Edit</span>
-            <select 
-              value={selectedSlug} 
-              onChange={(e) => handleLoadPage(e.target.value)}
-              className="px-4 py-2.5 neu-input rounded-2xl text-xs font-bold text-foreground cursor-pointer min-w-[280px]"
-            >
-              <optgroup label="Information & Pages">
-                <option value="info/about-us">About Us (/info/about-us)</option>
-                <option value="info/contact-us">Contact Us (/info/contact-us)</option>
-                <option value="info/disclaimers">Disclaimers (/info/disclaimers)</option>
-                <option value="info/faq">FAQ (/info/faq)</option>
-              </optgroup>
-              <optgroup label="Legal Policies">
-                <option value="info/policies/privacy">Privacy Policy (/info/policies/privacy)</option>
-                <option value="info/policies/shipping">Shipping Policy (/info/policies/shipping)</option>
-                <option value="info/policies/refund">Refund and Return Policy (/info/policies/refund)</option>
-                <option value="info/policies/terms">Terms and Conditions (/info/policies/terms)</option>
-              </optgroup>
-            </select>
-          </div>
 
+        {/* Global Action Buttons */}
+        <div className="flex items-center gap-3">
           <a
-            href={`http://localhost:3000/${selectedSlug}`}
+            href="http://localhost:3000/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-4 py-2.5 neu-btn text-foreground font-bold rounded-2xl text-xs transition duration-200 mt-auto cursor-pointer"
-            title="Open live storefront page in a new tab"
+            className="px-4 py-2.5 neu-btn text-foreground font-bold rounded-2xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+            title="Open live storefront homepage in a new tab"
           >
             <span>View Live</span>
             <ExternalLink className="w-3.5 h-3.5 text-primary" />
           </a>
 
           <button
+            type="button"
             onClick={handleSaveLayout}
             disabled={saveLoading}
-            className="flex items-center gap-2 px-6 py-2.5 neu-btn-primary font-bold rounded-2xl transition duration-200 cursor-pointer text-xs disabled:opacity-50 mt-auto"
+            className="px-6 py-2.5 neu-btn-primary font-bold rounded-2xl text-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
           >
-            {saveLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span>Save Text Changes</span>
+            {saveLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{saveSuccess ? 'Saved Successfully!' : 'Save Homepage'}</span>
           </button>
         </div>
       </div>
 
-      {pageLoading ? (
-        <div className="flex-1 flex items-center justify-center text-primary">
-          <Loader2 className="w-8 h-8 animate-spin" />
+      {/* ─────────────────────────────────────────────────────────────────────────────
+         HORIZONTAL SECTION SELECTOR (Replaces former left column)
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2.5 bg-card neu-extruded px-6 py-4 rounded-3xl border border-border/10 shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-border/15">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-primary" />
+              <span>Section:</span>
+            </span>
+
+            {/* Dropdown Selector */}
+            <div className="relative">
+              <select
+                value={activeSectionIdx}
+                onChange={(e) => {
+                  setActiveSectionIdx(Number(e.target.value));
+                  setExpandedIndex(0);
+                }}
+                className="px-4 py-2 bg-background neu-input rounded-2xl text-xs font-extrabold text-foreground cursor-pointer pr-9 focus:ring-2 focus:ring-primary/20 appearance-none"
+              >
+                {sections.map((sec, idx) => (
+                  <option key={sec.id || idx} value={idx}>
+                    #{idx + 1} — {sec.type} {sec.content?.title ? `(${sec.content.title})` : ''} {sec.is_visible ? '' : '[Hidden]'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Prev / Next Step Buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={activeSectionIdx === 0}
+                onClick={() => {
+                  setActiveSectionIdx(prev => Math.max(0, prev - 1));
+                  setExpandedIndex(0);
+                }}
+                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
+                title="Previous section"
+              >
+                <span>←</span>
+                <span>Prev</span>
+              </button>
+              <button
+                type="button"
+                disabled={activeSectionIdx === sections.length - 1}
+                onClick={() => {
+                  setActiveSectionIdx(prev => Math.min(sections.length - 1, prev + 1));
+                  setExpandedIndex(0);
+                }}
+                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
+                title="Next section"
+              >
+                <span>Next</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section Position & Visibility Controls */}
+          <div className="flex items-center gap-2">
+            {activeSec && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleToggleVisibility(activeSectionIdx)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    activeSec.is_visible
+                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                      : 'bg-muted text-muted-foreground border border-border/30'
+                  }`}
+                  title="Toggle section visibility on storefront"
+                >
+                  {activeSec.is_visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  <span>{activeSec.is_visible ? 'Visible on Store' : 'Hidden from Store'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={activeSectionIdx === 0}
+                  onClick={() => handleMoveSection(activeSectionIdx, 'up')}
+                  className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
+                  title="Move section higher on homepage"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Up</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={activeSectionIdx === sections.length - 1}
+                  onClick={() => handleMoveSection(activeSectionIdx, 'down')}
+                  className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
+                  title="Move section lower on homepage"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>Down</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="flex-1 bg-card neu-extruded p-7 rounded-3xl border border-border/10 overflow-y-auto flex flex-col gap-6">
-          {mainSec && (
-            <>
-              {/* ARTICLE / POLICY / BLOG EDITOR */}
-              {selectedSlug !== 'info/faq' && selectedSlug !== 'info/contact-us' && (
-                <div className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Page Headline / Article Title</label>
-                    <input
-                      type="text"
-                      value={mainSec.content.title || pageTitle || ''}
-                      onChange={(e) => {
-                        setPageTitle(e.target.value);
-                        handleUpdateContent('title', e.target.value);
-                      }}
-                      placeholder="e.g. Privacy Policy & Terms of Use"
-                      className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-bold text-foreground"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Rich Text Editor (CKEditor)</label>
-                    <div className="neu-inset rounded-2xl p-2 overflow-hidden">
-                      <CKEditorWrapper
-                        value={mainSec.content.body || ''}
-                        onChange={(data) => handleUpdateContent('body', data)}
-                        placeholder="Write policy details, paragraphs, lists, or story content..."
-                      />
+
+        {/* Horizontal Quick-Select Pills Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-border/40">
+          {sections.map((sec, idx) => {
+            const isSelected = activeSectionIdx === idx;
+            return (
+              <button
+                key={sec.id || idx}
+                type="button"
+                onClick={() => {
+                  setActiveSectionIdx(idx);
+                  setExpandedIndex(0);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'neu-inset text-primary ring-1 ring-primary/30'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                }`}
+              >
+                <span>{getSectionIcon(sec.type)}</span>
+                <span>{sec.type}</span>
+                <span className={`text-[9px] px-1 rounded-sm ${isSelected ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                  #{idx + 1}
+                </span>
+                {!sec.is_visible && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" title="Hidden" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+         FULL-WIDTH ACTIVE SECTION EDITOR
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <div className="flex-1 bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-5 overflow-y-auto w-full min-h-0">
+            {activeSec ? (
+              <div className="flex flex-col gap-5">
+                {/* Section Header Card */}
+                <div className="flex items-center justify-between pb-3 border-b border-border/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                      {getSectionIcon(activeSec.type)}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-foreground">
+                        {activeSec.type}
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground">
+                        Configure visuals, headlines, links, and responsive imagery
+                      </p>
                     </div>
                   </div>
+                  <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                    activeSec.is_visible ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                  }`}>
+                    {activeSec.is_visible ? 'Active & Live' : 'Hidden'}
+                  </span>
                 </div>
-              )}
 
-              {/* CONTACT US EDITOR */}
-              {selectedSlug === 'info/contact-us' && (
-                <div className="flex flex-col gap-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Support Email Address</label>
-                      <input
-                        type="text"
-                        value={mainSec.content.email || ''}
-                        onChange={(e) => handleUpdateContent('email', e.target.value)}
-                        placeholder="e.g. admin@perfumebooth.com"
-                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
-                      />
+                {/* ═══════════════════════════════════════════════════════════════════
+                   1. HERO BANNER SLIDES REPEATER (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'HeroBanner' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Section Headline</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.title || ''}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                          placeholder="e.g. Luxury Fragrances"
+                          className="px-3.5 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Section Subtitle</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.subtitle || ''}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'subtitle', e.target.value)}
+                          placeholder="e.g. Architectural perfumes from world-class houses"
+                          className="px-3.5 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Contact Phone Numbers</label>
-                      <input
-                        type="text"
-                        value={mainSec.content.phone || ''}
-                        onChange={(e) => handleUpdateContent('phone', e.target.value)}
-                        placeholder="e.g. +91 9266030909 / 011-46604937"
-                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Support Business Hours</label>
-                      <input
-                        type="text"
-                        value={mainSec.content.hours || ''}
-                        onChange={(e) => handleUpdateContent('hours', e.target.value)}
-                        placeholder="e.g. Mon to Sat, 10am to 6pm"
-                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Head Office Postal Address</label>
-                      <input
-                        type="text"
-                        value={mainSec.content.address || ''}
-                        onChange={(e) => handleUpdateContent('address', e.target.value)}
-                        placeholder="e.g. 70B/35A, 3rd Floor, Rama Road Industrial Area, New Delhi – 110015"
-                        className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-medium"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* FAQ EDITOR */}
-              {selectedSlug === 'info/faq' && (
-                <div className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">FAQ Section Headline</label>
-                    <input
-                      type="text"
-                      value={mainSec.content.title || 'Frequently Asked Questions'}
-                      onChange={(e) => handleUpdateContent('title', e.target.value)}
-                      placeholder="e.g. Frequently Asked Questions"
-                      className="w-full px-4 py-3 neu-input rounded-2xl text-sm font-bold text-foreground"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-3 mt-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Questions & Answers Dataset</label>
-                    <div className="flex flex-col gap-4">
-                      {(mainSec.content.faqs || []).map((faqItem: any, fIdx: number) => (
-                        <div key={fIdx} className="p-5 neu-inset rounded-2xl flex flex-col gap-3.5 relative group">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-extrabold text-primary uppercase tracking-wider">Question #{fIdx + 1}</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const list = [...(mainSec.content.faqs || [])];
-                                list.splice(fIdx, 1);
-                                handleUpdateContent('faqs', list);
-                              }}
-                              className="neu-btn p-1.5 rounded-xl text-muted-foreground hover:text-red-500 transition cursor-pointer"
-                              title="Delete Question"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="Enter question text..."
-                            value={faqItem.q}
-                            onChange={(e) => {
-                              const list = [...(mainSec.content.faqs || [])];
-                              list[fIdx].q = e.target.value;
-                              handleUpdateContent('faqs', list);
-                            }}
-                            className="px-4 py-2.5 neu-input rounded-xl text-xs font-bold"
-                          />
-                          <textarea
-                            placeholder="Enter detailed answer..."
-                            value={faqItem.a}
-                            onChange={(e) => {
-                              const list = [...(mainSec.content.faqs || [])];
-                              list[fIdx].a = e.target.value;
-                              handleUpdateContent('faqs', list);
-                            }}
-                            rows={3}
-                            className="px-4 py-2.5 neu-input rounded-xl text-xs font-medium resize-none"
-                          />
+                    <div className="flex flex-col gap-3 mt-1">
+                      <div className="flex justify-between items-center pb-1">
+                        <div>
+                          <label className="text-xs font-black text-primary uppercase tracking-wider">
+                            Slides Carousel Images ({(activeSec.content.slides || []).length})
+                          </label>
+                          <p className="text-[10px] text-muted-foreground">
+                            Click a slide card to expand or edit
+                          </p>
                         </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const list = [...(mainSec.content.faqs || [])];
-                          list.push({ q: 'New Question?', a: 'Detailed answer response here.' });
-                          handleUpdateContent('faqs', list);
-                        }}
-                        className="flex items-center justify-center gap-2 py-3.5 neu-btn text-xs font-bold rounded-2xl text-muted-foreground hover:text-foreground transition duration-150 cursor-pointer"
-                      >
-                        <PlusCircle className="w-4 h-4 text-primary" />
-                        <span>Add New Question & Answer</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const slides = [...(activeSec.content.slides || [])];
+                            slides.push({
+                              id: Date.now(),
+                              image: '',
+                              mobileImage: '',
+                              href: '/collections/all',
+                              alt_text: `Slide #${slides.length + 1}`
+                            });
+                            handleUpdateSectionContent(activeSectionIdx, 'slides', slides);
+                            setExpandedIndex(slides.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Slide</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.slides || []).map((slide: any, sIdx: number) => (
+                          <AccordionItem
+                            key={slide.id || sIdx}
+                            index={sIdx}
+                            total={(activeSec.content.slides || []).length}
+                            title={slide.alt_text || `Slide #${sIdx + 1}`}
+                            subtitle={slide.href || 'No link configured'}
+                            thumbnail={slide.image || slide.mobileImage}
+                            badge="Banner"
+                            isExpanded={expandedIndex === sIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === sIdx ? null : sIdx)}
+                            onMoveUp={() => handleRepeaterReorder('slides', sIdx, sIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('slides', sIdx, sIdx + 1)}
+                            onDelete={() => {
+                              const slides = [...(activeSec.content.slides || [])];
+                              slides.splice(sIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'slides', slides);
+                            }}
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ImageUploadPicker
+                                label="Desktop Banner Image (16:9)"
+                                folder="banners"
+                                aspectRatio="banner"
+                                value={slide.image || ''}
+                                onChange={(url) => {
+                                  const slides = [...(activeSec.content.slides || [])];
+                                  slides[sIdx].image = url;
+                                  handleUpdateSectionContent(activeSectionIdx, 'slides', slides);
+                                }}
+                                helpText="Recommended: 1920×800 px"
+                              />
+
+                              <ImageUploadPicker
+                                label="Mobile Banner Image (9:16 / 4:5)"
+                                folder="banners"
+                                aspectRatio="portrait"
+                                value={slide.mobileImage || ''}
+                                onChange={(url) => {
+                                  const slides = [...(activeSec.content.slides || [])];
+                                  slides[sIdx].mobileImage = url;
+                                  handleUpdateSectionContent(activeSectionIdx, 'slides', slides);
+                                }}
+                                helpText="Recommended: 800×1000 px"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                              <div>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase">Destination Link URL</label>
+                                <input
+                                  type="text"
+                                  value={slide.href || ''}
+                                  onChange={(e) => {
+                                    const slides = [...(activeSec.content.slides || [])];
+                                    slides[sIdx].href = e.target.value;
+                                    handleUpdateSectionContent(activeSectionIdx, 'slides', slides);
+                                  }}
+                                  placeholder="/collections/luxury"
+                                  className="w-full px-3 py-1.5 neu-input rounded-xl text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase">Alt Description / Title</label>
+                                <input
+                                  type="text"
+                                  value={slide.alt_text || ''}
+                                  onChange={(e) => {
+                                    const slides = [...(activeSec.content.slides || [])];
+                                    slides[sIdx].alt_text = e.target.value;
+                                    handleUpdateSectionContent(activeSectionIdx, 'slides', slides);
+                                  }}
+                                  placeholder="e.g. Signature Accords 2026"
+                                  className="w-full px-3 py-1.5 neu-input rounded-xl text-xs"
+                                />
+                              </div>
+                            </div>
+                          </AccordionItem>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </>
-          )}
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   2. GENDER SHOWCASE SECTION (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'GenderSection' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Title Prefix</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.title || 'Shop By'}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Italic Part</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.italicPart || 'Gender'}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-1">
+                        <label className="text-xs font-black text-primary uppercase">Gender Showcase Cards</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cards = [...(activeSec.content.cards || [])];
+                            cards.push({
+                              id: `card-${Date.now()}`,
+                              label: 'Unisex',
+                              tagline: 'Shared accords',
+                              desktopImage: '',
+                              mobileImage: '',
+                              href: '/collections/unisex'
+                            });
+                            handleUpdateSectionContent(activeSectionIdx, 'cards', cards);
+                            setExpandedIndex(cards.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Card</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.cards || []).map((card: any, cIdx: number) => (
+                          <AccordionItem
+                            key={card.id || cIdx}
+                            index={cIdx}
+                            total={(activeSec.content.cards || []).length}
+                            title={card.label || `Card #${cIdx + 1}`}
+                            subtitle={card.tagline || card.href}
+                            thumbnail={card.desktopImage || card.mobileImage}
+                            badge="Gender"
+                            isExpanded={expandedIndex === cIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === cIdx ? null : cIdx)}
+                            onMoveUp={() => handleRepeaterReorder('cards', cIdx, cIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('cards', cIdx, cIdx + 1)}
+                            onDelete={() => {
+                              const cards = [...(activeSec.content.cards || [])];
+                              cards.splice(cIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'cards', cards);
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={card.label || ''}
+                                onChange={(e) => {
+                                  const cards = [...(activeSec.content.cards || [])];
+                                  cards[cIdx].label = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'cards', cards);
+                                }}
+                                placeholder="Label (e.g. Men)"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
+                              />
+                              <input
+                                type="text"
+                                value={card.tagline || ''}
+                                onChange={(e) => {
+                                  const cards = [...(activeSec.content.cards || [])];
+                                  cards[cIdx].tagline = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'cards', cards);
+                                }}
+                                placeholder="Tagline (e.g. Bold, magnetic formulas)"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <ImageUploadPicker
+                                label="Desktop Card Image"
+                                folder="gender"
+                                aspectRatio="portrait"
+                                value={card.desktopImage || ''}
+                                onChange={(url) => {
+                                  const cards = [...(activeSec.content.cards || [])];
+                                  cards[cIdx].desktopImage = url;
+                                  handleUpdateSectionContent(activeSectionIdx, 'cards', cards);
+                                }}
+                              />
+                              <ImageUploadPicker
+                                label="Mobile Card Image"
+                                folder="gender"
+                                aspectRatio="portrait"
+                                value={card.mobileImage || ''}
+                                onChange={(url) => {
+                                  const cards = [...(activeSec.content.cards || [])];
+                                  cards[cIdx].mobileImage = url;
+                                  handleUpdateSectionContent(activeSectionIdx, 'cards', cards);
+                                }}
+                              />
+                            </div>
+                          </AccordionItem>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   3. VIDEO SECTION (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'VideoSection' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <input
+                        type="text"
+                        value={activeSec.content.title || 'The'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                        placeholder="Prefix"
+                        className="px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                      <input
+                        type="text"
+                        value={activeSec.content.italicPart || 'Cinematic'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
+                        placeholder="Italic word"
+                        className="px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                      <input
+                        type="text"
+                        value={activeSec.content.suffix || 'Experience'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'suffix', e.target.value)}
+                        placeholder="Suffix"
+                        className="px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-1">
+                        <label className="text-xs font-black text-primary uppercase">
+                          Video Clips ({(activeSec.content.items || []).length})
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const items = [...(activeSec.content.items || [])];
+                            items.push({
+                              id: `vid-${Date.now()}`,
+                              label: 'Atmospheric Scent',
+                              video: '',
+                              poster: '',
+                              href: '/products'
+                            });
+                            handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                            setExpandedIndex(items.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Video Clip</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.items || []).map((vItem: any, vIdx: number) => (
+                          <AccordionItem
+                            key={vIdx}
+                            index={vIdx}
+                            total={(activeSec.content.items || []).length}
+                            title={vItem.label || `Clip #${vIdx + 1}`}
+                            subtitle={vItem.video || 'No video link'}
+                            thumbnail={vItem.poster}
+                            badge="Video"
+                            isExpanded={expandedIndex === vIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === vIdx ? null : vIdx)}
+                            onMoveUp={() => handleRepeaterReorder('items', vIdx, vIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('items', vIdx, vIdx + 1)}
+                            onDelete={() => {
+                              const items = [...(activeSec.content.items || [])];
+                              items.splice(vIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={vItem.label || ''}
+                                onChange={(e) => {
+                                  const items = [...(activeSec.content.items || [])];
+                                  items[vIdx].label = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                }}
+                                placeholder="Title / Brand Label"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
+                              />
+                              <input
+                                type="text"
+                                value={vItem.video || ''}
+                                onChange={(e) => {
+                                  const items = [...(activeSec.content.items || [])];
+                                  items[vIdx].video = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                }}
+                                placeholder="MP4 Video URL"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                            </div>
+
+                            <ImageUploadPicker
+                              label="Video Poster Image"
+                              folder="video"
+                              aspectRatio="video"
+                              value={vItem.poster || ''}
+                              onChange={(url) => {
+                                const items = [...(activeSec.content.items || [])];
+                                items[vIdx].poster = url;
+                                handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                              }}
+                            />
+                          </AccordionItem>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   4. TOP CATEGORIES (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'TopCategories' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Section Title</label>
+                      <input
+                        type="text"
+                        value={activeSec.content.title || 'Explore Categories'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                        className="w-full px-3.5 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-1">
+                        <label className="text-xs font-black text-primary uppercase">Categories List</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cats = [...(activeSec.content.categories || [])];
+                            cats.push({ name: 'Oud & Woods', slug: 'oud-woods', image: '', count: '45+ Scents' });
+                            handleUpdateSectionContent(activeSectionIdx, 'categories', cats);
+                            setExpandedIndex(cats.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Category</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.categories || []).map((cat: any, cIdx: number) => (
+                          <AccordionItem
+                            key={cIdx}
+                            index={cIdx}
+                            total={(activeSec.content.categories || []).length}
+                            title={cat.name || `Category #${cIdx + 1}`}
+                            subtitle={cat.slug || cat.count}
+                            thumbnail={cat.image}
+                            badge="Category"
+                            isExpanded={expandedIndex === cIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === cIdx ? null : cIdx)}
+                            onMoveUp={() => handleRepeaterReorder('categories', cIdx, cIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('categories', cIdx, cIdx + 1)}
+                            onDelete={() => {
+                              const cats = [...(activeSec.content.categories || [])];
+                              cats.splice(cIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'categories', cats);
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={cat.name || ''}
+                                onChange={(e) => {
+                                  const cats = [...(activeSec.content.categories || [])];
+                                  cats[cIdx].name = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'categories', cats);
+                                }}
+                                placeholder="Category Name"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
+                              />
+                              <input
+                                type="text"
+                                value={cat.slug || ''}
+                                onChange={(e) => {
+                                  const cats = [...(activeSec.content.categories || [])];
+                                  cats[cIdx].slug = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'categories', cats);
+                                }}
+                                placeholder="Slug / Link"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                            </div>
+
+                            <ImageUploadPicker
+                              label="Category Artwork / Photo"
+                              folder="categories"
+                              aspectRatio="square"
+                              value={cat.image || ''}
+                              onChange={(url) => {
+                                const cats = [...(activeSec.content.categories || [])];
+                                cats[cIdx].image = url;
+                                handleUpdateSectionContent(activeSectionIdx, 'categories', cats);
+                              }}
+                            />
+                          </AccordionItem>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   5. SCENT GRID / NOTES (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'ScentGrid' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <input
+                        type="text"
+                        value={activeSec.content.title || 'The'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                        placeholder="Prefix"
+                        className="px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                      <input
+                        type="text"
+                        value={activeSec.content.italicPart || 'Art'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
+                        placeholder="Italic accent"
+                        className="px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                      <input
+                        type="text"
+                        value={activeSec.content.suffix || 'of Scent Notes'}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'suffix', e.target.value)}
+                        placeholder="Suffix"
+                        className="px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-1">
+                        <label className="text-xs font-black text-primary uppercase">Scent Families & Notes</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const items = [...(activeSec.content.items || [])];
+                            items.push({ name: 'Citrus Zest', desc: 'Sparkling bergamot & mandarin', image: '', link: '/scents/citrus' });
+                            handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                            setExpandedIndex(items.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Note</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.items || []).map((sItem: any, sIdx: number) => (
+                          <AccordionItem
+                            key={sIdx}
+                            index={sIdx}
+                            total={(activeSec.content.items || []).length}
+                            title={sItem.name || `Note #${sIdx + 1}`}
+                            subtitle={sItem.desc || sItem.link}
+                            thumbnail={sItem.image}
+                            badge="Scent"
+                            isExpanded={expandedIndex === sIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === sIdx ? null : sIdx)}
+                            onMoveUp={() => handleRepeaterReorder('items', sIdx, sIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('items', sIdx, sIdx + 1)}
+                            onDelete={() => {
+                              const items = [...(activeSec.content.items || [])];
+                              items.splice(sIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={sItem.name || ''}
+                                onChange={(e) => {
+                                  const items = [...(activeSec.content.items || [])];
+                                  items[sIdx].name = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                }}
+                                placeholder="Note Name (e.g. Woody & Amber)"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
+                              />
+                              <input
+                                type="text"
+                                value={sItem.desc || ''}
+                                onChange={(e) => {
+                                  const items = [...(activeSec.content.items || [])];
+                                  items[sIdx].desc = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                }}
+                                placeholder="Description"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                            </div>
+
+                            <ImageUploadPicker
+                              label="Scent Family Photo"
+                              folder="scent"
+                              aspectRatio="square"
+                              value={sItem.image || ''}
+                              onChange={(url) => {
+                                const items = [...(activeSec.content.items || [])];
+                                items[sIdx].image = url;
+                                handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                              }}
+                            />
+                          </AccordionItem>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   6. BRAND SLIDER (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'BrandSlider' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Title Prefix</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.title || 'Global'}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Italic Part</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.italicPart || 'Brands'}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-1">
+                        <label className="text-xs font-black text-primary uppercase">Brands Directory</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const brands = [...(activeSec.content.brands || [])];
+                            brands.push({ name: 'Lattafa', origin: 'UAE', logo: '', link: '/brand/lattafa' });
+                            handleUpdateSectionContent(activeSectionIdx, 'brands', brands);
+                            setExpandedIndex(brands.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Brand</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.brands || []).map((brand: any, bIdx: number) => (
+                          <AccordionItem
+                            key={bIdx}
+                            index={bIdx}
+                            total={(activeSec.content.brands || []).length}
+                            title={brand.name || `Brand #${bIdx + 1}`}
+                            subtitle={brand.link || brand.origin}
+                            thumbnail={brand.logo}
+                            badge="Brand"
+                            isExpanded={expandedIndex === bIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === bIdx ? null : bIdx)}
+                            onMoveUp={() => handleRepeaterReorder('brands', bIdx, bIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('brands', bIdx, bIdx + 1)}
+                            onDelete={() => {
+                              const brands = [...(activeSec.content.brands || [])];
+                              brands.splice(bIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'brands', brands);
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={brand.name || ''}
+                                onChange={(e) => {
+                                  const brands = [...(activeSec.content.brands || [])];
+                                  brands[bIdx].name = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'brands', brands);
+                                }}
+                                placeholder="Brand Name"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
+                              />
+                              <input
+                                type="text"
+                                value={brand.link || ''}
+                                onChange={(e) => {
+                                  const brands = [...(activeSec.content.brands || [])];
+                                  brands[bIdx].link = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'brands', brands);
+                                }}
+                                placeholder="Link URL (e.g. /brand/armaf)"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                            </div>
+
+                            <ImageUploadPicker
+                              label="Brand Logo Artwork"
+                              folder="brands"
+                              aspectRatio="square"
+                              value={brand.logo || ''}
+                              onChange={(url) => {
+                                const brands = [...(activeSec.content.brands || [])];
+                                brands[bIdx].logo = url;
+                                handleUpdateSectionContent(activeSectionIdx, 'brands', brands);
+                              }}
+                            />
+                          </AccordionItem>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   7. INSTAGRAM FEED (ACCORDIONS)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'InstagramFeed' && (
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Title</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.title || 'Follow Us On'}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Italic Part</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.italicPart || 'Instagram'}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-1">
+                        <label className="text-xs font-black text-primary uppercase">Instagram Photos</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const posts = [...(activeSec.content.posts || [])];
+                            posts.push({ image: '', link: 'https://instagram.com/perfumeboothindia', handle: '@perfumeboothindia', likes: '1.2k' });
+                            handleUpdateSectionContent(activeSectionIdx, 'posts', posts);
+                            setExpandedIndex(posts.length - 1);
+                          }}
+                          className="px-3 py-1.5 neu-btn text-xs font-bold text-primary flex items-center gap-1 rounded-xl cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Post</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5">
+                        {(activeSec.content.posts || []).map((post: any, pIdx: number) => (
+                          <AccordionItem
+                            key={pIdx}
+                            index={pIdx}
+                            total={(activeSec.content.posts || []).length}
+                            title={post.likes ? `${post.likes} · Instagram Post` : `Post #${pIdx + 1}`}
+                            subtitle={post.link || 'https://instagram.com'}
+                            thumbnail={post.image}
+                            badge="Instagram"
+                            isExpanded={expandedIndex === pIdx}
+                            onToggle={() => setExpandedIndex(expandedIndex === pIdx ? null : pIdx)}
+                            onMoveUp={() => handleRepeaterReorder('posts', pIdx, pIdx - 1)}
+                            onMoveDown={() => handleRepeaterReorder('posts', pIdx, pIdx + 1)}
+                            onDelete={() => {
+                              const posts = [...(activeSec.content.posts || [])];
+                              posts.splice(pIdx, 1);
+                              handleUpdateSectionContent(activeSectionIdx, 'posts', posts);
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={post.link || ''}
+                                onChange={(e) => {
+                                  const posts = [...(activeSec.content.posts || [])];
+                                  posts[pIdx].link = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'posts', posts);
+                                }}
+                                placeholder="Instagram Post URL"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                              <input
+                                type="text"
+                                value={post.likes || ''}
+                                onChange={(e) => {
+                                  const posts = [...(activeSec.content.posts || [])];
+                                  posts[pIdx].likes = e.target.value;
+                                  handleUpdateSectionContent(activeSectionIdx, 'posts', posts);
+                                }}
+                                placeholder="Likes / Tag (e.g. 1.4k likes)"
+                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
+                              />
+                            </div>
+
+                            <ImageUploadPicker
+                              label="Instagram Photo"
+                              folder="instagram"
+                              aspectRatio="square"
+                              value={post.image || ''}
+                              onChange={(url) => {
+                                const posts = [...(activeSec.content.posts || [])];
+                                posts[pIdx].image = url;
+                                handleUpdateSectionContent(activeSectionIdx, 'posts', posts);
+                              }}
+                            />
+                          </AccordionItem>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   8. PRODUCT SECTIONS (TRENDING / BEST SELLERS / NEW LAUNCHES)
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {(activeSec.type === 'TrendingSection' || activeSec.type === 'BestSellerSection' || activeSec.type === 'NewLaunches') && (
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Section Title</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.title || ''}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Italic Highlight</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.italicPart || ''}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">View All Link</label>
+                      <input
+                        type="text"
+                        value={activeSec.content.viewAllLink || ''}
+                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'viewAllLink', e.target.value)}
+                        className="w-full px-3 py-2 neu-input rounded-xl text-xs"
+                      />
+                    </div>
+                    {activeSec.content.collectionHandle !== undefined && (
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Collection Slug</label>
+                        <input
+                          type="text"
+                          value={activeSec.content.collectionHandle || ''}
+                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'collectionHandle', e.target.value)}
+                          className="w-full px-3 py-2 neu-input rounded-xl text-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════════
+                   9. RICH TEXT SECTION
+                   ═══════════════════════════════════════════════════════════════════ */}
+                {activeSec.type === 'RichText' && (
+                  <div className="flex flex-col gap-3">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Rich Text / Editorial Content</label>
+                    <div className="neu-inset rounded-2xl p-2 bg-card">
+                      <CKEditorWrapper
+                        value={activeSec.content.body || ''}
+                        onChange={(val) => handleUpdateSectionContent(activeSectionIdx, 'body', val)}
+                        placeholder="Write content..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
+                Select a section on the left to edit its parameters
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
+      );
+    }

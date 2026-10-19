@@ -1,5 +1,6 @@
 import { Product, unwrapApiData, ensureArray } from './types';
 import { cleanImageUrl, cleanCategoryName } from '../transformers';
+import { availableUnits, catalogAvailable } from '../catalog-availability';
 
 const isServer = typeof window === 'undefined';
 const isDocker = process.env.WATCHPACK_POLLING === "true";
@@ -36,7 +37,7 @@ export function mapDjangoProductToProduct(p: any): Product {
     handle: p.slug,
     title: p.title,
     description: p.description || '',
-    availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
+    availableForSale: catalogAvailable(p),
     vendor: p.vendor || p.brand || 'Perfume Booth',
     tags: p.tags || [],
     productType: cleanCategoryName(p.productType || p.category || ''),
@@ -76,13 +77,13 @@ export function mapDjangoProductToProduct(p: any): Product {
       title: variant.title || variant.option1_value || "Default Title",
       price: String(variant.price),
       compareAtPrice: variant.compare_at_price ? String(variant.compare_at_price) : undefined,
-      availableForSale: Number(variant.stock_level) > 0,
-      quantityAvailable: Number(variant.stock_level || 0),
+      availableForSale: Boolean(p.is_online) && variant.is_active !== false && availableUnits(variant) > 0,
+      quantityAvailable: availableUnits(variant),
       requiresShipping: true,
     })) : [{
       id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
-      availableForSale: p.is_online && (p.stock_count > 0 || p.stock > 0),
-      quantityAvailable: p.stock_count || p.stock || 0, requiresShipping: true,
+      availableForSale: catalogAvailable(p),
+      quantityAvailable: availableUnits(p), requiresShipping: true,
     }]
   };
 }
