@@ -143,11 +143,9 @@ export async function getCMSPage(slug: string) {
 
     // If FaqList, format faqs into styled HTML if bodyHtml is empty
     if (faqs.length > 0 && !bodyHtml.trim()) {
-      bodyHtml = faqs.map((faq: any, idx: number) => `
-        <div style="margin-bottom: 24px; padding: 20px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface);">
-          <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 8px; color: var(--color-text-primary);">${idx + 1}. ${faq.q}</h3>
-          <p style="font-size: 14px; color: var(--color-text-muted); line-height: 1.6;">${faq.a}</p>
-        </div>
+      bodyHtml = faqs.map((faq: any) => `
+        <h3 style="border-left: 2px solid var(--color-gold, #b8924a); padding-left: 0.75rem; font-size: 0.95rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--color-text-primary);">${faq.q}</h3>
+        <p style="font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.75; margin-bottom: 1rem;">Answer: ${faq.a}</p>
       `).join('');
     }
 

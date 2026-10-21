@@ -148,7 +148,10 @@ class CheckoutService:
                 variant_title=item.variant.title if item.variant else '',
                 sku=item.variant.sku if item.variant else item.product.sku,
                 quantity=item.quantity,
-                unit_price=item.unit_price
+                unit_price=item.unit_price,
+                unit_cost_snapshot=item.variant.cost_price if item.variant else item.product.cost_per_item,
+                brand_snapshot=str(item.product.attributes.get('brand') or item.product.attributes.get('vendor') or '')[:255],
+                category_snapshot=str(item.product.attributes.get('category') or '')[:255],
             )
 
         # 8: Reserve stock. COD is immediately committed; prepaid stock remains

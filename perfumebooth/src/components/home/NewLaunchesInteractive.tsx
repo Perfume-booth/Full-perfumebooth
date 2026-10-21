@@ -112,7 +112,7 @@ export default function NewLaunchesInteractive({
     return () => clearInterval(timer);
   }, [totalSections, isProductsHovered, nextSection]);
 
-  const currentProducts = productSections[activeSection] || [];
+  const currentProducts = productSections[activeSection % totalSections] || [];
   const currentBanner = banners[activeBanner];
 
   return (
@@ -223,6 +223,15 @@ export default function NewLaunchesInteractive({
 
         {/* 2x2 Grid of 4 Product Cards (All Cards Have the Exact Same Design) */}
         <div className="relative min-h-[460px] sm:min-h-[520px] lg:min-h-[580px] flex flex-col justify-center">
+          {products.length === 0 && (
+            <div role="status" className="rounded-2xl border border-[#e7e1d5] bg-white p-8 text-center text-stone-700">
+              <p className="font-serif text-2xl">New launches are currently unavailable</p>
+              <p className="mt-3 text-sm">Please refresh in a moment to try again.</p>
+              <Link href="/all" className="mt-5 inline-flex text-sm font-semibold text-[#8c6721] underline underline-offset-4">
+                Browse all perfumes
+              </Link>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}

@@ -8,6 +8,7 @@ Routes:
   /api/v1/admin/
 """
 from django.urls import path, include
+from apps.shop.report_views import ReportCatalogView, ReportDetailView
 
 # Catalog Views (Extracted Domain)
 from apps.catalog.views import (
@@ -86,6 +87,8 @@ orders_patterns = [
 ]
 
 admin_patterns = [
+    path('reports/', ReportCatalogView.as_view(), name='v1-report-catalog'),
+    path('reports/<slug:report_id>/', ReportDetailView.as_view(), name='v1-report-detail'),
     path('products/advanced-import/', include('apps.shop.advanced_import_urls')),
     path('products/', ProductListView.as_view(), name='v1-admin-products'),
     path('products/excel-export/', ProductExcelExportView.as_view(), name='v1-admin-products-excel-export'),

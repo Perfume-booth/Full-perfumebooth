@@ -1243,116 +1243,12 @@ class ProductExcelExportView(APIView):
 
 
 class AnalyticsAPIView(APIView):
-    """
-    GET /api/shop/analytics/
-    Dedicated Store Analytics & Reporting Endpoint.
-    Calculates revenue, orders, AOV, sales trends, category distribution, and top products.
-    """
     permission_classes = [permissions.IsAuthenticated, HasRolePermission]
     allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
     def get(self, request):
-        timeframe = request.query_params.get('timeframe', '7d')
-        now = timezone.now()
-
-        if timeframe == 'today':
-            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif timeframe == '30d':
-            start_date = now - timedelta(days=30)
-        elif timeframe == '90d':
-            start_date = now - timedelta(days=90)
-        elif timeframe == 'ytd':
-            start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:  # '7d' default
-            start_date = now - timedelta(days=7)
-
-        # Query real Order model instances if existing
-        orders_qs = Order.objects.filter(created_at__gte=start_date)
-        total_orders_count = orders_qs.count()
-        total_revenue_dec = orders_qs.filter(status='Paid').aggregate(total=Sum('total'))['total'] or Decimal('0.00')
-
-        if total_orders_count > 0:
-            aov = total_revenue_dec / Decimal(total_orders_count)
-        else:
-            aov = Decimal('0.00')
-
-        # Fallback values if database is fresh
-        if total_orders_count == 0:
-            total_revenue_str = "₹348,250.00"
-            total_orders_str = "1,482"
-            aov_str = "₹2,350.00"
-            live_shoppers = random.randint(18, 42)
-            conversion_rate = "3.8%"
-
-            sales_trend = [
-                {"name": "Mon", "sales": 4200, "orders": 14},
-                {"name": "Tue", "sales": 3800, "orders": 11},
-                {"name": "Wed", "sales": 9800, "orders": 28},
-                {"name": "Thu", "sales": 4780, "orders": 16},
-                {"name": "Fri", "sales": 8890, "orders": 31},
-                {"name": "Sat", "sales": 12400, "orders": 42},
-                {"name": "Sun", "sales": 15800, "orders": 55},
-            ]
-
-            category_data = [
-                {"name": "Eau de Parfum (EDP)", "value": 520, "color": "#8b5cf6"},
-                {"name": "Attar & CPO", "value": 310, "color": "#ec4899"},
-                {"name": "Scent Shots", "value": 240, "color": "#10b981"},
-                {"name": "Oud Collection", "value": 180, "color": "#f59e0b"},
-                {"name": "Body Mists", "value": 120, "color": "#3b82f6"},
-            ]
-
-            top_products = [
-                {"rank": 1, "title": "Ahmed Al Maghribi Exotic EDP (100ml)", "units": 142, "revenue": "₹2,84,000.00", "sku": "AAM-EXOTIC-100"},
-                {"rank": 2, "title": "MPF L'amour EDP (100ml)", "units": 118, "revenue": "₹2,36,000.00", "sku": "MPF-LAMOUR-100"},
-                {"rank": 3, "title": "Ahmed Al Maghribi Ignite Oud (60ml)", "units": 94, "revenue": "₹3,28,960.00", "sku": "AAM-IGNITE-60"},
-                {"rank": 4, "title": "Lomani Code EDP (100ml)", "units": 86, "revenue": "₹1,28,914.00", "sku": "LOM-CODE-100"},
-                {"rank": 5, "title": "Lattafa Khamrah EDP (100ml)", "units": 72, "revenue": "₹1,87,128.00", "sku": "LAT-KHAM-100"},
-            ]
-        else:
-            total_revenue_str = f"₹{total_revenue_dec:,.2f}"
-            total_orders_str = str(total_orders_count)
-            aov_str = f"₹{aov:,.2f}"
-            live_shoppers = random.randint(18, 42)
-            conversion_rate = "4.2%"
-
-            sales_trend = []
-            for i in range(7):
-                day_date = start_date + timedelta(days=i)
-                day_name = day_date.strftime('%a')
-                day_orders = orders_qs.filter(created_at__date=day_date.date())
-                day_rev = day_orders.aggregate(total=Sum('total'))['total'] or 0
-                sales_trend.append({"name": day_name, "sales": float(day_rev), "orders": day_orders.count()})
-
-            category_data = [
-                {"name": "Eau de Parfum (EDP)", "value": 450, "color": "#8b5cf6"},
-                {"name": "Attar & CPO", "value": 280, "color": "#ec4899"},
-                {"name": "Scent Shots", "value": 210, "color": "#10b981"},
-                {"name": "Oud Collection", "value": 150, "color": "#f59e0b"},
-            ]
-
-            top_products = [
-                {"rank": i + 1, "title": p.title, "units": p.inventory.stock_level, "revenue": f"₹{p.price:,.2f}", "sku": p.sku}
-                for i, p in enumerate(Product.objects.filter(is_online=True)[:5])
-            ]
-
-        return Response({
-            'timeframe': timeframe,
-            'kpis': [
-                {'title': 'Total Revenue', 'value': total_revenue_str, 'change': '+14.2%', 'isPositive': True},
-                {'title': 'Total Orders', 'value': total_orders_str, 'change': '+8.5%', 'isPositive': True},
-                {'title': 'Average Order Value (AOV)', 'value': aov_str, 'change': '+3.1%', 'isPositive': True},
-                {'title': 'Order Conversion Rate', 'value': conversion_rate, 'change': '+1.2%', 'isPositive': True},
-            ],
-            'salesTrend': sales_trend,
-            'categoryData': category_data,
-            'topProducts': top_products,
-            'paymentMethods': [
-                {'method': 'Cash on Delivery (COD)', 'percentage': '62%', 'count': '918 orders'},
-                {'method': 'Online UPI / Cards (Razorpay)', 'percentage': '38%', 'count': '564 orders'},
-            ],
-            'liveVisitors': live_shoppers,
-        })
+        from .reporting import build_report
+        return Response(build_report(request.query_params.get('timeframe', '7d')))
 
 
 

@@ -74,64 +74,40 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('7d');
   
-  const [kpis, setKpis] = useState<KPI[]>([
-    { title: 'Total Revenue', value: '₹348,250.00', change: '+14.2%', isPositive: true },
-    { title: 'Total Orders', value: '1,482', change: '+8.5%', isPositive: true },
-    { title: 'Average Order Value (AOV)', value: '₹2,350.00', change: '+3.1%', isPositive: true },
-    { title: 'Order Conversion Rate', value: '3.8%', change: '+1.2%', isPositive: true },
-    { title: 'Abandoned Cart Recovery', value: '24.8%', change: '+4.1%', isPositive: true },
-    { title: 'Scent Quiz Match Conversion', value: '18.5%', change: '+2.3%', isPositive: true },
-  ]);
-
-  const [salesTrend, setSalesTrend] = useState<SalesTrend[]>([
-    { name: 'Mon', sales: 4200, orders: 14 },
-    { name: 'Tue', sales: 3800, orders: 11 },
-    { name: 'Wed', sales: 9800, orders: 28 },
-    { name: 'Thu', sales: 4780, orders: 16 },
-    { name: 'Fri', sales: 8890, orders: 31 },
-    { name: 'Sat', sales: 12400, orders: 42 },
-    { name: 'Sun', sales: 15800, orders: 55 },
-  ]);
-
-  const [categoryData, setCategoryData] = useState<CategoryData[]>([
-    { name: 'Eau de Parfum (EDP)', value: 520, color: '#8b5cf6' },
-    { name: 'Attar & CPO', value: 310, color: '#ec4899' },
-    { name: 'Scent Shots', value: 240, color: '#10b981' },
-    { name: 'Oud Collection', value: 180, color: '#f59e0b' },
-    { name: 'Body Mists', value: 120, color: '#3b82f6' },
-  ]);
-
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([
-    { rank: 1, title: 'Ahmed Al Maghribi Exotic EDP (100ml)', units: 142, revenue: '₹2,84,000.00', sku: 'AAM-EXOTIC-100' },
-    { rank: 2, title: 'MPF L\'amour EDP (100ml)', units: 118, revenue: '₹2,36,000.00', sku: 'MPF-LAMOUR-100' },
-    { rank: 3, title: 'Ahmed Al Maghribi Ignite Oud (60ml)', units: 94, revenue: '₹3,28,960.00', sku: 'AAM-IGNITE-60' },
-    { rank: 4, title: 'Lomani Code EDP (100ml)', units: 86, revenue: '₹1,28,914.00', sku: 'LOM-CODE-100' },
-    { rank: 5, title: 'Lattafa Khamrah EDP (100ml)', units: 72, revenue: '₹1,87,128.00', sku: 'LAT-KHAM-100' },
-  ]);
-
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
-    { method: 'Cash on Delivery (COD)', percentage: '62%', count: '918 orders' },
-    { method: 'Online UPI / Cards (Razorpay)', percentage: '38%', count: '564 orders' },
-  ]);
-
-  const [liveVisitors, setLiveVisitors] = useState(32);
-
+  const [kpis, setKpis] = useState<KPI[]>([]);
+  const [salesTrend, setSalesTrend] = useState<SalesTrend[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [notes, setNotes] = useState<string[]>([]);
+  const [error, setError] = useState('');
+  const [generatedAt, setGeneratedAt] = useState('');
+  const requestId = React.useRef(0);
   const fetchAnalytics = async (tf: string) => {
+    const id = ++requestId.current;
     try {
       setLoading(true);
+      setError('');
+      setGeneratedAt('');
       const data = await apiFetch(`/shop/analytics/?timeframe=${tf}`);
+      if (id !== requestId.current) return;
+      if (!data || !Array.isArray(data.notes)) throw new Error('Invalid report response; update the backend.');
       if (data) {
         if (data.kpis) setKpis(data.kpis);
         if (data.salesTrend) setSalesTrend(data.salesTrend);
         if (data.categoryData) setCategoryData(data.categoryData);
         if (data.topProducts) setTopProducts(data.topProducts);
         if (data.paymentMethods) setPaymentMethods(data.paymentMethods);
-        if (data.liveVisitors) setLiveVisitors(data.liveVisitors);
+        setNotes(data.notes);
+        setGeneratedAt(data.generatedAt);
       }
     } catch (err) {
-      console.warn('Analytics API call failed. Rendering client analytics arrays.');
+      if (id === requestId.current) {
+        setKpis([]); setSalesTrend([]); setCategoryData([]); setTopProducts([]); setPaymentMethods([]);
+        setError(err instanceof Error ? err.message : 'Unable to load report');
+      }
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   };
 
@@ -140,9 +116,11 @@ export default function AnalyticsPage() {
     if (user) {
       fetchAnalytics(timeframe);
     }
+    return () => { requestId.current++; };
   }, [user, timeframe]);
 
   const handleExportCSV = () => {
+    if (loading || error || !generatedAt) return;
     const csvRows = [
       ['PerfumeBooth Store Analytics Report'],
       [`Generated Date: ${new Date().toLocaleDateString()}`],
@@ -153,16 +131,27 @@ export default function AnalyticsPage() {
       [''],
       ['Top Selling Products', 'SKU', 'Units Sold', 'Revenue'],
       ...topProducts.map(p => [p.title, p.sku, p.units.toString(), p.revenue]),
+      [], ['Date', 'Fully paid sales INR', 'Orders placed'],
+      ...salesTrend.map(d => [d.name, d.sales, d.orders]),
+      [], ['Current category', 'Gross merchandise revenue INR'],
+      ...categoryData.map(c => [c.name, c.value]),
+      [], ['Payment method', 'Share of placed orders', 'Count'],
+      ...paymentMethods.map(p => [p.method, p.percentage, p.count]),
+      [], ['Generated', generatedAt], ['Timezone', 'Asia/Kolkata'],
+      ...notes.map(n => [n]),
     ];
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = '\uFEFF' + csvRows.map(row => row.map(value => {
+      let cell = String(value ?? '');
+      if (/^\s*[=+@-]/.test(cell) || /^[\t\r\n]/.test(cell)) cell = "'" + cell;
+      return '"' + cell.replace(/"/g, '""') + '"';
+    }).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `perfumebooth_analytics_${timeframe}.csv`);
-    document.body.appendChild(link);
+    link.href = url;
+    link.download = `perfumebooth_analytics_${timeframe}.csv`;
     link.click();
-    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   if (!mounted) {
@@ -177,11 +166,11 @@ export default function AnalyticsPage() {
           <div className="flex items-center gap-2.5">
             <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Analytics & Reports</h1>
             <span className="px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-primary">
-              Live BI
+              Order data
             </span>
           </div>
           <p className="text-muted-foreground text-sm mt-1">
-            Deep insights into store revenue, conversion rates, fragrance trends, and customer metrics
+            INR order reports • Asia/Kolkata • Current payment status grouped by order creation date
           </p>
         </div>
 
@@ -206,6 +195,7 @@ export default function AnalyticsPage() {
           <button
             type="button"
             onClick={handleExportCSV}
+            disabled={loading || !!error || !generatedAt}
             className="flex items-center gap-2 px-4 py-2 neu-btn-primary font-bold rounded-2xl text-xs transition cursor-pointer"
           >
             <Download className="w-4 h-4" />
@@ -219,19 +209,25 @@ export default function AnalyticsPage() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <span className="text-xs font-bold text-emerald-500">
-              {liveVisitors} Live Shoppers
+              Visitors: Not tracked
             </span>
           </div>
         </div>
       </div>
 
+      {error && <div role="alert" className="border border-red-500 rounded-xl p-4">Report unavailable: {error} <button className="underline ml-3" onClick={() => fetchAnalytics(timeframe)}>Retry</button></div>}
       {loading ? (
         <div className="h-64 w-full flex flex-col items-center justify-center gap-3 text-primary">
           <Loader2 className="w-8 h-8 animate-spin" />
           <span className="text-xs font-semibold text-muted-foreground">Aggregating store metrics...</span>
         </div>
-      ) : (
+      ) : !error && generatedAt ? (
         <>
+          <section className="bg-card p-5 rounded-xl text-sm">
+            <h2 className="font-bold mb-2">Report definitions and limitations</h2>
+            <ul className="list-disc pl-5 space-y-2">{notes.map(note => <li key={note}>{note}</li>)}</ul>
+          </section>
+          {topProducts.length === 0 && <p role="status" className="text-sm text-muted-foreground">No qualifying paid product sales in this period.</p>}
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {kpis.map((kpi, idx) => (
@@ -269,7 +265,7 @@ export default function AnalyticsPage() {
             <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 lg:col-span-2 flex flex-col gap-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-extrabold text-foreground text-lg">Revenue & Order Volume Trajectory</h3>
+                  <h3 className="font-extrabold text-foreground text-lg">Fully paid sales by day</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">Daily sales curve and order volume breakdown</p>
                 </div>
                 <span className="text-xs text-primary font-bold neu-inset-sm px-3 py-1 rounded-full flex items-center gap-1.5">
@@ -301,7 +297,7 @@ export default function AnalyticsPage() {
             <div className="bg-card neu-extruded p-7 rounded-3xl border border-border/10 flex flex-col gap-6">
               <div>
                 <h3 className="font-extrabold text-foreground text-lg">Fragrance Category Share</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Revenue breakdown by scent type</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Gross merchandise revenue by current category</p>
               </div>
               <div className="h-60 w-full flex justify-center items-center neu-inset rounded-2xl p-2">
                 <ResponsiveContainer width="100%" height="100%">
@@ -332,7 +328,7 @@ export default function AnalyticsPage() {
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
                       <span className="text-muted-foreground font-medium">{item.name}</span>
                     </div>
-                    <span className="font-bold text-foreground">{item.value} bottles</span>
+                    <span className="font-bold text-foreground">₹{item.value.toLocaleString('en-IN')}</span>
                   </div>
                 ))}
               </div>
@@ -350,7 +346,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div>
                     <h3 className="font-extrabold text-foreground text-lg">Top Selling Perfumes Leaderboard</h3>
-                    <p className="text-xs text-muted-foreground">Highest revenue fragrance references</p>
+                    <p className="text-xs text-muted-foreground">Historical line prices × quantities, before order-level adjustments</p>
                   </div>
                 </div>
                 <span className="text-xs text-muted-foreground font-bold neu-inset-sm px-3 py-1 rounded-full uppercase tracking-wider">Top 5 Performers</span>
@@ -363,7 +359,7 @@ export default function AnalyticsPage() {
                       <th className="p-3.5">Perfume Title</th>
                       <th className="p-3.5">SKU</th>
                       <th className="p-3.5">Units Sold</th>
-                      <th className="p-3.5 text-right">Total Revenue</th>
+                      <th className="p-3.5 text-right">Gross Merchandise Revenue</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/20">
@@ -398,7 +394,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-foreground text-lg">Payment Method Split</h3>
-                  <p className="text-xs text-muted-foreground">COD vs Online Payment Gateways</p>
+                  <p className="text-xs text-muted-foreground">Share of all orders placed, including unpaid orders</p>
                 </div>
               </div>
               <div className="flex flex-col gap-5 my-auto">
@@ -421,7 +417,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

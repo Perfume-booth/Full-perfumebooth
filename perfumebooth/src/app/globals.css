@@ -451,179 +451,209 @@
 
 /* ─── Rich Text Content (CMS pages / policy body) ─── */
 
-/* Base */
 .rich-text {
   color: var(--color-text-primary);
   font-size: 0.9375rem;
   line-height: 1.9;
 }
 
-/* ── Headings ── */
 .rich-text h1 {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.45rem;
-  font-weight: 700;
+  border-bottom: 2px solid var(--color-border);
   margin: 2.5rem 0 1rem;
   padding-bottom: 0.6rem;
-  border-bottom: 2px solid var(--color-border);
+  font-family: var(--font-serif), "Cormorant Garamond", serif;
+  font-size: 1.45rem;
+  font-weight: 700;
   position: relative;
+  color: var(--color-text-primary);
 }
-.rich-text h1::after {
+
+.rich-text h1:after {
   content: "";
+  background: var(--color-gold);
+  width: 48px;
+  height: 2px;
   position: absolute;
   bottom: -2px;
   left: 0;
-  width: 48px;
-  height: 2px;
-  background: var(--color-gold);
 }
 
 .rich-text h2 {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
+  border-left: 3px solid var(--color-gold);
+  background: linear-gradient(90deg, rgba(184, 146, 74, 0.06), transparent);
+  border-radius: 0 6px 6px 0;
   margin: 2.5rem 0 0.75rem;
   padding: 0.6rem 1rem;
-  border-left: 3px solid var(--color-gold);
-  background: linear-gradient(90deg, rgba(184,146,74,0.06) 0%, transparent 100%);
-  border-radius: 0 6px 6px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.rich-text h2,
+.rich-text h3 {
+  color: var(--color-text-primary);
+  font-family: var(--font-serif), "Cormorant Garamond", serif;
 }
 
 .rich-text h3 {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
+  border-left: 2px solid var(--color-gold-light);
   margin: 1.75rem 0 0.5rem;
   padding-left: 0.75rem;
-  border-left: 2px solid var(--color-gold-light);
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .rich-text h4,
 .rich-text h5,
 .rich-text h6 {
-  font-weight: 600;
   color: var(--color-text-primary);
   margin: 1.25rem 0 0.4rem;
+  font-weight: 600;
 }
 
-/* ── Paragraphs ── */
 .rich-text p {
-  margin-bottom: 1.1rem;
   color: var(--color-text-primary);
+  margin-bottom: 1.1rem;
+  line-height: 1.9;
 }
 
-/* ── Links ── */
 .rich-text a {
   color: var(--color-gold);
   text-decoration: underline;
   text-underline-offset: 3px;
-  transition: color 150ms ease, text-decoration-color 150ms ease;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
+
 .rich-text a:hover {
   color: var(--color-gold-dark);
 }
 
-/* ── Bold / Strong ── */
 .rich-text strong,
 .rich-text b {
   color: var(--color-text-primary);
   font-weight: 600;
 }
 
-/* ── Ordered List — numbered with gold counter ── */
 .rich-text ol {
-  list-style: none;
   counter-reset: policy-counter;
-  margin: 1rem 0 1.25rem 0;
+  margin: 1rem 0 1.25rem;
   padding: 0;
+  list-style: none;
 }
+
 .rich-text ol > li {
   counter-increment: policy-counter;
-  position: relative;
-  padding: 0.55rem 0.75rem 0.55rem 2.75rem;
-  margin-bottom: 0.5rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
   color: var(--color-text-primary);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.75rem 0.55rem 2.75rem;
   line-height: 1.7;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
 }
+
 .rich-text ol > li:hover {
   border-color: var(--color-gold-light);
   box-shadow: var(--shadow-card);
 }
-.rich-text ol > li::before {
+
+.rich-text ol > li:before {
   content: counter(policy-counter);
-  position: absolute;
-  left: 0.7rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1.5rem;
-  height: 1.5rem;
   background: var(--color-gold);
   color: #fff;
+  border-radius: 50%;
+  justify-content: center;
+  align-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
   font-size: 0.7rem;
   font-weight: 700;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   line-height: 1;
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 0.7rem;
+  transform: translateY(-50%);
 }
 
-/* ── Unordered List — disc with gold bullet ── */
 .rich-text ul {
-  list-style: none;
-  margin: 1rem 0 1.25rem 0;
+  margin: 1rem 0 1.25rem;
   padding: 0;
+  list-style: none;
 }
+
 .rich-text ul > li {
-  position: relative;
-  padding: 0.3rem 0.5rem 0.3rem 1.75rem;
-  margin-bottom: 0.4rem;
   color: var(--color-text-primary);
+  margin-bottom: 0.4rem;
+  padding: 0.3rem 0.5rem 0.3rem 1.75rem;
   line-height: 1.75;
+  position: relative;
 }
-.rich-text ul > li::before {
+
+.rich-text ul > li:before {
   content: "";
-  position: absolute;
-  left: 0.35rem;
-  top: 0.72rem;
-  width: 7px;
-  height: 7px;
   background: var(--color-gold);
   border-radius: 50%;
   flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  position: absolute;
+  top: 0.72rem;
+  left: 0.35rem;
 }
 
-/* ── Nested lists ── */
 .rich-text ol ol,
-.rich-text ul ul,
 .rich-text ol ul,
-.rich-text ul ol {
+.rich-text ul ol,
+.rich-text ul ul {
   margin: 0.4rem 0 0.4rem 1rem;
 }
 
-/* ── Blockquote ── */
 .rich-text blockquote {
   border-left: 4px solid var(--color-gold);
-  background: linear-gradient(90deg, rgba(184,146,74,0.05) 0%, transparent 100%);
-  padding: 1rem 1.25rem;
-  margin: 1.5rem 0;
-  border-radius: 0 8px 8px 0;
-  font-style: italic;
   color: var(--color-text-secondary);
+  background: linear-gradient(90deg, rgba(184, 146, 74, 0.05), transparent);
+  border-radius: 0 8px 8px 0;
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  font-style: italic;
 }
 
-/* ── HR ── */
 .rich-text hr {
+  background: linear-gradient(90deg, transparent, var(--color-border), transparent);
   border: none;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--color-border), transparent);
   margin: 2.5rem 0;
+}
+
+.rich-text * {
+  max-width: 100%;
+}
+
+.rich-text img {
+  border-radius: 8px;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem 0;
+  display: block;
+}
+
+.rich-text table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+.rich-text td,
+.rich-text th {
+  border: 1px solid var(--color-border);
+  padding: 0.75rem 1rem;
+}
+
+.rich-text th {
+  background: var(--color-surface);
+  font-weight: 600;
 }
 
 /* ─── Custom Scrollbar Utility ─── */

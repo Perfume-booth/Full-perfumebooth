@@ -9,17 +9,14 @@ export default async function NewLaunchesSection() {
   let latestProducts: Product[] = [];
   try {
     const latestCollection = await getCollection("new", 20);
-    latestProducts = latestCollection?.products?.edges?.map((edge: any) => edge.node) || [];
-    if (!latestProducts || latestProducts.length < 4) {
-      const col = await getCollection("new", 20);
-      const colProducts = (col?.products?.edges?.map((e: any) => e.node) || []) as Product[];
-      latestProducts = Array.from(new Map([...latestProducts, ...colProducts].map(p => [p.id, p])).values());
-    }
-    if (latestProducts.length === 0) {
-      latestProducts = await getProducts(20);
-    }
+    latestProducts = latestCollection?.products?.edges?.map((edge) => edge.node) || [];
   } catch (err) {
     console.error("Error fetching latest products for NewLaunchesSection:", err);
+  }
+
+  // A failed collection request must not skip the catalog fallback.
+  if (latestProducts.length === 0) {
+    latestProducts = await getProducts(20);
   }
 
   return (

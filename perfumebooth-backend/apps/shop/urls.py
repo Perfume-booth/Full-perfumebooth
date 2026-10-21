@@ -1,5 +1,6 @@
 # pyrefly: ignore [missing-import]
 from django.urls import path, include
+from .report_views import ReportCatalogView, ReportDetailView
 from .views import (
     ProductListView, ProductDetailView, DashboardAnalyticsView, AnalyticsAPIView, BrandListView, 
     ProductFacetsView, CollectionListCreateView, CollectionDetailView,
@@ -12,6 +13,8 @@ from .views import (
 )
 
 urlpatterns = [
+    path('reports/', ReportCatalogView.as_view(), name='report-catalog'),
+    path('reports/<slug:report_id>/', ReportDetailView.as_view(), name='report-detail'),
     path('products/advanced-import/', include('apps.shop.advanced_import_urls')),
     path('products/', ProductListView.as_view(), name='product-list'),
     path('products/excel-export/', ProductExcelExportView.as_view(), name='product-excel-export'),

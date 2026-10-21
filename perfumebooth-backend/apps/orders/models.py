@@ -197,6 +197,9 @@ class OrderItem(models.Model):
     sku = models.CharField(max_length=200, blank=True, default='')
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_cost_snapshot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    brand_snapshot = models.CharField(max_length=255, blank=True, default='')
+    category_snapshot = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         db_table = 'orders_order_item'
