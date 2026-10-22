@@ -20,6 +20,7 @@ import {
   Plus
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import ResizableTextarea from '@/components/ui/ResizableTextarea';
 
 interface OrderItemSummary {
   id: string;
@@ -148,7 +149,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-extrabold text-foreground tracking-tight">{customer.full_name}</h1>
               {customer.is_active ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-emerald-600">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold neu-inset-sm text-emerald-800 dark:text-emerald-300">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                   Active Account
                 </span>
@@ -170,7 +171,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-2xl neu-btn transition-all cursor-pointer ${
             customer.is_active
               ? 'text-destructive hover:text-destructive'
-              : 'text-emerald-600 hover:text-emerald-700'
+              : 'text-emerald-800 hover:text-emerald-900 dark:text-emerald-300'
           }`}
         >
           {customer.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
@@ -258,8 +259,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                         <td className="py-3.5 px-4">
                           <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold neu-inset-sm ${
                             o.status === 'Paid' || o.status === 'Delivered'
-                              ? 'text-emerald-600'
-                              : 'text-amber-600'
+                              ? 'text-emerald-800 dark:text-emerald-300'
+                              : 'text-amber-700'
                           }`}>
                             {o.status}
                           </span>
@@ -365,13 +366,13 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-muted-foreground mb-1.5">Internal Staff Notes</label>
-                <textarea
+                <ResizableTextarea
+                  label="Internal Staff Notes"
                   rows={4}
                   placeholder="Add private staff notes regarding preferences or customer service requests..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full p-3.5 text-xs neu-input rounded-2xl font-medium resize-none"
+                  minHeight={80}
                 />
               </div>
             </div>

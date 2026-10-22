@@ -254,6 +254,11 @@ class CheckoutServiceTests(TestCase):
         Coupon.objects.create(code='SAVE10', discount_type=Coupon.DiscountType.PERCENTAGE, discount_value=10, is_active=True)
 
     def test_successful_checkout_end_to_end(self):
+        self.prod1.cost_per_item = Decimal('200.00')
+        self.prod1.attributes = {'brand': 'Test House', 'category': 'Perfume'}
+        self.prod1.save()
+        self.prod2_var.cost_price = Decimal('90.00')
+        self.prod2_var.save()
         checkout_input = CheckoutInput(
             items=[
                 CartItemInput(product_id=str(self.prod1.id), quantity=1),
@@ -293,6 +298,15 @@ class CheckoutServiceTests(TestCase):
         self.assertEqual(variant_item.product_title, self.prod2.title)
         self.assertEqual(variant_item.variant_title, self.prod2_var.title)
         self.assertEqual(variant_item.sku, self.prod2_var.sku)
+        self.assertEqual(variant_item.unit_cost_snapshot, Decimal('90.00'))
+        simple_item = order.items.get(product=self.prod1)
+        self.assertEqual(simple_item.unit_cost_snapshot, Decimal('200.00'))
+        self.assertEqual(simple_item.brand_snapshot, 'Test House')
+        self.assertEqual(simple_item.category_snapshot, 'Perfume')
+        self.prod1.cost_per_item = Decimal('999.00')
+        self.prod1.save()
+        simple_item.refresh_from_db()
+        self.assertEqual(simple_item.unit_cost_snapshot, Decimal('200.00'))
 
         # Verify stock decrement
         inv1 = Inventory.objects.get(product=self.prod1)

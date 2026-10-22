@@ -1,5 +1,9 @@
-import { sendGTMEvent } from '@next/third-parties/google';
+import { sendGAEvent } from '@next/third-parties/google';
 import type { Product } from '@/types/product';
+import { analyticsAllowed, trackFirstParty } from './first-party-analytics';
+const sendGTMEvent = (data: { event: string; ecommerce: Record<string, unknown> }) => {
+  if (analyticsAllowed() && process.env.NEXT_PUBLIC_GA_ID) sendGAEvent('event', data.event, data.ecommerce);
+};
 
 // Map database product to GA4 E-commerce Item format
 const mapProductToGA4Item = (product: any, quantity: number = 1) => {
@@ -30,6 +34,8 @@ const mapProductToGA4Item = (product: any, quantity: number = 1) => {
  * Track view_item_list (Product Listing Page)
  */
 export const trackViewItemList = (products: Product[], collectionTitle?: string) => {
+  if (!analyticsAllowed()) return;
+  trackFirstParty('view_item_list');
   if (!products || products.length === 0) return;
   try {
     sendGTMEvent({
@@ -51,6 +57,8 @@ export const trackViewItemList = (products: Product[], collectionTitle?: string)
  * Track view_item (Product Details Page)
  */
 export const trackViewItem = (product: Product) => {
+  if (!analyticsAllowed()) return;
+  if (product) trackFirstParty('view_item', { product_id: String(product.id) });
   if (!product) return;
   try {
     sendGTMEvent({
@@ -70,6 +78,8 @@ export const trackViewItem = (product: Product) => {
  * Track add_to_cart (Button Click)
  */
 export const trackAddToCart = (product: Product, quantity: number = 1) => {
+  if (!analyticsAllowed()) return;
+  if (product) trackFirstParty('add_to_cart', { product_id: String(product.id), quantity });
   if (!product) return;
   try {
     const item = mapProductToGA4Item(product, quantity);
@@ -90,6 +100,8 @@ export const trackAddToCart = (product: Product, quantity: number = 1) => {
  * Track begin_checkout (Checkout Page Start)
  */
 export const trackBeginCheckout = (items: any[], total: number) => {
+  if (!analyticsAllowed()) return;
+  trackFirstParty('begin_checkout');
   if (!items || items.length === 0) return;
   try {
     sendGTMEvent({
@@ -114,19 +126,6 @@ export const trackPurchase = (
   total: number,
   coupon?: string
 ) => {
-  if (!items || items.length === 0) return;
-  try {
-    sendGTMEvent({
-      event: 'purchase',
-      ecommerce: {
-        transaction_id: orderId,
-        value: total,
-        currency: 'INR',
-        coupon: coupon || undefined,
-        items: items.map((item) => mapProductToGA4Item(item, item.cartQuantity || 1)),
-      },
-    });
-  } catch (err) {
-    console.error('Error tracking purchase:', err);
-  }
+  // The thank-you page is not proof of payment. Purchases are derived from Django.
+  return;
 };

@@ -27,6 +27,7 @@ import {
   FileText 
 } from 'lucide-react';
 import ImageUploadPicker from '@/components/cms/ImageUploadPicker';
+import ResizableTextarea from '@/components/ui/ResizableTextarea';
 
 const CKEditorWrapper = dynamic(() => import('@/components/cms/CKEditorWrapper'), {
   ssr: false,
@@ -162,99 +163,14 @@ function InfoPagesContent() {
 
   const currentPageMeta = INFO_PAGES.find(p => p.slug === selectedSlug) || INFO_PAGES[0];
   const PageIcon = currentPageMeta.icon;
-  const activePageIndex = Math.max(0, INFO_PAGES.findIndex(p => p.slug === selectedSlug));
-
   return (
     <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
       {/* ─────────────────────────────────────────────────────────────────────────────
-         HORIZONTAL PAGE SELECTOR (Replaces former left column)
+         HORIZONTAL PAGE SELECTOR (Quick-Select Pills + Actions)
          ───────────────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2.5 bg-card neu-extruded px-6 py-4 rounded-3xl border border-border/10 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-border/15">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-primary" />
-              <span>Page:</span>
-            </span>
-
-            {/* Dropdown Selector */}
-            <div className="relative">
-              <select
-                value={selectedSlug}
-                onChange={(e) => setSelectedSlug(e.target.value)}
-                className="px-4 py-2 bg-background neu-input rounded-2xl text-xs font-extrabold text-foreground cursor-pointer pr-9 focus:ring-2 focus:ring-primary/20 appearance-none"
-              >
-                {INFO_PAGES.map((page, idx) => (
-                  <option key={page.slug} value={page.slug}>
-                    #{idx + 1} — {page.title}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* Prev / Next Step Buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={activePageIndex === 0}
-                onClick={() => {
-                  const prevSlug = INFO_PAGES[Math.max(0, activePageIndex - 1)].slug;
-                  setSelectedSlug(prevSlug);
-                }}
-                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
-                title="Previous page"
-              >
-                <span>←</span>
-                <span>Prev</span>
-              </button>
-              <button
-                type="button"
-                disabled={activePageIndex === INFO_PAGES.length - 1}
-                onClick={() => {
-                  const nextSlug = INFO_PAGES[Math.min(INFO_PAGES.length - 1, activePageIndex + 1)].slug;
-                  setSelectedSlug(nextSlug);
-                }}
-                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
-                title="Next page"
-              >
-                <span>Next</span>
-                <span>→</span>
-              </button>
-            </div>
-
-            <span className="text-[11px] font-mono text-muted-foreground hidden sm:inline">
-              /{selectedSlug}
-            </span>
-          </div>
-
-          {/* Action Buttons: Preview & Save */}
-          <div className="flex items-center gap-2.5">
-            <a
-              href={`http://localhost:3000/${selectedSlug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 neu-btn rounded-xl text-xs font-bold text-foreground flex items-center gap-1.5 cursor-pointer"
-              title="View this page live on storefront"
-            >
-              <span>Preview Page</span>
-              <ExternalLink className="w-3.5 h-3.5 text-primary" />
-            </a>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-5 py-2 neu-btn-primary rounded-xl text-xs font-bold flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              <span>{saveSuccess ? 'Saved Successfully!' : 'Save Page'}</span>
-            </button>
-          </div>
-        </div>
-
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card neu-extruded px-6 py-3 rounded-3xl border border-border/10 shrink-0">
         {/* Horizontal Quick-Select Pills Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-border/40">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-thin scrollbar-thumb-border/40 max-w-full flex-1">
           {INFO_PAGES.map((page, idx) => {
             const Icon = page.icon;
             const isSelected = selectedSlug === page.slug;
@@ -277,6 +193,30 @@ function InfoPagesContent() {
               </button>
             );
           })}
+        </div>
+
+        {/* Action Buttons: Preview & Save */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <a
+            href={`http://localhost:3000/${selectedSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 neu-btn rounded-xl text-xs font-bold text-foreground flex items-center gap-1.5 cursor-pointer"
+            title="View this page live on storefront"
+          >
+            <span>Preview Page</span>
+            <ExternalLink className="w-3.5 h-3.5 text-primary" />
+          </a>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-5 py-2 neu-btn-primary rounded-xl text-xs font-bold flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{saveSuccess ? 'Saved Successfully!' : 'Save Page'}</span>
+          </button>
         </div>
       </div>
 
@@ -459,13 +399,9 @@ function InfoPagesContent() {
                     />
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-primary" />
-                      <span>Warehouse / Registered Office</span>
-                    </label>
-                    <input
-                      type="text"
+                  <div className="flex flex-col gap-1.5 md:col-span-2">
+                    <ResizableTextarea
+                      label="Warehouse / Registered Office"
                       value={contactSec?.content?.address || ''}
                       onChange={(e) => {
                         const list = [...sections];
@@ -484,7 +420,8 @@ function InfoPagesContent() {
                         setSections(list);
                       }}
                       placeholder="70B/35A, Rama Road Industrial Area, New Delhi – 110015"
-                      className="px-3.5 py-2 neu-input rounded-xl text-xs"
+                      rows={2}
+                      minHeight={60}
                     />
                   </div>
                 </div>
@@ -611,7 +548,7 @@ function InfoPagesContent() {
                         className="px-3.5 py-2 neu-input rounded-xl text-xs font-bold"
                       />
 
-                      <textarea
+                      <ResizableTextarea
                         value={faq.a || ''}
                         onChange={(e) => {
                           const list = [...sections];
@@ -624,8 +561,8 @@ function InfoPagesContent() {
                           }
                         }}
                         rows={2}
+                        minHeight={65}
                         placeholder="Answer details..."
-                        className="px-3.5 py-2 neu-input rounded-xl text-xs resize-none"
                       />
                     </div>
                   ))}

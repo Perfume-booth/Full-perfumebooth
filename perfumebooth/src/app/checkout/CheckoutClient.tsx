@@ -18,6 +18,7 @@ import { toast, Toaster } from "react-hot-toast";
 import ShippingMethods from "./components/ShippingMethods";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackBeginCheckout } from "@/lib/analytics";
+import { analyticsToken } from '@/lib/first-party-analytics';
 
 let activeCheckoutInstances = 0;
 
@@ -323,6 +324,7 @@ export default function CheckoutClient({ customer }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': checkoutRetryKey() },
         body: JSON.stringify({
+          analyticsToken: analyticsToken(),
           items,
           form,
           finalTotal,
@@ -430,6 +432,7 @@ export default function CheckoutClient({ customer }: Props) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Idempotency-Key': checkoutRetryKey() },
           body: JSON.stringify({
+            analyticsToken: analyticsToken(),
             items,
             form,
             finalTotal,

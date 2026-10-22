@@ -10,7 +10,7 @@ import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import MaterialSymbolsInjector from "@/components/layout/MaterialSymbolsInjector";
-import { GoogleAnalytics, GoogleTagManager } from "@next/third-parties/google";
+import AnalyticsConsent from '@/components/layout/AnalyticsConsent';
 import ClientSideHydrators from "@/components/layout/ClientSideHydrators";
 
 const cormorant = Cormorant_Garamond({
@@ -69,7 +69,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" className={`${inter.variable} ${cormorant.variable}`} suppressHydrationWarning>
-      <GoogleTagManager gtmId="GTM-PLC7P2NZ" />
       <head>
         <script
           type="application/ld+json"
@@ -96,9 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Global overlays & Client Hydrators */}
         <MaterialSymbolsInjector />
         <ClientSideHydrators />
-        {process.env.NEXT_PUBLIC_GA_ID && (
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
-        )}
+        <AnalyticsConsent />
       </body>
     </html>
   );

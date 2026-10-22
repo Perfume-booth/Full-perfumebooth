@@ -207,7 +207,7 @@ export default function SingleFieldUpdatePage() {
             <div className="neu-inset p-6 rounded-3xl flex flex-col justify-between">
               <div>
                 <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
                   Isolated Change Diff
                 </h3>
 
@@ -226,14 +226,14 @@ export default function SingleFieldUpdatePage() {
                         <strong className="text-foreground font-semibold break-all">{currentValue || '(Blank)'}</strong>
                       </div>
                       <div className="neu-inset-sm p-3.5 rounded-2xl">
-                        <span className="text-emerald-600 text-[10px] uppercase font-bold block mb-1">NEW VALUE</span>
+                        <span className="text-emerald-800 dark:text-emerald-300 text-[10px] uppercase font-bold block mb-1">NEW VALUE</span>
                         <strong className="text-foreground font-semibold break-all">
                           {isCleared ? <em className="text-rose-600 font-bold">(CLEARED)</em> : newValue || '(Blank)'}
                         </strong>
                       </div>
                     </div>
 
-                    <div className="p-3.5 neu-inset-sm text-emerald-600 dark:text-emerald-400 rounded-2xl text-xs flex items-center gap-2 font-semibold">
+                    <div className="p-3.5 neu-inset-sm text-emerald-800 dark:text-emerald-300 rounded-2xl text-xs flex items-center gap-2 font-semibold">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
                       <span>All other catalog fields remain <strong>UNCHANGED</strong> and safe.</span>
                     </div>

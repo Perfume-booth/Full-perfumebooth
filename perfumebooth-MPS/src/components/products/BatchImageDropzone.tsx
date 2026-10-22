@@ -309,7 +309,7 @@ export default function BatchImageDropzone({
                     <img
                       src={item.previewUrl}
                       alt={`Featured ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      className="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-200"
                     />
 
                     {/* Featured number badge */}

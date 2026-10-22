@@ -280,7 +280,7 @@ export default function BulkOperationsPage() {
 
         {/* Applied Alert Feedback */}
         {appliedCount !== null && (
-          <div className="p-4 neu-inset-sm text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-2xl flex items-center gap-2">
+          <div className="p-4 neu-inset-sm text-emerald-800 dark:text-emerald-400 text-xs font-bold rounded-2xl flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>Successfully updated field across {appliedCount} products!</span>
           </div>
@@ -299,7 +299,7 @@ export default function BulkOperationsPage() {
             </button>
             <button
               onClick={() => router.push('/csv-editor/review')}
-              className="px-6 py-3 neu-btn text-emerald-600 hover:text-emerald-700 text-xs font-bold rounded-2xl cursor-pointer transition-all flex items-center gap-2"
+              className="px-6 py-3 neu-btn text-emerald-800 hover:text-emerald-900 dark:text-emerald-300 text-xs font-bold rounded-2xl cursor-pointer transition-all flex items-center gap-2"
             >
               Review Changes <ArrowRight className="w-4 h-4" />
             </button>

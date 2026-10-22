@@ -81,7 +81,7 @@ export default function ExportCenterPage() {
         {/* Export Control Panel */}
         <div className="md:col-span-2 bg-card neu-extruded p-6 sm:p-8 rounded-3xl border-0 flex flex-col gap-6">
           <div className="flex items-center gap-4 border-b border-border/50 pb-4">
-            <div className="p-3 bg-card neu-inset-sm rounded-2xl text-emerald-600">
+            <div className="p-3 bg-card neu-inset-sm rounded-2xl text-emerald-800 dark:text-emerald-400">
               <Download className="w-6 h-6" />
             </div>
             <div>
@@ -106,10 +106,10 @@ export default function ExportCenterPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4" /> SAFE MINIMAL UPDATE
                   </span>
-                  {exportMode === 'MINIMAL' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                  {exportMode === 'MINIMAL' && <CheckCircle2 className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />}
                 </div>
                 <p className="text-[11px] leading-relaxed font-medium">
                   Exports <strong>ONLY</strong> product handles, required identifiers, and explicitly edited fields. Untouched catalog data remains unchanged.
@@ -189,7 +189,7 @@ export default function ExportCenterPage() {
                   </span>
                 </div>
               ) : (
-                <div className="p-4 neu-inset-sm text-emerald-600 dark:text-emerald-400 text-xs rounded-2xl flex items-center gap-2 font-bold">
+                <div className="p-4 neu-inset-sm text-emerald-800 dark:text-emerald-400 text-xs rounded-2xl flex items-center gap-2 font-bold">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>Ready for export! Zero blocking errors detected.</span>
                 </div>

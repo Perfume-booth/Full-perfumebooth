@@ -420,6 +420,14 @@ class RazorpayWebhookView(APIView):
         if not isinstance(event, dict):
             return Response({'detail': 'Invalid event.'}, status=400)
         event_type = event.get('event')
+        if event_type == 'refund.processed':
+            from .payment_ledger import record_refund
+            try:
+                refund = event['payload']['refund']['entity']
+            except (KeyError, TypeError):
+                return Response({'detail': 'Malformed refund event.'}, status=400)
+            record_refund(refund, event.get('created_at'))
+            return Response({'detail': 'OK'}, status=200)
         if event_type not in {'payment.captured', 'payment.failed', 'payment.authorized'}:
             return Response({'detail': 'Event not handled.'}, status=status.HTTP_200_OK)
 

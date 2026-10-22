@@ -25,18 +25,12 @@ import {
   Compass, 
   Tag, 
   Camera, 
-  ShoppingBag, 
   Plus, 
   FileText,
   ChevronsUpDown
 } from 'lucide-react';
 import ImageUploadPicker from '@/components/cms/ImageUploadPicker';
 import AccordionItem from '@/components/cms/AccordionItem';
-
-const CKEditorWrapper = dynamic(() => import('@/components/cms/CKEditorWrapper'), {
-  ssr: false,
-  loading: () => <div className="p-4 bg-muted border border-border rounded-xl text-xs text-muted-foreground animate-pulse">Loading CKEditor...</div>
-});
 
 interface CMSSection {
   id?: string;
@@ -206,10 +200,6 @@ export default function CMSBuilderPage() {
       case 'BrandSlider': return <Tag className="w-4 h-4 text-emerald-500" />;
       case 'InstagramFeed': return <Camera className="w-4 h-4 text-pink-500" />;
       case 'TopCategories': return <Compass className="w-4 h-4 text-indigo-500" />;
-      case 'TrendingSection':
-      case 'BestSellerSection':
-      case 'NewLaunches':
-      case 'ProductCarousel': return <ShoppingBag className="w-4 h-4 text-amber-500" />;
       default: return <Layers className="w-4 h-4 text-primary" />;
     }
   };
@@ -280,112 +270,11 @@ export default function CMSBuilderPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────────────
-         HORIZONTAL SECTION SELECTOR (Replaces former left column)
+         HORIZONTAL SECTION SELECTOR (Quick-Select Pills + Position & Visibility)
          ───────────────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2.5 bg-card neu-extruded px-6 py-4 rounded-3xl border border-border/10 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-border/15">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-primary" />
-              <span>Section:</span>
-            </span>
-
-            {/* Dropdown Selector */}
-            <div className="relative">
-              <select
-                value={activeSectionIdx}
-                onChange={(e) => {
-                  setActiveSectionIdx(Number(e.target.value));
-                  setExpandedIndex(0);
-                }}
-                className="px-4 py-2 bg-background neu-input rounded-2xl text-xs font-extrabold text-foreground cursor-pointer pr-9 focus:ring-2 focus:ring-primary/20 appearance-none"
-              >
-                {sections.map((sec, idx) => (
-                  <option key={sec.id || idx} value={idx}>
-                    #{idx + 1} — {sec.type} {sec.content?.title ? `(${sec.content.title})` : ''} {sec.is_visible ? '' : '[Hidden]'}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* Prev / Next Step Buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={activeSectionIdx === 0}
-                onClick={() => {
-                  setActiveSectionIdx(prev => Math.max(0, prev - 1));
-                  setExpandedIndex(0);
-                }}
-                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
-                title="Previous section"
-              >
-                <span>←</span>
-                <span>Prev</span>
-              </button>
-              <button
-                type="button"
-                disabled={activeSectionIdx === sections.length - 1}
-                onClick={() => {
-                  setActiveSectionIdx(prev => Math.min(sections.length - 1, prev + 1));
-                  setExpandedIndex(0);
-                }}
-                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
-                title="Next section"
-              >
-                <span>Next</span>
-                <span>→</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Section Position & Visibility Controls */}
-          <div className="flex items-center gap-2">
-            {activeSec && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleToggleVisibility(activeSectionIdx)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    activeSec.is_visible
-                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                      : 'bg-muted text-muted-foreground border border-border/30'
-                  }`}
-                  title="Toggle section visibility on storefront"
-                >
-                  {activeSec.is_visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                  <span>{activeSec.is_visible ? 'Visible on Store' : 'Hidden from Store'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={activeSectionIdx === 0}
-                  onClick={() => handleMoveSection(activeSectionIdx, 'up')}
-                  className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
-                  title="Move section higher on homepage"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                  <span>Up</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={activeSectionIdx === sections.length - 1}
-                  onClick={() => handleMoveSection(activeSectionIdx, 'down')}
-                  className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
-                  title="Move section lower on homepage"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                  <span>Down</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card neu-extruded px-6 py-3 rounded-3xl border border-border/10 shrink-0">
         {/* Horizontal Quick-Select Pills Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-border/40">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-thin scrollbar-thumb-border/40 max-w-full flex-1">
           {sections.map((sec, idx) => {
             const isSelected = activeSectionIdx === idx;
             return (
@@ -413,6 +302,49 @@ export default function CMSBuilderPage() {
               </button>
             );
           })}
+        </div>
+
+        {/* Section Position & Visibility Controls */}
+        <div className="flex items-center gap-2 shrink-0">
+          {activeSec && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleToggleVisibility(activeSectionIdx)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activeSec.is_visible
+                    ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20'
+                    : 'bg-muted text-muted-foreground border border-border/30'
+                }`}
+                title="Toggle section visibility on storefront"
+              >
+                {activeSec.is_visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                <span>{activeSec.is_visible ? 'Visible on Store' : 'Hidden from Store'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={activeSectionIdx === 0}
+                onClick={() => handleMoveSection(activeSectionIdx, 'up')}
+                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
+                title="Move section higher on homepage"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span>Up</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={activeSectionIdx === sections.length - 1}
+                onClick={() => handleMoveSection(activeSectionIdx, 'down')}
+                className="px-2.5 py-1.5 neu-btn rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center gap-1 cursor-pointer"
+                title="Move section lower on homepage"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span>Down</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -814,18 +746,6 @@ export default function CMSBuilderPage() {
                                 className="px-3 py-1.5 neu-input rounded-xl text-xs"
                               />
                             </div>
-
-                            <ImageUploadPicker
-                              label="Video Poster Image"
-                              folder="video"
-                              aspectRatio="video"
-                              value={vItem.poster || ''}
-                              onChange={(url) => {
-                                const items = [...(activeSec.content.items || [])];
-                                items[vIdx].poster = url;
-                                handleUpdateSectionContent(activeSectionIdx, 'items', items);
-                              }}
-                            />
                           </AccordionItem>
                         ))}
                       </div>
@@ -1249,70 +1169,6 @@ export default function CMSBuilderPage() {
                           </AccordionItem>
                         ))}
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ═══════════════════════════════════════════════════════════════════
-                   8. PRODUCT SECTIONS (TRENDING / BEST SELLERS / NEW LAUNCHES)
-                   ═══════════════════════════════════════════════════════════════════ */}
-                {(activeSec.type === 'TrendingSection' || activeSec.type === 'BestSellerSection' || activeSec.type === 'NewLaunches') && (
-                  <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Section Title</label>
-                        <input
-                          type="text"
-                          value={activeSec.content.title || ''}
-                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'title', e.target.value)}
-                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Italic Highlight</label>
-                        <input
-                          type="text"
-                          value={activeSec.content.italicPart || ''}
-                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'italicPart', e.target.value)}
-                          className="w-full px-3 py-2 neu-input rounded-xl text-xs font-bold"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase">View All Link</label>
-                      <input
-                        type="text"
-                        value={activeSec.content.viewAllLink || ''}
-                        onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'viewAllLink', e.target.value)}
-                        className="w-full px-3 py-2 neu-input rounded-xl text-xs"
-                      />
-                    </div>
-                    {activeSec.content.collectionHandle !== undefined && (
-                      <div>
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">Collection Slug</label>
-                        <input
-                          type="text"
-                          value={activeSec.content.collectionHandle || ''}
-                          onChange={(e) => handleUpdateSectionContent(activeSectionIdx, 'collectionHandle', e.target.value)}
-                          className="w-full px-3 py-2 neu-input rounded-xl text-xs"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ═══════════════════════════════════════════════════════════════════
-                   9. RICH TEXT SECTION
-                   ═══════════════════════════════════════════════════════════════════ */}
-                {activeSec.type === 'RichText' && (
-                  <div className="flex flex-col gap-3">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Rich Text / Editorial Content</label>
-                    <div className="neu-inset rounded-2xl p-2 bg-card">
-                      <CKEditorWrapper
-                        value={activeSec.content.body || ''}
-                        onChange={(val) => handleUpdateSectionContent(activeSectionIdx, 'body', val)}
-                        placeholder="Write content..."
-                      />
                     </div>
                   </div>
                 )}

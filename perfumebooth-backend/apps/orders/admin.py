@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Order, OrderItem, Shipment, PaymentAttempt, PaymentEvent, PaymentOutbox
+from .models import Order, OrderItem, Shipment, PaymentAttempt, PaymentEvent, PaymentOutbox, PaymentTransaction
 
 
 class ReadOnlyPaymentAdmin(admin.ModelAdmin):
@@ -18,6 +18,13 @@ class PaymentAttemptAdmin(ReadOnlyPaymentAdmin):
     list_display = ('order', 'gateway_order_id', 'status', 'last_error', 'updated_at')
     list_filter = ('status',)
     search_fields = ('gateway_order_id', 'order__order_number')
+
+
+@admin.register(PaymentTransaction)
+class PaymentTransactionAdmin(ReadOnlyPaymentAdmin):
+    list_display = ('reference', 'order', 'kind', 'amount', 'currency', 'occurred_at', 'time_basis')
+    list_filter = ('gateway', 'kind', 'currency')
+    search_fields = ('reference', 'payment_id', 'order__order_number')
 
 
 @admin.register(PaymentEvent)

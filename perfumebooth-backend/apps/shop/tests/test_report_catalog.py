@@ -64,7 +64,20 @@ class ReportCatalogTests(TestCase):
         self.order.payment_status = 'Partially Refunded'
         self.order.save()
         self.assertEqual(self.report('sales-orders')['rows'], [])
-        self.assertEqual(self.report('finance-refunds')['rows'][0][-1], '195.00')
+        # An editable order status cannot prove the amount of money refunded.
+        self.assertEqual(self.report('finance-refunds')['rows'], [])
+
+    def test_repeat_rate_and_rfm(self):
+        self.assertEqual(self.report('customers-repeat-rate')['rows'], [[1, 0, 1, 0.0]])
+        row = self.report('customers-rfm')['rows'][0]
+        self.assertEqual(row[4:8], [3, 3, 3, '333'])
+        self.assertEqual(row[2], 1)
+
+    def test_tracking_coverage_counts_orders_not_split_shipments(self):
+        Shipment.objects.create(order=self.order, shipped_at=self.now-timedelta(hours=1), awb_code='TRACK')
+        Shipment.objects.create(order=self.order, shipped_at=self.now-timedelta(hours=1))
+        Shipment.objects.create(order=self.order, status='Cancelled', awb_code='CANCELLED')
+        self.assertEqual(self.report('fulfillment-coverage')['rows'], [[1, 1, 0, 100.0]])
 
     def test_shipping_event_window(self):
         Shipment.objects.create(order=self.order, shipped_at=self.now-timedelta(hours=2),

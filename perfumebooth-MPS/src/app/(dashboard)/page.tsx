@@ -219,7 +219,7 @@ export default function DashboardPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300">
               {liveVisitors} Live Shoppers
             </span>
           </div>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
                   ) : (
                     <ArrowDownRight className="w-4 h-4 text-red-500" />
                   )}
-                  <span className={`text-xs font-bold ${kpi.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                  <span className={`text-xs font-bold ${kpi.isPositive ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-500'}`}>
                     {kpi.change}
                   </span>
                   <span className="text-xs text-muted-foreground">vs last month</span>
@@ -460,7 +460,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{p.revenue}</span>
+                  <span className="text-sm font-extrabold text-emerald-800 dark:text-emerald-300">{p.revenue}</span>
                 </div>
               </div>
             ))}

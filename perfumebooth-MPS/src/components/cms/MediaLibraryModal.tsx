@@ -371,12 +371,12 @@ export default function MediaLibraryModal({
                       className="group relative bg-card border border-border/30 rounded-2xl overflow-hidden hover:border-primary/60 hover:shadow-lg transition cursor-pointer flex flex-col"
                     >
                       {/* Image Thumbnail Aspect Container */}
-                      <div className="relative aspect-square w-full bg-muted/40 overflow-hidden flex items-center justify-center">
+                      <div className="relative aspect-square w-full bg-muted/20 dark:bg-black/20 overflow-hidden flex items-center justify-center p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={asset.url}
                           alt={asset.alt_text || asset.name}
-                          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                          className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs"
                           loading="lazy"
                         />
 

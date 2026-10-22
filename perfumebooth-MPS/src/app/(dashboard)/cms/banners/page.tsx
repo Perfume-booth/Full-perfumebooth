@@ -242,7 +242,7 @@ export default function BannersPage() {
                             alt={banner.title || 'Banner'} 
                             fill 
                             sizes="96px"
-                            className="object-cover rounded-lg" 
+                            className="object-contain p-0.5 rounded-lg" 
                           />
                         </div>
                       ) : (
@@ -355,8 +355,8 @@ export default function BannersPage() {
                       </label>
                       {slide.existingImageUrl && (
                         <div className="mb-2 p-2 neu-inset-sm rounded-xl flex items-center gap-3">
-                          <div className="relative w-24 h-12 rounded-lg overflow-hidden shrink-0">
-                            <Image src={slide.existingImageUrl} alt="Current Desktop" fill className="object-cover" />
+                          <div className="relative w-24 h-12 rounded-lg overflow-hidden shrink-0 bg-muted/30">
+                            <Image src={slide.existingImageUrl} alt="Current Desktop" fill className="object-contain p-0.5" />
                           </div>
                           <div className="text-xs">
                             <span className="font-bold text-primary block">Active Desktop Image</span>
@@ -382,8 +382,8 @@ export default function BannersPage() {
                       </label>
                       {slide.existingMobileUrl && (
                         <div className="mb-2 p-2 neu-inset-sm rounded-xl flex items-center gap-3">
-                          <div className="relative w-16 h-12 rounded-lg overflow-hidden shrink-0">
-                            <Image src={slide.existingMobileUrl} alt="Current Mobile" fill className="object-cover" />
+                          <div className="relative w-16 h-12 rounded-lg overflow-hidden shrink-0 bg-muted/30">
+                            <Image src={slide.existingMobileUrl} alt="Current Mobile" fill className="object-contain p-0.5" />
                           </div>
                           <div className="text-xs">
                             <span className="font-bold text-primary block">Active Mobile Image</span>

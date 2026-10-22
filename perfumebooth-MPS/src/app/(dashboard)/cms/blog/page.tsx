@@ -26,6 +26,7 @@ const CKEditorWrapper = dynamic(() => import('@/components/cms/CKEditorWrapper')
   ssr: false,
   loading: () => <div className="p-4 bg-muted border border-border rounded-xl text-xs text-muted-foreground animate-pulse">Loading CKEditor...</div>
 });
+import ResizableTextarea from '@/components/ui/ResizableTextarea';
 
 interface BlogPost {
   id: string;
@@ -276,7 +277,7 @@ export default function CMSBlogManagerPage() {
                 {/* Thumbnail */}
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-muted/40 border border-border shrink-0">
                   {post.cover_image ? (
-                    <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    <img src={post.cover_image} alt={post.title} className="w-full h-full object-contain p-1 group-hover:scale-105 transition duration-300" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                       <ImageIcon className="w-6 h-6 opacity-40" />
@@ -452,13 +453,12 @@ export default function CMSBlogManagerPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Short Excerpt / Card Summary</label>
-                <textarea
+                <ResizableTextarea
+                  label="Short Excerpt / Card Summary"
                   rows={2}
                   value={excerpt}
                   onChange={(e) => setExcerpt(e.target.value)}
                   placeholder="Write a 1-2 sentence preview for article cards..."
-                  className="px-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
                 />
               </div>
 

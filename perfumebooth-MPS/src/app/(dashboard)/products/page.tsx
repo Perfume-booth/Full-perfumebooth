@@ -7,6 +7,7 @@ import CatalogExportModal from '@/components/products/CatalogExportModal';
 import BatchImageDropzone from '@/components/products/BatchImageDropzone';
 import VariantManager, { VariantItem } from '@/components/products/VariantManager';
 import ShippingSection, { ShippingValues } from '@/components/products/ShippingSection';
+import ResizableTextarea from '@/components/ui/ResizableTextarea';
 import { apiFetch, getApiBaseUrl, formatProductImageUrl } from '@/lib/api';
 import {
   Plus,
@@ -1578,7 +1579,7 @@ export default function ProductsPage() {
                     {collectionsInput.map((colName) => (
                       <span
                         key={colName}
-                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl neu-inset-sm text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm"
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl neu-inset-sm text-xs font-semibold text-emerald-800 dark:text-emerald-400 border border-emerald-500/20 shadow-sm"
                       >
                         <span>📁 {colName}</span>
                         <button
@@ -1601,14 +1602,14 @@ export default function ProductsPage() {
             </div>
 
             {/* Description */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Description</label>
-              <textarea
+            <div className="flex flex-col gap-1.5">
+              <ResizableTextarea
+                label="Description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Enter detailed description..."
                 rows={4}
-                className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground resize-y"
+                minHeight={80}
               />
             </div>
 
@@ -1663,7 +1664,7 @@ export default function ProductsPage() {
 
               {/* Real-time Google Search Snippet Preview */}
               <div className="p-5 neu-inset rounded-2xl flex flex-col gap-1 max-w-2xl border border-border/20">
-                <span className="text-[12px] text-emerald-600 dark:text-emerald-500 font-normal truncate block">
+                <span className="text-[12px] text-emerald-800 dark:text-emerald-400 font-normal truncate block">
                   https://perfumebooth.com/products/{slug || 'product-handle'}
                 </span>
                 <span className="text-[18px] text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer truncate block">
@@ -1692,18 +1693,16 @@ export default function ProductsPage() {
                 </div>
 
                 {/* Meta Description */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Meta Description</label>
-                    <span className="text-xs text-muted-foreground">{metaDescription.length} of 320 characters</span>
-                  </div>
-                  <textarea
+                <div className="flex flex-col gap-1.5">
+                  <ResizableTextarea
+                    label="Meta Description"
                     maxLength={320}
                     value={metaDescription}
                     onChange={(e) => setMetaDescription(e.target.value)}
                     placeholder={description || "e.g. Discover our premium scent crafted for longevity..."}
                     rows={3}
-                    className="w-full px-4 py-2.5 neu-input rounded-2xl text-sm text-foreground resize-y"
+                    minHeight={70}
+                    helpText={`${metaDescription.length} of 320 characters`}
                   />
                 </div>
                 
@@ -1807,7 +1806,7 @@ export default function ProductsPage() {
             <>
               <button
                 onClick={() => handleBulkStatusChange(true)}
-                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-emerald-600 dark:text-emerald-400 font-semibold rounded-2xl cursor-pointer text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 neu-btn text-emerald-800 dark:text-emerald-400 font-semibold rounded-2xl cursor-pointer text-sm"
               >
                 <Check className="w-4 h-4" />
                 <span>Publish ({selectedSlugs.length})</span>
@@ -2106,7 +2105,7 @@ export default function ProductsPage() {
                           {((product.attributes?.collections || (product as any).collections) as string[] | undefined)?.map((col) => (
                             <span
                               key={col}
-                              className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium neu-inset-sm text-emerald-800 dark:text-emerald-400 border border-emerald-500/20"
                               title={`Collection: ${col}`}
                             >
                               📁 {col}
@@ -2202,7 +2201,7 @@ export default function ProductsPage() {
                                 Low Stock: {product.stock} units
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-300 neu-inset-sm rounded-full border border-emerald-500/30 bg-emerald-500/5">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 neu-inset-sm rounded-full border border-emerald-500/30 bg-emerald-500/5">
                                 {product.stock}
                               </span>
                             )}
@@ -2212,7 +2211,7 @@ export default function ProductsPage() {
                       </td>
                       <td className="p-5">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold neu-inset-sm ${product.is_online
-                          ? 'text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/5'
+                          ? 'text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 bg-emerald-500/5'
                           : 'text-zinc-500 dark:text-zinc-400 border border-border/30'
                           }`}>
                           {product.is_online ? 'Online' : 'Offline'}

@@ -17,13 +17,13 @@ export default function Navbar() {
   if (!mounted || !user) return <div className="h-16 border-b border-border mb-6"></div>;
 
   return (
-    <header className="h-16 bg-card neu-extruded-sm border-b border-border/20 flex items-center justify-between px-8 mb-6 sticky top-0 z-10 transition-all duration-300">
+    <header className="min-h-16 bg-card neu-extruded-sm border-b border-border/20 flex flex-wrap gap-2 items-center justify-between px-4 md:px-8 py-2 mb-6 sticky top-0 z-10 transition-all duration-300">
       <div>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Welcome back,</h2>
         <h3 className="font-semibold text-foreground text-sm">{user.fullName || 'Admin Merchant'}</h3>
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 md:gap-5">
         <button
           onClick={toggleTheme}
           className="w-10 h-10 rounded-full neu-btn flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-all duration-200"

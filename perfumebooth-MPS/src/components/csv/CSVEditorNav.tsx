@@ -42,7 +42,7 @@ export default function CSVEditorNav() {
           <div>
             <h1 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2.5">
               Safe Partial CSV Editor
-              <span className="text-[11px] px-3 py-1 neu-inset-sm text-emerald-600 font-bold rounded-full">
+              <span className="text-[11px] px-3 py-1 neu-inset-sm text-emerald-800 dark:text-emerald-300 font-bold rounded-full">
                 Safe Partial Updates Active
               </span>
             </h1>

@@ -26,19 +26,19 @@
 
 :root {
   --background: #ebedf2;
-  --foreground: #1e293b;
+  --foreground: #0f172a; /* slate-900 */
   --card: #ebedf2;
-  --card-foreground: #1e293b;
+  --card-foreground: #0f172a;
   --popover: #ebedf2;
-  --popover-foreground: #1e293b;
+  --popover-foreground: #0f172a;
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
   --secondary: #e2e6ed;
-  --secondary-foreground: #334155;
+  --secondary-foreground: #1e293b; /* slate-800 */
   --muted: #e2e6ed;
-  --muted-foreground: #64748b;
+  --muted-foreground: #334155; /* slate-700: crystal clear, high-contrast */
   --accent: #e2e6ed;
-  --accent-foreground: #1e293b;
+  --accent-foreground: #0f172a;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: rgba(163, 177, 198, 0.4);
@@ -57,19 +57,19 @@
 .dark {
   color-scheme: dark;
   --background: #0b0e14;
-  --foreground: #f8fafc;
+  --foreground: #ffffff;
   --card: #19202c;
-  --card-foreground: #f8fafc;
+  --card-foreground: #ffffff;
   --popover: #19202c;
-  --popover-foreground: #f8fafc;
+  --popover-foreground: #ffffff;
   --primary: #9333ea;
   --primary-foreground: #ffffff;
   --secondary: #242c3d;
   --secondary-foreground: #f8fafc;
   --muted: #242c3d;
-  --muted-foreground: #94a3b8;
+  --muted-foreground: #e2e8f0; /* slate-200: bright, crisp */
   --accent: #2c364b;
-  --accent-foreground: #f8fafc;
+  --accent-foreground: #ffffff;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: rgba(255, 255, 255, 0.14);
@@ -89,7 +89,88 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   min-height: 100vh;
+  font-weight: 700;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ==========================================================================
+   MPS High-Contrast & Bold Typography System (700 / 800 weight & colors)
+   No text below 700 weight, no pale/washed-out text colors
+   ========================================================================== */
+
+/* Elevate all light and medium weights to at least 700 (bold) or 800 (extrabold) */
+.font-thin,
+.font-extralight,
+.font-light,
+.font-normal,
+.font-medium,
+.font-semibold {
+  font-weight: 700 !important;
+}
+
+.font-bold {
+  font-weight: 700 !important;
+}
+
+.font-extrabold {
+  font-weight: 800 !important;
+}
+
+.font-black {
+  font-weight: 900 !important;
+}
+
+/* Base elements inherit bold weights */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 800 !important;
+}
+
+button, input, textarea, select, label {
+  font-weight: 700 !important;
+}
+
+/* Light mode text color enforcement: elevate pale grays (< 700) to slate-700 / slate-800 */
+html:not(.dark) .text-muted-foreground,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-zinc-500,
+html:not(.dark) .text-zinc-600,
+html:not(.dark) .text-gray-400,
+html:not(.dark) .text-gray-500,
+html:not(.dark) .text-gray-600 {
+  color: #334155 !important; /* slate-700: high-contrast, crystal clear */
+}
+
+html:not(.dark) .text-foreground,
+html:not(.dark) .text-slate-700,
+html:not(.dark) .text-slate-800,
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-zinc-700,
+html:not(.dark) .text-zinc-800,
+html:not(.dark) .text-zinc-900 {
+  color: #0f172a !important; /* slate-900 / 800-grade dark */
+}
+
+/* Ensure emerald text is always emerald-800 in light mode (never below 800) */
+html:not(.dark) .text-emerald-500,
+html:not(.dark) .text-emerald-600,
+html:not(.dark) .text-emerald-700 {
+  color: #065f46 !important; /* emerald-800: deep, bold, crystal clear */
+}
+
+/* Dark mode text color enforcement: ensure all text is bright and crisp */
+.dark .text-muted-foreground,
+.dark .text-slate-400,
+.dark .text-slate-500,
+.dark .text-zinc-400,
+.dark .text-zinc-500,
+.dark .text-gray-400,
+.dark .text-gray-500 {
+  color: #cbd5e1 !important; /* slate-300: bright, legible on dark backgrounds */
 }
 
 /* Neumorphic Core Utility Classes */

@@ -25,6 +25,7 @@ class CheckoutInput:
     shipping_address: Dict[str, Any]
     payment_method: str
     coupon_code: str
+    analytics_token: str = ''
 
 
 def validate_checkout_request(data: dict) -> CheckoutInput:
@@ -131,5 +132,6 @@ def validate_checkout_request(data: dict) -> CheckoutInput:
         items=clean_items,
         shipping_address=normalized_address,
         payment_method=payment_method,
-        coupon_code=coupon_code
+        coupon_code=coupon_code,
+        analytics_token=str(data.get('analytics_token') or '')[:1000],
     )

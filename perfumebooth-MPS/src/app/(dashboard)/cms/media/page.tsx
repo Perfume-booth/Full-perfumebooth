@@ -320,12 +320,12 @@ export default function MediaManagerPage() {
                     key={asset.id}
                     className="group bg-card border border-border/30 rounded-2xl overflow-hidden hover:border-primary/60 hover:shadow-lg transition flex flex-col"
                   >
-                    <div className="relative aspect-square w-full bg-muted/40 overflow-hidden flex items-center justify-center">
+                    <div className="relative aspect-square w-full bg-muted/20 dark:bg-black/20 overflow-hidden flex items-center justify-center p-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={asset.url}
                         alt={asset.name}
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                        className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs"
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
@@ -349,7 +349,7 @@ export default function MediaManagerPage() {
                             onClick={() => handleCopyUrl(asset.url, asset.id)}
                             className="flex-1 py-1.5 bg-white text-black font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm"
                           >
-                            {copiedId === asset.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedId === asset.id ? <Check className="w-3.5 h-3.5 text-emerald-800" /> : <Copy className="w-3.5 h-3.5" />}
                             <span>{copiedId === asset.id ? 'Copied!' : 'Copy URL'}</span>
                           </button>
                           <a

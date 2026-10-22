@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
       fetch(`${BACKEND_URL}/api/shop/facets/`, { cache: "no-store" }),
     ]);
 
-    const rawProducts = productsRes.ok ? await productsRes.json() : [];
+    if (!productsRes.ok) return NextResponse.json({ error: 'Search temporarily unavailable' }, { status: 502 });
+    const rawProducts = await productsRes.json();
     const productsData = Array.isArray(rawProducts) ? rawProducts : (rawProducts?.data && Array.isArray(rawProducts.data) ? rawProducts.data : []);
     let products = productsData.map(mapDjangoProductToProduct);
 

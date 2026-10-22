@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { TOP_BRANDS } from "@/lib/constants";
 import { cleanCategoryName } from "@/lib/transformers";
+import { trackFirstParty } from '@/lib/first-party-analytics';
 
 interface SuggestionProduct {
   id: string;
@@ -44,6 +45,7 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const searchIdRef = useRef('');
   const router = useRouter();
 
   const debouncedQuery = useDebounce(query, 250);
@@ -128,6 +130,9 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
         signal: controller.signal,
       });
       const data = await res.json();
+      if (!res.ok || abortControllerRef.current !== controller) return;
+      searchIdRef.current = crypto.randomUUID();
+      trackFirstParty('search', { query: q.slice(0, 150), result_count: data.totalCount ?? data.products?.length ?? 0, search_id: searchIdRef.current });
       setSuggestions(data.products || []);
     } catch (err: any) {
       if (err.name === "AbortError") return;
@@ -198,6 +203,7 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
     e.preventDefault();
     if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
       const selected = suggestions[selectedIndex];
+      trackFirstParty('search_click', { search_id: searchIdRef.current, product_id: String(selected.id) });
       saveRecentSearch(selected.title);
       router.push(`/products/${selected.handle}`);
       setIsOpen(false);
@@ -405,6 +411,7 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
                         key={product.id}
                         onClick={() => {
                           saveRecentSearch(product.title);
+                          trackFirstParty('search_click', { search_id: searchIdRef.current, product_id: String(product.id) });
                           router.push(`/products/${product.handle}`);
                           setShowMobileOverlay(false);
                         }}
@@ -612,6 +619,7 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
                         key={product.id}
                         onClick={() => {
                           saveRecentSearch(product.title);
+                          trackFirstParty('search_click', { search_id: searchIdRef.current, product_id: String(product.id) });
                           router.push(`/products/${product.handle}`);
                           setIsOpen(false);
                         }}

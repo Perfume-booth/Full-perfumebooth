@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 from apps.checkout.services.checkout_service import CheckoutService
 from apps.checkout.validators import CartItemInput, CheckoutInput
 from apps.inventory.services import InventoryReservationService
-from apps.orders.models import Order, PaymentAttempt, PaymentEvent, PaymentOutbox
+from apps.orders.models import Order, PaymentAttempt, PaymentEvent, PaymentOutbox, PaymentTransaction
 from apps.orders.payments import initialize, process_entity, verify, reconcile
 from apps.orders.tasks import process_payment_outbox
 from apps.shop.models import Product, Inventory
@@ -69,6 +69,7 @@ class PaymentTests(TestCase):
         self.assertEqual(self.inventory.stock_level, 19)
         self.assertEqual(PaymentOutbox.objects.count(), 2)
         self.assertEqual(PaymentEvent.objects.count(), 2)
+        self.assertEqual(PaymentTransaction.objects.filter(kind='capture').count(), 1)
 
     def test_bad_amount_currency_and_binding_rejected(self):
         order = self.order()

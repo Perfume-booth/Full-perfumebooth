@@ -58,136 +58,112 @@ export default async function HomePage() {
     { id: 8, image: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/anfar-for-website_jpg.jpg?v=1787821501", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/anfar-for-website_jpg.jpg?v=1787821501", href: "/anfar", alt_text: "Anfar Signature Scents Collection" },
   ];
 
-  const sections = cmsPage?.sections?.length ? cmsPage.sections : null;
+  const sections = cmsPage?.sections || [];
+  const getSection = (type: string) => sections.find((s: any) => s.type === type);
 
-  const renderSection = (sec: any, index: number) => {
-    if (sec.is_visible === false) return null;
-    const content = sec.content || {};
+  const heroSec = getSection('HeroBanner');
+  const catSec = getSection('TopCategories');
+  const genderSec = getSection('GenderSection');
+  const videoSec = getSection('VideoSection');
+  const scentSec = getSection('ScentGrid');
+  const brandSec = getSection('BrandSlider');
+  const instaSec = getSection('InstagramFeed');
 
-    switch (sec.type) {
-      case 'HeroBanner': {
-        const slides = (content.slides && content.slides.length > 0) ? content.slides : fallbackSlides;
-        return <HeroBanner key={sec.id || index} slides={slides} title={content.title} subtitle={content.subtitle} />;
-      }
-      case 'TopCategories':
-        return <TopCategories key={sec.id || index} data={content.categories} />;
-      case 'GenderSection':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <GenderSection cards={content.cards} title={content.title} italicPart={content.italicPart} />
-          </div>
-        );
-      case 'VideoSection':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <VideoSection items={content.items} title={content.title} italicPart={content.italicPart} suffix={content.suffix} />
-          </div>
-        );
-      case 'NewLaunches':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
-              <NewLaunchesSection />
-            </Suspense>
-          </div>
-        );
-      case 'ScentGrid':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <ScentGrid items={content.items} title={content.title} italicPart={content.italicPart} suffix={content.suffix} viewAllLink={content.viewAllLink} />
-          </div>
-        );
-      case 'TrendingSection':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
-              <TrendingSection title={content.title} italicPart={content.italicPart} viewAllLink={content.viewAllLink} collectionHandle={content.collectionHandle} limit={content.limit} />
-            </Suspense>
-          </div>
-        );
-      case 'BestSellerSection':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
-              <BestSellerSection title={content.title} italicPart={content.italicPart} viewAllLink={content.viewAllLink} collectionHandle={content.collectionHandle} limit={content.limit} />
-            </Suspense>
-          </div>
-        );
-      case 'RecentlyViewed':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <RecentlyViewed />
-          </div>
-        );
-      case 'BrandSlider':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <BrandSlider brands={content.brands} title={content.title} italicPart={content.italicPart} />
-          </div>
-        );
-      case 'BlogSection':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <Suspense fallback={<div className="h-64 flex items-center justify-center text-[var(--color-gold)] font-display tracking-widest uppercase">Loading Journal...</div>}>
-              <BlogSectionWrapper />
-            </Suspense>
-          </div>
-        );
-      case 'InstagramFeed':
-        return (
-          <div key={sec.id || index} className="deferred-render-section">
-            <InstagramFeed posts={content.posts} title={content.title} italicPart={content.italicPart} viewAllLink={content.viewAllLink} />
-          </div>
-        );
-      case 'RichText':
-        return (
-          <div key={sec.id || index} className="max-w-5xl mx-auto px-6 py-12 rich-text" dangerouslySetInnerHTML={{ __html: content.body || '' }} />
-        );
-      default:
-        return null;
-    }
-  };
-
-  if (sections && sections.length > 0) {
-    const sortedSections = [...sections].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-    return (
-      <>
-        {sortedSections.map((sec, idx) => renderSection(sec, idx))}
-      </>
-    );
-  }
-
-  // Graceful fallback if CMS page is not seeded or empty
   return (
     <>
-      <HeroBanner slides={fallbackSlides} />
-      <TopCategories />
-      <div className="deferred-render-section"><GenderSection /></div>
-      <div className="deferred-render-section"><VideoSection /></div>
+      {heroSec?.is_visible !== false && (
+        <HeroBanner
+          slides={heroSec?.content?.slides?.length ? heroSec.content.slides : fallbackSlides}
+          title={heroSec?.content?.title}
+          subtitle={heroSec?.content?.subtitle}
+        />
+      )}
+
+      {catSec?.is_visible !== false && (
+        <TopCategories data={catSec?.content?.categories} />
+      )}
+
+      {genderSec?.is_visible !== false && (
+        <div className="deferred-render-section">
+          <GenderSection
+            cards={genderSec?.content?.cards}
+            title={genderSec?.content?.title}
+            italicPart={genderSec?.content?.italicPart}
+          />
+        </div>
+      )}
+
+      {videoSec?.is_visible !== false && (
+        <div className="deferred-render-section">
+          <VideoSection
+            items={videoSec?.content?.items}
+            title={videoSec?.content?.title}
+            italicPart={videoSec?.content?.italicPart}
+            suffix={videoSec?.content?.suffix}
+          />
+        </div>
+      )}
+
       <div className="deferred-render-section">
         <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
           <NewLaunchesSection />
         </Suspense>
       </div>
-      <div className="deferred-render-section"><ScentGrid /></div>
+
+      {scentSec?.is_visible !== false && (
+        <div className="deferred-render-section">
+          <ScentGrid
+            items={scentSec?.content?.items}
+            title={scentSec?.content?.title}
+            italicPart={scentSec?.content?.italicPart}
+            suffix={scentSec?.content?.suffix}
+            viewAllLink={scentSec?.content?.viewAllLink}
+          />
+        </div>
+      )}
+
       <div className="deferred-render-section">
         <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
           <TrendingSection />
         </Suspense>
       </div>
+
       <div className="deferred-render-section">
         <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-12"><CollectionSkeleton count={4} /></div>}>
           <BestSellerSection />
         </Suspense>
       </div>
-      <div className="deferred-render-section"><RecentlyViewed /></div>
-      <div className="deferred-render-section"><BrandSlider /></div>
+
+      <div className="deferred-render-section">
+        <RecentlyViewed />
+      </div>
+
+      {brandSec?.is_visible !== false && (
+        <div className="deferred-render-section">
+          <BrandSlider
+            brands={brandSec?.content?.brands}
+            title={brandSec?.content?.title}
+            italicPart={brandSec?.content?.italicPart}
+          />
+        </div>
+      )}
+
       <div className="deferred-render-section">
         <Suspense fallback={<div className="h-64 flex items-center justify-center text-[var(--color-gold)] font-display tracking-widest uppercase">Loading Journal...</div>}>
           <BlogSectionWrapper />
         </Suspense>
       </div>
-      <div className="deferred-render-section"><InstagramFeed /></div>
+
+      {instaSec?.is_visible !== false && (
+        <div className="deferred-render-section">
+          <InstagramFeed
+            posts={instaSec?.content?.posts}
+            title={instaSec?.content?.title}
+            italicPart={instaSec?.content?.italicPart}
+            viewAllLink={instaSec?.content?.viewAllLink}
+          />
+        </div>
+      )}
     </>
   );
 }

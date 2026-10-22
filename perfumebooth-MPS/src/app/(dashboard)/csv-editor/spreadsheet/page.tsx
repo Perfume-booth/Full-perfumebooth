@@ -35,7 +35,7 @@ export default function SpreadsheetEditorPage() {
             <div>
               <h2 className="text-lg font-extrabold text-foreground tracking-tight">Excel Data Grid Editor</h2>
               <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                Edit cells directly. Colors highlight changes: <span className="text-emerald-600 font-bold">Green = Edited</span>, <span className="text-amber-600 font-bold">Yellow = Warning</span>, <span className="text-muted-foreground font-bold">Gray = Untouched</span>.
+                Edit cells directly. Colors highlight changes: <span className="text-emerald-800 dark:text-emerald-300 font-bold">Green = Edited</span>, <span className="text-amber-700 dark:text-amber-300 font-bold">Yellow = Warning</span>, <span className="text-muted-foreground font-bold">Gray = Untouched</span>.
               </p>
             </div>
           </div>

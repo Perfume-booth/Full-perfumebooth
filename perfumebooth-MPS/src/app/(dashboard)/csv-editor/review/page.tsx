@@ -27,7 +27,7 @@ export default function ChangeReviewPage() {
             <div>
               <h2 className="text-lg font-extrabold text-foreground tracking-tight">Change Review Audit Screen</h2>
               <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                Review exact <strong className="text-rose-500">OLD VALUE</strong> → <strong className="text-emerald-600">NEW VALUE</strong> comparisons prior to exporting CSV.
+                Review exact <strong className="text-rose-500">OLD VALUE</strong> → <strong className="text-emerald-800 dark:text-emerald-300">NEW VALUE</strong> comparisons prior to exporting CSV.
               </p>
             </div>
           </div>
@@ -97,7 +97,7 @@ export default function ChangeReviewPage() {
                             Warning
                           </span>
                         ) : (
-                          <span className="px-3 py-1 neu-inset-sm text-emerald-600 font-bold rounded-full text-[10px]">
+                          <span className="px-3 py-1 neu-inset-sm text-emerald-800 dark:text-emerald-300 font-bold rounded-full text-[10px]">
                             Valid Update
                           </span>
                         )}

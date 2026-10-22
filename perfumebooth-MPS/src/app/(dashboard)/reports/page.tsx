@@ -6,7 +6,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 type Entry = { id: string; title: string; group: string; status: string; reason: string };
 type Result = Entry & { columns: string[]; rows: (string | number | null)[][]; notes: string[];
-  total: number; page: number; page_size: number; start: string; end: string; generatedAt: string };
+  total: number; page: number; page_size: number; start: string; end: string; generatedAt: string;
+  data_state?: string; history_start?: string | null };
 function indiaDate(offset = 0) {
   const date = new Date(Date.now() + offset * 86400000);
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
@@ -91,6 +92,9 @@ export default function ReportsPage() {
         {error && <p role="alert" className="text-red-500">{error}</p>}
         {result && !loading && <>
           <h2 className="text-xl font-bold mb-3">{result.title}</h2>
+          {result.data_state && <p role="status" className="mb-4 rounded border p-3 text-sm">
+            {result.data_state === 'disabled' ? 'Collection is disabled. Enable consent-based analytics in the storefront and backend before collecting data.' : result.data_state === 'needs_credentials' ? 'Requires API credentials and account permissions. See the configuration keys below; do not enter secrets in the browser.' : result.data_state === 'sync_failed' ? 'Latest sync failed. Previously fetched data, if shown, may be stale. Check the source readiness report.' : result.data_state === 'awaiting_data' ? 'Implemented — awaiting processed events or a successful source sync. No historical data is fabricated.' : `Source data available${result.history_start ? ` since ${new Date(result.history_start).toLocaleString()}` : ''}. Read the source-specific definitions and coverage below.`}
+          </p>}
           {result.status !== 'available' ? <div role="status" className="border border-amber-500/40 rounded-xl p-4"><strong>Data source not connected</strong><p className="mt-2 text-sm">{result.reason}</p><p className="mt-2 text-sm">This report is not implemented end to end yet. No historical results are estimated.</p></div> : <>
             <details className="text-sm mb-4" open><summary className="cursor-pointer font-semibold">Definitions and limitations</summary><ul className="list-disc pl-5 mt-2 space-y-1 text-muted-foreground">{result.notes.map(n => <li key={n}>{n}</li>)}</ul></details>
             <p className="text-xs text-muted-foreground mb-3">{result.total} rows · — means unknown, not zero. CSV includes every row in the filtered result.</p>

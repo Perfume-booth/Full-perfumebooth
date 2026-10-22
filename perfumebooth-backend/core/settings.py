@@ -79,7 +79,17 @@ LOCAL_APPS = [
     'apps.checkout',
     'apps.catalog',
     'apps.inventory',
+    'apps.analytics',
 ]
+
+FIRST_PARTY_ANALYTICS_ENABLED = config('FIRST_PARTY_ANALYTICS_ENABLED', default=False, cast=bool)
+ANALYTICS_INGEST_KEY = config('ANALYTICS_INGEST_KEY', default='')
+ANALYTICS_RETENTION_DAYS = config('ANALYTICS_RETENTION_DAYS', default=90, cast=int)
+ANALYTICS_INTEGRATIONS = {key: config(key, default='') for key in [
+    'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REFRESH_TOKEN', 'GA4_PROPERTY_ID', 'SEARCH_CONSOLE_SITE',
+    'GOOGLE_ADS_CUSTOMER_ID', 'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_API_VERSION', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID',
+    'META_ADS_ACCESS_TOKEN', 'META_ADS_ACCOUNT_ID', 'META_ADS_API_VERSION',
+]}
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -197,6 +207,9 @@ CELERY_TASK_ROUTES = {
 }
 
 CELERY_BEAT_SCHEDULE = {
+    'analytics-inbox': {'task': 'apps.analytics.tasks.process_pending_events', 'schedule': 10.0},
+    'analytics-retention': {'task': 'apps.analytics.tasks.expire_analytics', 'schedule': 86400.0},
+    'analytics-provider-refresh': {'task': 'apps.analytics.tasks.refresh_provider_reports', 'schedule': 21600.0},
     'scheduled-catalog-prices': {'task': 'apps.shop.tasks.run_scheduled_imports', 'schedule': 30.0},
     'payment-outbox': {'task': 'apps.orders.tasks.process_payment_outbox', 'schedule': 15.0},
     'payment-reconciliation': {'task': 'apps.orders.tasks.reconcile_payments', 'schedule': 60.0},

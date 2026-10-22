@@ -414,7 +414,7 @@ export default function StaffSettingsPage() {
           </div>
 
           {changeSelfSuccess && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-800 dark:text-emerald-300">
               {changeSelfSuccess}
             </div>
           )}

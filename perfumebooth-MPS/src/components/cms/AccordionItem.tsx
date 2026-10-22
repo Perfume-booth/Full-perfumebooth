@@ -66,7 +66,7 @@ export default function AccordionItem({
                 src={thumbnail} 
                 alt={title} 
                 fill 
-                className="object-cover"
+                className="object-contain p-0.5"
                 unoptimized
               />
             ) : (

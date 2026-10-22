@@ -313,7 +313,7 @@ export default function OrderDetailPage() {
       </div>
 
       {successMsg && (
-        <div className="p-4 rounded-2xl bg-card neu-inset-sm text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 border-0">
+        <div className="p-4 rounded-2xl bg-card neu-inset-sm text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 border-0">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {successMsg}
         </div>

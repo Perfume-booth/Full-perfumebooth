@@ -128,6 +128,8 @@ def process_entity(entity, event_id, event_type):
         raise ValidationError('Payment event and status disagree.')
     outcome = 'ignored'
     if event_type == 'payment.captured':
+        from .payment_ledger import record_capture
+        record_capture(order, entity)
         if order.payment_intent_id == entity['id']:
             outcome = 'duplicate'
         elif (order.payment_status != Order.PaymentStatus.PENDING

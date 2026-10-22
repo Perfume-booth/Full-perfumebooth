@@ -390,7 +390,7 @@ export default function VariantManager({
                             type="number"
                             value={v.price}
                             onChange={(e) => handleUpdateRow(idx, 'price', e.target.value)}
-                            className="w-20 px-2 py-1 neu-input rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400"
+                            className="w-20 px-2 py-1 neu-input rounded-xl text-xs font-bold text-emerald-800 dark:text-emerald-400"
                           />
                         </td>
 
@@ -428,7 +428,7 @@ export default function VariantManager({
                             <span
                               className={`text-[9px] font-bold px-2 py-0.5 rounded-full text-center neu-inset-sm ${
                                 inStock
-                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  ? 'text-emerald-800 dark:text-emerald-400'
                                   : 'text-red-500'
                               }`}
                             >
@@ -444,7 +444,7 @@ export default function VariantManager({
                             onClick={() => handleToggleActive(idx)}
                             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold transition cursor-pointer neu-btn ${
                               isActive
-                                ? 'text-emerald-600 dark:text-emerald-400'
+                                ? 'text-emerald-800 dark:text-emerald-400'
                                 : 'text-muted-foreground'
                             }`}
                             title={isActive ? 'Active and purchasable' : 'Hidden from storefront'}

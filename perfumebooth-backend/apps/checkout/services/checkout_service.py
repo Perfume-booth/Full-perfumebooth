@@ -43,6 +43,7 @@ class CheckoutService:
         except (ValueError, TypeError, AttributeError):
             raise ValidationError({'detail': 'A UUID Idempotency-Key header is required.'})
         payload = asdict(input_data)
+        payload.pop('analytics_token', None)  # Consent/session changes must not alter commerce retry identity.
         payload['user'] = str(user.pk) if user and user.is_authenticated else None
         fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
         record, _ = CheckoutRequest.objects.get_or_create(key=key, defaults={'fingerprint': fingerprint})
@@ -123,6 +124,9 @@ class CheckoutService:
             customer_phone=input_data.shipping_address.get('phone', ''),
             coupon_code=totals.coupon_code or '',
         )
+
+        from apps.analytics.ingestion import attach_order
+        attach_order(order, input_data.analytics_token)
 
         if totals.coupon_code:
             from apps.orders.models import Coupon, CouponRedemption

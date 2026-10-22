@@ -14,6 +14,7 @@ import {
   FileImage,
   FolderOpen
 } from 'lucide-react';
+import ResizableTextarea from '@/components/ui/ResizableTextarea';
 
 interface Product {
   slug: any;
@@ -391,14 +392,14 @@ export default function CollectionsPage() {
               </div>
 
               {/* Description */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Description</label>
-                <textarea
+              <div className="flex flex-col gap-1.5">
+                <ResizableTextarea
+                  label="Description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Write a descriptive collection banner text..."
-                  rows={6}
-                  className="w-full px-4 py-3 neu-input rounded-2xl transition duration-200 text-sm text-foreground font-medium resize-none"
+                  rows={4}
+                  minHeight={80}
                 />
               </div>
             </div>

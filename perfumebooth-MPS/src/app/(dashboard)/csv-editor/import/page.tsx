@@ -105,7 +105,7 @@ export default function CSVImportPage() {
 
             {products.length > 0 ? (
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold neu-inset-sm p-3 rounded-2xl">
+                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold neu-inset-sm p-3 rounded-2xl">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>Loaded {fileName || 'Catalog File'}</span>
                 </div>

@@ -5,7 +5,7 @@ from decimal import Decimal
 from itertools import combinations
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from apps.orders.models import Order, Shipment
+from apps.orders.models import Order, OrderItem, Shipment
 from apps.shop.models import Product, ProductVariant, Inventory
 from apps.inventory.models import InventoryMovement
 from .reporting import TZ
@@ -29,9 +29,11 @@ register('Sales', [('sales-orders', 'Sales breakdown by order'), ('sales-time', 
 register('Customers', [('customers-rfm', 'RFM customer list'), ('customers-repeat', 'New vs returning / one-time customers'),
     ('customers-cohorts', 'Customer cohort repeat-purchase analysis'), ('customers-location', 'Purchasing customers by shipping location'),
     ('customers-time', 'New vs returning purchasing customers over time'), ('customers-registrations', 'New customer accounts over time')])
+register('Customers', [('customers-repeat-rate', 'Repeat-purchase rate')])
+register('Orders & fulfillment', [('fulfillment-coverage', 'Shipment tracking coverage')])
 register('Finance', [('finance-orders', 'Order finance: discounts, shipping and taxes'),
-    ('finance-payments', 'Payments by method and status'), ('finance-outstanding', 'Outstanding payments'),
-    ('finance-refunds', 'Fully / partially refunded order status'), ('finance-summary', 'Finance summary'),
+    ('finance-payments', 'Verified collections by gateway and method'), ('finance-outstanding', 'Outstanding payments'),
+    ('finance-refunds', 'Processed refund transactions'), ('finance-summary', 'Finance summary'),
     ('profit-orders', 'Gross profit and cost coverage by order'), ('profit-products', 'Gross profit by product'),
     ('profit-variants', 'Gross profit by variant')])
 register('Inventory', [('stock-current', 'Current stock and SKU value'), ('stock-low', 'Low / out-of-stock SKUs'),
@@ -63,6 +65,15 @@ register('Fraud', [('fraud-risk', 'High-risk orders and fraud cancellations'), (
 register('Store performance', [(f'vitals-{metric}-{dimension}', f'{metric.upper()} by {dimension}')
     for metric in ['lcp', 'inp', 'cls'] for dimension in ['time', 'page-type', 'url']],
     'Requires real-user Web Vitals collection; lab measurements cannot substitute for historical visitor data.')
+
+
+from apps.analytics.reports import SUPPORTED as ANALYTICS_REPORTS
+register('Analytics integrations', [('analytics-sources', 'Analytics source readiness'),
+    ('external-ga4', 'GA4 traffic and engagement'), ('external-search_console', 'Google Search Console SEO performance'),
+    ('external-google_ads', 'Google Ads campaign spend'), ('external-meta_ads', 'Meta Ads campaign spend')])
+for spec in CATALOG:
+    if spec['id'] in ANALYTICS_REPORTS or spec['id'] == 'campaigns':
+        spec.update(status='available', reason='')
 
 
 def bounds(params, now=None):
@@ -108,9 +119,31 @@ def report_data(key, params, now=None):
     if spec['status'] != 'available':
         return result
     notes = result['notes']
+    if key == 'campaigns':
+        from apps.analytics.campaign_reports import campaign_report
+        columns, rows, extra_notes, state, first = campaign_report(start, end)
+        result.update(columns=columns, rows=rows, notes=extra_notes, data_state=state, history_start=first)
+        return result
+    if key == 'analytics-sources' or key.startswith('external-'):
+        from apps.analytics.provider_reports import provider_report
+        columns, rows, extra_notes, state, first = provider_report(key, start, end)
+        result.update(columns=columns, rows=rows, notes=extra_notes, data_state=state, history_start=first)
+        return result
+    if key in ANALYTICS_REPORTS:
+        from apps.analytics.reports import analytics_report
+        columns, rows, extra_notes, state, first = analytics_report(key, start, end)
+        result.update(columns=columns, rows=rows, notes=extra_notes, data_state=state, history_start=first)
+        return result
+    if key in ['finance-payments', 'finance-refunds']:
+        from .transaction_reports import money_report
+        columns, rows, extra_notes = money_report(key, start, end)
+        result.update(columns=columns, rows=[[number(v) for v in row] for row in rows], notes=extra_notes)
+        return result
     notes.append('INR only. Date windows use Asia/Kolkata. Order reports use creation date and current payment status, not settlement date.')
-    orders = limited(Order.objects.filter(created_at__gte=start, created_at__lt=end, currency='INR')
-                     .select_related('user').prefetch_related('items__product').order_by('created_at', 'id'))
+    order_query = Order.objects.filter(created_at__gte=start, created_at__lt=end, currency='INR')
+    if OrderItem.objects.filter(order__in=order_query).count() > MAX_RECORDS:
+        raise ValidationError('Too many order lines. Narrow the date range.')
+    orders = limited(order_query.select_related('user').prefetch_related('items__product').order_by('created_at', 'id'))
     settled = [o for o in orders if paid(o)]
     if sum(len(o.items.all()) for o in orders) > MAX_RECORDS:
         raise ValidationError('Too many order lines. Narrow the date range.')
@@ -146,7 +179,7 @@ def report_data(key, params, now=None):
             day = o.created_at.astimezone(TZ).date().isoformat()
             label = {'sales-orders': o.order_number, 'finance-orders': o.order_number,
                      'sales-time': day, 'sales-averages': day, 'sales-weekdays': o.created_at.astimezone(TZ).strftime('%A'),
-                     'sales-customers': identity(o) + ' | ' + (o.user.full_name if o.user else str(o.shipping_address.get('name') or o.shipping_address.get('first_name') or 'Guest')), 'sales-coupons': o.coupon_code or '(No coupon)',
+                     'sales-customers': identity(o) + ' | ' + (o.user.full_name if o.user else str(o.shipping_address.get('name') or ' '.join(filter(None, [o.shipping_address.get('firstName'), o.shipping_address.get('lastName')])) or o.shipping_address.get('first_name') or 'Guest')), 'sales-coupons': o.coupon_code or '(No coupon)',
                      'sales-types': 'New' if first_orders.get(identity(o)) == o.pk else 'Returning',
                      'finance-summary': 'All qualifying paid orders'}.get(key)
             v = groups[label]
@@ -181,16 +214,9 @@ def report_data(key, params, now=None):
                       [[label, v[0], v[1], None if v[3] else v[2], None if v[3] else v[1]-v[2],
                         None if v[3] or not v[1] else round((v[1]-v[2])/v[1]*100, 2), v[3]] for label, v in sorted(groups.items())])
 
-    if key == 'finance-payments':
-        groups = defaultdict(lambda: [0, ZERO])
-        for o in orders:
-            groups[(o.payment_method, o.payment_status)][0] += 1
-            groups[(o.payment_method, o.payment_status)][1] += o.total
-        notes.append('Amounts are order face values by status, not net payment transactions or gateway settlements.')
-        return finish(['Method', 'Payment status', 'Orders', 'Order face value INR'], [[*k, *v] for k, v in sorted(groups.items())])
-    if key in ['finance-outstanding', 'finance-refunds']:
-        statuses = ['Pending', 'Authorized', 'Failed'] if key == 'finance-outstanding' else ['Refunded', 'Partially Refunded']
-        notes.append('Refund rows show order face value only; exact refund amount/time is not available. Failed payments are outstanding attempts, not accounts receivable.')
+    if key == 'finance-outstanding':
+        statuses = ['Pending', 'Authorized', 'Failed']
+        notes.append('Failed payments are outstanding attempts, not accounts receivable. Amounts are order face values.')
         return finish(['Order', 'Date', 'Method', 'Payment status', 'Order status', 'Order face value INR'],
                       [[o.order_number, o.created_at.astimezone(TZ).date().isoformat(), o.payment_method, o.payment_status, o.status, o.total]
                        for o in orders if o.payment_status in statuses and (key == 'finance-refunds' or o.status != 'Cancelled')])
@@ -209,8 +235,18 @@ def report_data(key, params, now=None):
         people = defaultdict(list)
         for o in history:
             people[identity(o)].append(o)
-        notes.append('Purchasers only. Identity is account ID, otherwise normalized guest email; unidentified guests stay separate. RFM reports raw recency/frequency/monetary measures, not predictive scores.')
+        notes.append('Purchasers only. Identity is account ID, otherwise normalized guest email; unidentified guests stay separate. Refunded and partially refunded orders are excluded from these qualifying-purchase metrics.')
         active = {identity(o) for o in settled}
+        if key == 'customers-repeat-rate':
+            repeat = sum(len(p) >= 2 for p in people.values())
+            notes.append('Cumulative through end date: identities with at least two qualifying paid orders / all purchasing identities. Start date does not restrict the denominator. This is not the daily returning-purchaser share.')
+            return finish(['Purchasing identities', 'Repeat purchasers', 'One-time purchasers', 'Repeat-purchase rate %'],
+                          [[len(people), repeat, len(people)-repeat, round(repeat/len(people)*100, 2) if people else None]])
+        if key == 'customers-rfm':
+            from .customer_reports import rfm_rows
+            notes.append('RFM scores use tie-preserving percentile ranks across all historical qualifying purchasers through end date. Output includes purchasers active in the selected period. Scores describe this customer base, not predicted behavior.')
+            return finish(['Customer identity', 'Recency days', 'Lifetime paid orders', 'Lifetime paid total INR', 'R score', 'F score', 'M score', 'RFM score', 'Segment'],
+                          rfm_rows(people, active, end))
         if key == 'customers-time':
             daily = defaultdict(lambda: [set(), set()])
             for o in settled:
@@ -225,7 +261,7 @@ def report_data(key, params, now=None):
             places = defaultdict(set)
             for o in settled:
                 a = o.shipping_address
-                places[(a.get('country') or 'Unknown', a.get('state') or 'Unknown', a.get('city') or 'Unknown')].add(identity(o))
+                places[(a.get('country') or a.get('countryCode') or 'Unknown', a.get('state') or 'Unknown', a.get('city') or 'Unknown')].add(identity(o))
             return finish(['Shipping country', 'State', 'City', 'Unique purchasing identities'], [[*k, len(v)] for k, v in sorted(places.items())])
         if key == 'customers-cohorts':
             cohorts = defaultdict(set)
@@ -246,6 +282,14 @@ def report_data(key, params, now=None):
                         (end.date()-p[-1].created_at.astimezone(TZ).date()).days, len(p), sum((o.total for o in p), ZERO),
                         'One-time' if len(p)==1 else 'Returning'] for who, p in people.items() if who in active])
 
+    if key == 'fulfillment-coverage':
+        shipments = limited(Shipment.objects.filter(order__in=order_query).exclude(status='Cancelled'))
+        shipped_orders = {s.order_id for s in shipments if s.shipped_at}
+        tracked_orders = {s.order_id for s in shipments if s.shipped_at and (s.awb_code.strip() or s.tracking_url.strip())}
+        notes.append('Unique orders created in the selected period with a non-cancelled shipped shipment. Tracking means an AWB or tracking URL on at least one shipped shipment; this does not verify carrier updates or complete split-shipment coverage.')
+        return finish(['Shipped orders', 'Orders with tracking', 'Orders without tracking', 'Tracking coverage %'],
+                      [[len(shipped_orders), len(tracked_orders), len(shipped_orders-tracked_orders),
+                        round(len(tracked_orders)/len(shipped_orders)*100, 2) if shipped_orders else None]])
     if key in ['orders-time', 'orders-status']:
         groups = Counter(o.created_at.astimezone(TZ).date().isoformat() if key == 'orders-time' else o.status for o in orders)
         return finish(['Date' if key == 'orders-time' else 'Status', 'Orders'], sorted(groups.items()))

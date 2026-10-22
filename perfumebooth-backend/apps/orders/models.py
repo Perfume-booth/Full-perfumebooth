@@ -123,6 +123,31 @@ class PaymentEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class PaymentTransaction(models.Model):
+    """Verified money movement, independent of editable order status.
+
+    No historical amounts are inferred from order totals. Reference uniqueness
+    deduplicates provider retries even when webhook event IDs differ.
+    """
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='payment_transactions')
+    gateway = models.CharField(max_length=30, default='razorpay')
+    reference = models.CharField(max_length=100)
+    payment_id = models.CharField(max_length=100, db_index=True)
+    kind = models.CharField(max_length=10, choices=[('capture', 'Capture'), ('refund', 'Refund')])
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3)
+    method = models.CharField(max_length=30, blank=True)
+    occurred_at = models.DateTimeField(db_index=True)
+    time_basis = models.CharField(max_length=30, default='received_at')
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['gateway', 'kind', 'reference'], name='unique_payment_movement'),
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name='payment_movement_positive'),
+        ]
+
+
 class PaymentOutbox(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
     kind = models.CharField(max_length=20)
