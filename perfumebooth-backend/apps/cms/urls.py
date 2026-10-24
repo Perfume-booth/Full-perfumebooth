@@ -1,4 +1,5 @@
 from django.urls import path
+from .notification_views import SubscribeView, RestockSubscribeView, ManageNotificationView
 from .views import (
     CMSPageListView, CMSPageView, BlogPostListView, BlogPostDetailView,
     ContactSubmissionCreateView, NewsletterSubscribeView, NewsletterStatusView,
@@ -11,7 +12,9 @@ urlpatterns = [
     path('blogs/', BlogPostListView.as_view(), name='cms-blog-list'),
     path('blogs/<path:slug_or_id>/', BlogPostDetailView.as_view(), name='cms-blog-detail'),
     path('contact/', ContactSubmissionCreateView.as_view(), name='cms-contact-submit'),
-    path('newsletter/subscribe/', NewsletterSubscribeView.as_view(), name='cms-newsletter-subscribe'),
+    path('newsletter/subscribe/', SubscribeView.as_view(), name='cms-newsletter-subscribe'),
+    path('notifications/restock/', RestockSubscribeView.as_view(), name='cms-restock-subscribe'),
+    path('notifications/manage/', ManageNotificationView.as_view(), name='cms-notification-manage'),
     path('newsletter/status/', NewsletterStatusView.as_view(), name='cms-newsletter-status'),
     path('media/', MediaAssetListView.as_view(), name='cms-media-list'),
     path('media/upload/', MediaAssetUploadView.as_view(), name='cms-media-upload'),

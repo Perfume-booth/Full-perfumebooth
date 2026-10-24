@@ -59,6 +59,39 @@ class AnalyticsTests(TestCase):
         order.save()
         self.assertEqual(self.report('conversion')['rows'][-1], ['verified_paid_order', 1])
 
+    def test_dashboard_conversion_deduplicates_sessions_and_referrer_sales(self):
+        event, token = accept(self.payload(properties={'referrer': 'https://www.instagram.com/'}))
+        accept(self.payload(properties={'referrer': 'https://google.com/'}))
+        accept(self.payload(session_id=str(uuid.uuid4()), visitor_id=str(uuid.uuid4())))
+        for index, status in enumerate(['Paid', 'Paid', 'Pending', 'Refunded', 'Partially Refunded']):
+            order = Order.objects.create(order_number=f'DASH-{index}', subtotal=100, total=100, payment_status=status)
+            attach_order(order, token)
+        foreign = Order.objects.create(order_number='DASH-USD', subtotal=100, total=100, currency='USD', payment_status='Paid')
+        attach_order(foreign, token)
+        earlier = Order.objects.create(order_number='DASH-EARLY', subtotal=100, total=100, payment_status='Paid')
+        Order.objects.filter(pk=earlier.pk).update(created_at=event.received_at-timedelta(seconds=1))
+        attach_order(earlier, token)
+        process_pending_events()
+        self.assertEqual(self.report('conversion-time')['rows'][0][1:], [2, 1, 50.0])
+        self.assertEqual(self.report('sales-referrer')['rows'], [['www.instagram.com', 2, '200.00']])
+
+    def test_dashboard_reports_do_not_invent_data_when_disabled(self):
+        accept(self.payload())
+        process_pending_events()
+        with override_settings(FIRST_PARTY_ANALYTICS_ENABLED=False):
+            for key in ['conversion-time', 'sales-referrer']:
+                report = self.report(key)
+                self.assertEqual(report['data_state'], 'disabled')
+                self.assertEqual(report['rows'], [])
+
+    def test_dashboard_conversion_requires_a_page_observation(self):
+        _, token = accept(self.payload(name='add_to_cart', properties={'product_id': 'p'}))
+        order = Order.objects.create(order_number='DASH-NO-PAGE', subtotal=100, total=100, payment_status='Paid')
+        attach_order(order, token)
+        process_pending_events()
+        self.assertEqual(self.report('conversion-time')['rows'], [])
+        self.assertEqual(self.report('sales-referrer')['rows'], [])
+
     def test_search_clicks_and_vitals_latest_observation(self):
         accept(self.payload(name='search', properties={'query': 'oud', 'search_id': 'search1', 'result_count': 0}))
         accept(self.payload(name='search_click', properties={'search_id': 'search1', 'product_id': 'p'}))

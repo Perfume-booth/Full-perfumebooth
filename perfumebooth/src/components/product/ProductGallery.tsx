@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import { AnimatedChevronLeft as ChevronLeft } from "@/components/ui/icons/AnimatedChevronLeft";
 import { AnimatedChevronRight as ChevronRight } from "@/components/ui/icons/AnimatedChevronRight";
+import { useProductVariant } from "./ProductVariantContext";
 
 interface ProductGalleryProps {
   images: { id: number; image: string; alt_text: string }[];
   title: string;
+  children?: ReactNode;
 }
 
-export default function ProductGallery({ images, title }: ProductGalleryProps) {
+export default function ProductGallery({ images, title, children }: ProductGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomStyle, setZoomStyle] = useState({ display: "none", transformOrigin: "center", transform: "scale(1)" });
 
@@ -24,6 +26,44 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
+  const { selectedVariant } = useProductVariant();
+
+  // Switch main gallery image when selected variant changes
+  useEffect(() => {
+    if (!emblaApi || !selectedVariant) return;
+
+    if (selectedVariant.image) {
+      const idx = images.findIndex((img) => img.image === selectedVariant.image);
+      if (idx !== -1) {
+        emblaApi.scrollTo(idx);
+        setActiveIndex(idx);
+        return;
+      }
+    }
+
+    if (selectedVariant.title) {
+      const vTitle = selectedVariant.title.toLowerCase();
+      const altIdx = images.findIndex(
+        (img) => img.alt_text && img.alt_text.toLowerCase().includes(vTitle)
+      );
+      if (altIdx !== -1) {
+        emblaApi.scrollTo(altIdx);
+        setActiveIndex(altIdx);
+        return;
+      }
+    }
+
+    if (selectedVariant.option1_value) {
+      const optVal = selectedVariant.option1_value.toLowerCase();
+      const optIdx = images.findIndex(
+        (img) => img.alt_text && img.alt_text.toLowerCase().includes(optVal)
+      );
+      if (optIdx !== -1) {
+        emblaApi.scrollTo(optIdx);
+        setActiveIndex(optIdx);
+      }
+    }
+  }, [selectedVariant, emblaApi, images]);
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -38,6 +78,7 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
     setScrollSnaps(emblaApi.scrollSnapList());
     emblaApi.on("select", onSelect);
     emblaApi.on("reInit", onSelect);
+    return () => { emblaApi.off("select", onSelect); emblaApi.off("reInit", onSelect); };
   }, [emblaApi, onSelect]);
 
   const scrollTo = useCallback((index: number) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
@@ -46,9 +87,9 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
 
   if (!images || images.length === 0) {
     return (
-      <div className="w-full aspect-square bg-gray-50 flex items-center justify-center border border-[var(--color-border)]">
+      <div className="space-y-5"><div className="w-full aspect-square bg-gray-50 flex items-center justify-center border border-[var(--color-border)]">
         <span className="text-gray-400 text-sm uppercase tracking-widest">No Image Available</span>
-      </div>
+      </div>{children}</div>
     );
   }
 
@@ -72,18 +113,21 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
   };
 
   return (
-    <div className="flex flex-col-reverse md:flex-row gap-4 lg:gap-8 w-full h-full self-start">
+    <div className={`grid gap-3 md:gap-5 w-full items-start ${images.length > 1 ? "grid-cols-[3.5rem_minmax(0,1fr)] md:grid-cols-[4.5rem_minmax(0,1fr)]" : "grid-cols-1"}`}>
       {/* Thumbnails */}
       {images.length > 1 && (
         <div
-          className="hidden md:flex flex-col gap-3.5 overflow-y-hidden w-18 max-h-[500px] scrollbar-hide py-2 px-0.5 snap-y snap-mandatory"
+          aria-label="Product images"
+          className="flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[min(65vw,500px)] py-1 px-1 snap-y snap-mandatory"
         >
           {images.map((img, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => scrollTo(idx)}
-              className={`relative flex-shrink-0 w-14 h-14 transition-all duration-500 overflow-hidden snap-center rounded-xl border ${activeIndex === idx
+              aria-label={`View product image ${idx + 1}`}
+              aria-pressed={activeIndex === idx}
+              className={`relative flex-shrink-0 w-full aspect-square transition-all duration-500 overflow-hidden snap-center rounded-xl border ${activeIndex === idx
                 ? "ring-2 ring-[#b8924a] ring-offset-2 border-transparent opacity-100"
                 : "border-[var(--color-border)] opacity-60 hover:opacity-100 hover:border-[#b8924a] grayscale hover:grayscale-0"
                 }  shadow-sm`}
@@ -93,6 +137,7 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
                 src={img.image}
                 alt={img.alt_text || `${title} thumbnail ${idx + 1}`}
                 fill
+                sizes="64px"
                 className="object-contain p-2"
               />
             </button>
@@ -101,7 +146,8 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
       )}
 
       {/* Main Image Slider */}
-      <div className="relative flex-grow group aspect-square w-full max-w-[500px] max-h-[500px] mx-auto overflow-hidden bg-white border border-[var(--color-border)]/40">
+      <div className="min-w-0 w-full max-w-[500px] mx-auto space-y-5">
+      <div data-testid="product-main-image" className="relative group aspect-square w-full overflow-hidden bg-white border border-[var(--color-border)]/40">
         <div className="overflow-hidden h-full w-full" ref={emblaRef}>
           <div className="flex h-full">
             {images.map((img, idx) => (
@@ -121,7 +167,7 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
                       transformOrigin: zoomStyle.transformOrigin,
                       transform: zoomStyle.transform
                     } : {}}
-                    sizes="(max-width: 768px) 100vw, 80vw"
+                    sizes="(max-width: 1023px) 80vw, 500px"
                     priority={idx === 0}
                   />
                 </div>
@@ -172,6 +218,8 @@ export default function ProductGallery({ images, title }: ProductGalleryProps) {
             ))}
           </div>
         )}
+      </div>
+      {children}
       </div>
     </div>
   );

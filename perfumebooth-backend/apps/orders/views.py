@@ -496,6 +496,18 @@ class ShiprocketWebhookView(APIView):
     authentication_classes = []
 
     def post(self, request):
+        import hmac
+        from django.conf import settings
+        expected_token = getattr(settings, 'SHIPROCKET_WEBHOOK_TOKEN', '')
+        provided_token = (
+            request.headers.get('x-api-key') or 
+            request.headers.get('X-Shiprocket-Token') or 
+            request.headers.get('Authorization', '').replace('Bearer ', '').strip()
+        )
+
+        if not expected_token or not provided_token or not hmac.compare_digest(expected_token, provided_token):
+            return Response({'detail': 'Unauthorized webhook request.'}, status=status.HTTP_401_UNAUTHORIZED)
+
         data = request.data
         order_number = data.get('order_id')
         current_status = data.get('current_status', '').upper()

@@ -137,6 +137,7 @@ class PurchaseLifecycleTests(TestCase):
             status=Shipment.Status.PENDING,
         )
 
+        from django.conf import settings
         with patch('apps.orders.tasks.send_shipping_dispatch_email.delay') as mock_dispatch_email:
             # Shipped webhook
             resp = self.client.post('/api/v1/checkout/webhooks/shiprocket/', {
@@ -145,7 +146,7 @@ class PurchaseLifecycleTests(TestCase):
                 'shipment_id': 'SR-SHIP-123',
                 'awb': 'AWB-COD-999',
                 'courier_name': 'Bluedart Express',
-            }, format='json')
+            }, format='json', HTTP_X_API_KEY=settings.SHIPROCKET_WEBHOOK_TOKEN)
             self.assertEqual(resp.status_code, 200)
             mock_dispatch_email.assert_called_once_with(str(order.id))
 
@@ -157,7 +158,7 @@ class PurchaseLifecycleTests(TestCase):
             'order_id': order.order_number,
             'current_status': 'DELIVERED',
             'shipment_id': 'SR-SHIP-123',
-        }, format='json')
+        }, format='json', HTTP_X_API_KEY=settings.SHIPROCKET_WEBHOOK_TOKEN)
         self.assertEqual(resp.status_code, 200)
 
         order.refresh_from_db()

@@ -36,6 +36,7 @@ export interface VariantItem {
   dimensions?: string;
   is_default?: boolean;
   is_active?: boolean;
+  image?: string | null;
 }
 
 interface VariantManagerProps {
@@ -297,6 +298,7 @@ export default function VariantManager({
               <thead className="text-muted-foreground font-bold uppercase text-[10px] tracking-wider border-b border-border/40">
                 <tr>
                   <th className="p-3 text-center w-12" title="Default Variant (120)">Default</th>
+                  <th className="p-3 text-center w-16" title="Variant Image">Image</th>
                   <th className="p-3">Attribute & Value (114)</th>
                   <th className="p-3">Variant SKU (112)</th>
                   <th className="p-3">Barcode (113)</th>
@@ -337,6 +339,42 @@ export default function VariantManager({
                           >
                             <Star className={`w-3.5 h-3.5 ${isDefault ? 'fill-amber-400' : ''}`} />
                           </button>
+                        </td>
+
+                        {/* Variant Image Preview */}
+                        <td className="p-3 text-center">
+                          {v.image ? (
+                            <div className="relative group/thumb inline-block">
+                              <img
+                                src={v.image}
+                                alt={v.title}
+                                className="w-10 h-10 object-contain rounded-xl neu-inset-sm border border-border/30 bg-card p-0.5 mx-auto"
+                                onError={(e) => {
+                                  // Fallback gracefully on broken images
+                                  const target = e.currentTarget;
+                                  target.style.display = 'none';
+                                  const fallback = target.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.classList.remove('hidden');
+                                }}
+                              />
+                              <div className="hidden w-10 h-10 rounded-xl neu-inset-sm border border-border/20 flex-col items-center justify-center text-muted-foreground/60 mx-auto text-[9px] font-bold">
+                                <span>No Img</span>
+                              </div>
+                              <div className="absolute left-12 top-0 z-50 hidden group-hover/thumb:block w-36 h-36 bg-card rounded-2xl neu-extruded border border-border p-1.5 shadow-2xl pointer-events-none">
+                                <img
+                                  src={v.image}
+                                  alt={v.title}
+                                  className="w-full h-full object-contain rounded-xl bg-black/5"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                                <span className="block text-[9px] text-center font-bold mt-1 text-foreground truncate">{v.title}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl neu-inset-sm border border-border/20 flex flex-col items-center justify-center text-muted-foreground/60 mx-auto text-[9px] font-bold" title="No image assigned to this variant">
+                              <span>No Img</span>
+                            </div>
+                          )}
                         </td>
 
                         {/* 114. Variant Attributes (Option 1 Value & Name) */}
@@ -488,7 +526,7 @@ export default function VariantManager({
                       {/* Expandable Panel for 122. Dimensions, 123. Weight, and Option 2 */}
                       {isExpanded && (
                         <tr className="border-b border-border/20">
-                          <td colSpan={11} className="p-4">
+                          <td colSpan={12} className="p-4">
                             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-card neu-extruded-sm border border-border/20 rounded-2xl p-4">
                               {/* 123. Variant Weight */}
                               <div className="flex flex-col gap-1">
@@ -544,6 +582,37 @@ export default function VariantManager({
                                   placeholder="e.g. EDP, Extrait, Oil"
                                   className="px-3 py-2 neu-input rounded-xl text-xs font-semibold text-foreground"
                                 />
+                              </div>
+
+                              {/* Variant Image URL */}
+                              <div className="flex flex-col gap-1 sm:col-span-4 border-t border-border/20 pt-3 mt-1">
+                                <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center justify-between">
+                                  <span>Variant Image URL (Cloudflare R2 / S3 CDN)</span>
+                                  {v.image && (
+                                    <a href={v.image} target="_blank" rel="noreferrer" className="text-primary hover:underline lowercase font-normal text-[10px]">
+                                      open link in new tab ↗
+                                    </a>
+                                  )}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={v.image || ''}
+                                    onChange={(e) => handleUpdateRow(idx, 'image', e.target.value)}
+                                    placeholder="https://pub-...r2.dev/variants/image.jpg"
+                                    className="flex-1 px-3 py-2 neu-input rounded-xl text-xs font-mono text-foreground"
+                                  />
+                                  {v.image && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateRow(idx, 'image', '')}
+                                      className="px-2.5 py-2 text-xs text-red-500 hover:text-red-400 neu-btn rounded-xl cursor-pointer"
+                                      title="Remove image from variant"
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>

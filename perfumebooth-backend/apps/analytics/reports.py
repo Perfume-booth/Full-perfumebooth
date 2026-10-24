@@ -1,12 +1,13 @@
 from collections import defaultdict
 from datetime import timedelta
+from decimal import Decimal
 from math import ceil
 from django.conf import settings
 from .models import Event, OrderAttribution
 from apps.shop.reporting import TZ
 
 SUPPORTED = {'sessions-time', 'visitors-now', 'sessions-referrer', 'sessions-device', 'sessions-landing',
-             'conversion', 'search-queries', 'search-clicks', 'search-conversion'} | {
+             'conversion', 'conversion-time', 'sales-referrer', 'search-queries', 'search-clicks', 'search-conversion'} | {
     f'vitals-{metric}-{dimension}' for metric in ['lcp', 'inp', 'cls'] for dimension in ['time', 'page-type', 'url']}
 
 
@@ -28,7 +29,34 @@ def analytics_report(key, start, end):
     paid_sessions = {p.session_id for p in purchases}
     notes.append('Purchases mean Django Paid orders created in the selected window, attributed at checkout with a signed consent-session token. Uncollected COD and refunded orders are excluded; no revenue is inferred from thank-you pages.')
     columns, rows = [], []
-    if key.startswith('vitals-'):
+    if key in ['conversion-time', 'sales-referrer']:
+        # One first observed page per session/window. Never infer a referrer from
+        # a later page, and never credit an order placed before that observation.
+        first_pages = {sid: next((e for e in observations if e.name == 'page_view'), None)
+                       for sid, observations in sessions.items()}
+        eligible = [p for p in purchases if first_pages.get(p.session_id)
+                    and p.order.currency == 'INR'
+                    and p.order.created_at >= first_pages[p.session_id].received_at]
+        converted = {p.session_id for p in eligible}
+        if key == 'conversion-time':
+            days = defaultdict(set)
+            for sid, page in first_pages.items():
+                if page:
+                    days[page.received_at.astimezone(TZ).date().isoformat()].add(sid)
+            columns = ['Session cohort date', 'Observed sessions', 'Sessions with qualifying paid order', 'Observed conversion %']
+            rows = [[day, len(sids), len(sids & converted), round(100 * len(sids & converted) / len(sids), 2)]
+                    for day, sids in sorted(days.items())]
+            notes.append('Daily cohorts use the first page observed within this window. Numerator is distinct cohort sessions with a later qualifying INR paid order before the window ends; multiple orders count once. No-page sessions are excluded. This is not cross-device conversion, and recent cohorts can still convert later.')
+        else:
+            groups = defaultdict(lambda: [0, Decimal('0')])
+            for attributed in eligible:
+                referrer = first_pages[attributed.session_id].properties.get('referrer') or 'Unknown / direct'
+                groups[referrer][0] += 1
+                groups[referrer][1] += attributed.order.total
+            columns = ['Observed referrer', 'Qualifying paid orders', 'Observed paid total INR']
+            rows = [[referrer, count, str(total)] for referrer, (count, total) in sorted(groups.items(), key=lambda item: -item[1][1])]
+            notes.append('Same-session first-observed referrer, not causal marketing attribution. Amounts are qualifying INR paid order totals including tax/shipping, not net sales or settlement revenue. Unattributed, pending, cancelled and refunded orders are excluded; missing or retained-out history is not reconstructed.')
+    elif key.startswith('vitals-'):
         _, metric, dimension = key.split('-', 2)
         latest = {}
         for event in events:

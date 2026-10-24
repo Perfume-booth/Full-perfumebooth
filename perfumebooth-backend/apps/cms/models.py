@@ -168,6 +168,27 @@ class NewsletterSubscriber(models.Model):
         return f"{self.email} ({status})"
 
 
+class NotificationSubscription(models.Model):
+    """Confirmed consent and durable delivery state, separate from order email."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField()
+    kind = models.CharField(max_length=20, choices=[('newsletter', 'Newsletter'), ('restock', 'Restock')])
+    target = models.CharField(max_length=50, default='newsletter')
+    product = models.ForeignKey('shop.Product', null=True, blank=True, on_delete=models.CASCADE)
+    variant = models.ForeignKey('shop.ProductVariant', null=True, blank=True, on_delete=models.CASCADE)
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_active = models.BooleanField(default=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    confirmation_state = models.CharField(max_length=20, default='pending', db_index=True)
+    notification_state = models.CharField(max_length=20, default='pending', db_index=True)
+    notified_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['email', 'kind', 'target'], name='unique_notification_subscription')]
+
+
 class MediaFolder(models.Model):
     """
     Folder categorization for CMS media assets (Laravel Filament style).

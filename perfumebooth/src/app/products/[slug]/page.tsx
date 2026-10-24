@@ -8,6 +8,7 @@ import { parseRating, getBrandFromTags, cleanMetafieldValue } from '@/lib/transf
 import { cleanImageUrl as normalizeMediaUrl } from '@/lib/media-url';
 import { availableUnits, catalogAvailable } from '@/lib/catalog-availability';
 import ProductGallery from "@/components/product/ProductGallery";
+import { ProductVariantProvider, ProductVariantSelector } from "@/components/product/ProductVariantContext";
 import ProductDetailsClient from "@/components/product/ProductDetailsClient";
 import ProductReviews from "@/components/product/ProductReviews";
 import RelatedProducts from "@/components/product/RelatedProducts";
@@ -95,6 +96,7 @@ export interface Product {
         availableForSale?: boolean;
         quantityAvailable?: number;
         requiresShipping?: boolean;
+        image?: string | null;
     }[];
     coupons?: { code: string; label: string; description: string }[];
 }
@@ -137,6 +139,20 @@ async function getProduct(slug: string): Promise<Product | null> {
             }
         }
 
+        // Append any variant images that are not yet in the gallery
+        if (Array.isArray(p.variants)) {
+            p.variants.forEach((v: any, vIdx: number) => {
+                const vImg = cleanImageUrl(v.image);
+                if (vImg && !images.some((img: any) => img.image === vImg)) {
+                    images.push({
+                        id: images.length + vIdx + 1,
+                        image: vImg,
+                        alt_text: `${p.title} - ${v.title || v.option1_value || 'Variant'}`
+                    });
+                }
+            });
+        }
+
         const priceVal = parseFloat(p.price || "0").toFixed(2);
         const comparePriceVal = p.compare_at_price ? parseFloat(p.compare_at_price).toFixed(2) : undefined;
 
@@ -166,11 +182,13 @@ async function getProduct(slug: string): Promise<Product | null> {
                 is_default: Boolean(variant.is_default),
                 availableForSale: Boolean(p.is_online) && variant.is_active !== false && availableUnits(variant) > 0,
                 quantityAvailable: availableUnits(variant),
-                requiresShipping: true
+                requiresShipping: true,
+                image: cleanImageUrl(variant.image) || (images.length > 0 ? images[0].image : null)
             })) : [{
                 id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
                 availableForSale: catalogAvailable(p),
-                quantityAvailable: availableUnits(p), requiresShipping: true
+                quantityAvailable: availableUnits(p), requiresShipping: true,
+                image: cleanImageUrl(p.image) || (images.length > 0 ? images[0].image : null)
             }],
             coupons: []
         };
@@ -358,13 +376,16 @@ export default async function ProductPage({
 
             {/* Layout Container */}
             <div className="max-w-7xl mx-auto px-4 md:px-6 pt-16 md:pt-8">
+                <ProductVariantProvider key={String(product.id)} product={product}>
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
 
                     {/* Left Column Stack (Gallery + Narrative) */}
                     <div className="contents lg:flex lg:flex-col lg:col-span-7 gap-8 lg:gap-12">
                         {/* 1. Gallery - Always Top */}
                         <div className="w-full h-fit order-1">
-                            <ProductGallery images={product.images} title={product.title} />
+                            <ProductGallery images={product.images} title={product.title}>
+                                <ProductVariantSelector product={product} />
+                            </ProductGallery>
                         </div>
 
                         {/* 3. Narrative - 3rd on Mobile, Below Gallery on Desktop */}
@@ -395,6 +416,7 @@ export default async function ProductPage({
                         </div>
                     </div>
                 </div>
+                </ProductVariantProvider>
             </div>
 
             <div className="w-full">

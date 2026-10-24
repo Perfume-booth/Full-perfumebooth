@@ -75,11 +75,10 @@ def sanitized_exception_handler(exc, context):
 
         # Do not interpolate exception messages: database/provider errors can contain secrets.
         logger.error(
-            "Unhandled server exception in %s on %s (type=%s): %s",
+            "Unhandled server exception in %s on %s (type=%s)",
             view_name,
             path,
             type(exc).__name__,
-            str(exc),
             exc_info=True,
         )
 

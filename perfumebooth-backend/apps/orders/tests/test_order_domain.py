@@ -124,13 +124,14 @@ class OrderDomainTests(TestCase):
         )
         order = Order.objects.get(id=result['order_id'])
 
+        from django.conf import settings
         response = self.client.post('/api/v1/checkout/webhooks/shiprocket/', {
             'order_id': order.order_number,
             'current_status': 'DELIVERED',
             'shipment_id': 'provider-shipment-delivered',
             'awb': 'AWB-DELIVERED',
             'courier_name': 'Test Courier',
-        }, format='json')
+        }, format='json', HTTP_X_API_KEY=settings.SHIPROCKET_WEBHOOK_TOKEN)
 
         self.assertEqual(response.status_code, 200)
         order.refresh_from_db()

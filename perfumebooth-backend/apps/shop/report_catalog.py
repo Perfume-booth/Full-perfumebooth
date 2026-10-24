@@ -68,6 +68,7 @@ register('Store performance', [(f'vitals-{metric}-{dimension}', f'{metric.upper(
 
 
 from apps.analytics.reports import SUPPORTED as ANALYTICS_REPORTS
+register('Acquisition & search', [('conversion-time', 'Observed session conversion over time')])
 register('Analytics integrations', [('analytics-sources', 'Analytics source readiness'),
     ('external-ga4', 'GA4 traffic and engagement'), ('external-search_console', 'Google Search Console SEO performance'),
     ('external-google_ads', 'Google Ads campaign spend'), ('external-meta_ads', 'Meta Ads campaign spend')])

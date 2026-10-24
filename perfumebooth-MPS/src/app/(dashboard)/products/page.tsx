@@ -2090,6 +2090,31 @@ export default function ProductsPage() {
                         >
                           {product.title}
                         </button>
+                        {product.variants && product.variants.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg neu-inset-sm text-primary border border-primary/20">
+                              {product.variants.length} Variants
+                            </span>
+                            {product.variants.some((v: any) => v.image) && (
+                              <div className="flex items-center -space-x-1.5 overflow-hidden py-0.5" title="Variant bottle previews">
+                                {product.variants.filter((v: any) => v.image).slice(0, 6).map((v: any, vIdx: number) => (
+                                  <img
+                                    key={v.id || vIdx}
+                                    src={v.image!}
+                                    alt={v.title}
+                                    title={`${v.title} (₹${v.price})`}
+                                    className="inline-block w-6 h-6 rounded-full ring-2 ring-card object-contain bg-white border border-border/30"
+                                  />
+                                ))}
+                                {product.variants.filter((v: any) => v.image).length > 6 && (
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-[9px] font-bold ring-2 ring-card text-foreground">
+                                    +{product.variants.filter((v: any) => v.image).length - 6}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className="text-xs font-mono text-muted-foreground">{product.sku}</span>
                           {(product.barcode || product.attributes?.barcode) && (

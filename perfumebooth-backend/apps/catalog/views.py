@@ -2,6 +2,7 @@
 Catalog Views — Thin Controllers for Product Catalog, Facets, Brands, and Recommendations.
 All domain logic is delegated to CatalogService, FacetService, BrandService, and RecommendationService.
 """
+import re
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,10 +15,17 @@ from .services import (
     RecommendationService,
 )
 
+BRAND_NAME_REGEX = re.compile(r"^[A-Za-z0-9 .\-&'+/]{1,100}$")
+
 
 class BrandListView(APIView):
     """GET /api/v1/catalog/brands/ — List brands. POST / DELETE to manage brands."""
-    permission_classes = [permissions.AllowAny]
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
 
     def get(self, request):
         brands = BrandService.get_cached_brands()
@@ -25,10 +33,13 @@ class BrandListView(APIView):
 
     def post(self, request):
         brand_name = request.data.get('brand')
-        if brand_name:
-            brands = BrandService.save_brand(brand_name)
-            return Response({'status': 'success', 'brands': brands})
-        return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not brand_name:
+            return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        brand_name = str(brand_name).strip()
+        if not BRAND_NAME_REGEX.match(brand_name):
+            return Response({'error': 'Invalid brand name.'}, status=status.HTTP_400_BAD_REQUEST)
+        brands = BrandService.save_brand(brand_name)
+        return Response({'status': 'success', 'brands': brands})
 
     def put(self, request):
         old_brand = request.data.get('old_brand') or request.data.get('old_name')
@@ -38,7 +49,10 @@ class BrandListView(APIView):
                 {'error': 'Both old_brand and new_brand are required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        brands = BrandService.update_brand(old_brand, new_brand)
+        new_brand = str(new_brand).strip()
+        if not BRAND_NAME_REGEX.match(new_brand):
+            return Response({'error': 'Invalid brand name.'}, status=status.HTTP_400_BAD_REQUEST)
+        brands = BrandService.update_brand(str(old_brand).strip(), new_brand)
         return Response({'status': 'success', 'brands': brands})
 
     def patch(self, request):
@@ -48,7 +62,7 @@ class BrandListView(APIView):
         brand_name = request.data.get('brand') or request.query_params.get('brand')
         if not brand_name:
             return Response({'error': 'Brand name is required'}, status=status.HTTP_400_BAD_REQUEST)
-        brands = BrandService.delete_brand(brand_name)
+        brands = BrandService.delete_brand(str(brand_name).strip())
         return Response({'status': 'success', 'brands': brands})
 
 

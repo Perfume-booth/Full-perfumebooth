@@ -1,6 +1,9 @@
 import random
+import secrets
+import re
 import logging
 from datetime import datetime, timedelta
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -23,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Initialize circuit breakers for Google and Facebook OAuth endpoints
 google_breaker = CircuitBreaker(name="GoogleOAuth", failure_threshold=3, recovery_timeout=15.0)
 facebook_breaker = CircuitBreaker(name="FacebookOAuth", failure_threshold=3, recovery_timeout=15.0)
+PINCODE_REGEX = re.compile(r'^\d{6}$')
 
 
 def get_tokens_for_user(user):
@@ -164,8 +168,8 @@ class CustomerSendOTPView(APIView):
         if not phone:
             return Response({'detail': 'Phone number is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Generate a 6-digit code
-        code = f"{random.randint(100000, 999999)}"
+        # Generate a cryptographically secure 6-digit code
+        code = f"{secrets.randbelow(900000) + 100000}"
         expires_at = timezone.now() + timedelta(minutes=5)
 
         # Create verification record
@@ -175,9 +179,8 @@ class CustomerSendOTPView(APIView):
             expires_at=expires_at
         )
 
-        # Log to console for development testing
-        print(f"\n[OTP DEBUG] Sent OTP '{code}' to phone '{phone}'\n")
-        logger.info(f"OTP '{code}' sent to '{phone}'")
+        if settings.DEBUG:
+            logger.debug("OTP generated for phone ending in %s", phone[-4:] if len(phone) >= 4 else phone)
 
         # In production, integrate your SMS provider here (e.g. Twilio / Fast2SMS)
 
@@ -258,8 +261,10 @@ class CustomerSocialAuthView(APIView):
         first_name = ''
         last_name = ''
 
+        allow_mock = getattr(settings, 'DEBUG', False) or getattr(settings, 'ALLOW_MOCK_OAUTH', False)
+
         if provider == 'google':
-            if token == 'mock-google-id-token-12345':
+            if allow_mock and token == 'mock-google-id-token-12345':
                 email = 'google.user@example.com'
                 uid = 'google-mock-12345'
                 first_name = 'Google'
@@ -288,7 +293,7 @@ class CustomerSocialAuthView(APIView):
                 last_name = data.get('family_name', '')
 
         elif provider == 'facebook':
-            if token == 'mock-facebook-access-token-12345':
+            if allow_mock and token == 'mock-facebook-access-token-12345':
                 email = 'facebook.user@example.com'
                 uid = 'facebook-mock-12345'
                 first_name = 'Facebook'
@@ -313,14 +318,22 @@ class CustomerSocialAuthView(APIView):
                     last_name = parts[1] if len(parts) > 1 else ''
 
         elif provider == 'apple':
-            if token == 'mock-apple-identity-token-12345':
+            if allow_mock and token == 'mock-apple-identity-token-12345':
                 email = 'apple.user@example.com'
                 uid = 'apple-mock-12345'
                 first_name = 'Apple'
                 last_name = 'User'
             else:
                 try:
-                    decoded = jwt.decode(token, options={"verify_signature": False})
+                    from jwt import PyJWKClient
+                    jwks_client = PyJWKClient("https://appleid.apple.com/auth/keys")
+                    signing_key = jwks_client.get_signing_key_from_jwt(token)
+                    decoded = jwt.decode(
+                        token,
+                        signing_key.key,
+                        algorithms=["RS256"],
+                        options={"verify_exp": True, "verify_signature": True}
+                    )
                     email = decoded.get('email')
                     uid = decoded.get('sub')
                 except Exception:
@@ -336,11 +349,21 @@ class CustomerSocialAuthView(APIView):
         try:
             social_account = SocialAccount.objects.get(provider=provider, uid=uid)
             user = social_account.user
+            if user and (user.is_staff or user.is_superuser):
+                return Response(
+                    {'detail': 'Staff accounts cannot sign in through customer social authentication.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         except SocialAccount.DoesNotExist:
             # Check if user exists with the same email
             user = None
             if email:
                 user = CustomUser.objects.filter(email=email).first()
+                if user and (user.is_staff or user.is_superuser):
+                    return Response(
+                        {'detail': 'Staff accounts cannot sign in through customer social authentication.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
 
             if not user:
                 # Create a new user
@@ -440,26 +463,42 @@ class CustomerAddressListView(APIView):
         user = request.user
         data = request.data
 
-        # If this is the first address, make it default
-        is_first = not user.addresses.exists()
-        is_default = data.get('is_default', is_first)
+        address1 = str(data.get('address1') or '').strip()
+        city = str(data.get('city') or '').strip()
+        pincode = str(data.get('zip', data.get('pincode', '')) or '').strip()
 
-        if is_default:
-            user.addresses.update(is_default=False)
+        if not address1 or not city or not pincode:
+            return Response(
+                {'detail': 'Address line 1, city, and PIN code are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        addr = CustomerAddress.objects.create(
-            user=user,
-            first_name=data.get('first_name', data.get('firstName', '')),
-            last_name=data.get('last_name', data.get('lastName', '')),
-            address1=data.get('address1', ''),
-            address2=data.get('address2', ''),
-            city=data.get('city', ''),
-            province=data.get('province', data.get('state', '')),
-            country=data.get('country', 'India'),
-            zip=data.get('zip', data.get('pincode', '')),
-            phone=data.get('phone', ''),
-            is_default=is_default
-        )
+        if not PINCODE_REGEX.match(pincode):
+            return Response(
+                {'detail': 'Invalid PIN code. Must be a 6-digit postal code.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            has_existing = user.addresses.exists()
+            is_default = True if not has_existing else bool(data.get('is_default', False))
+
+            if is_default and has_existing:
+                user.addresses.update(is_default=False)
+
+            addr = CustomerAddress.objects.create(
+                user=user,
+                first_name=data.get('first_name', data.get('firstName', '')),
+                last_name=data.get('last_name', data.get('lastName', '')),
+                address1=address1,
+                address2=data.get('address2', ''),
+                city=city,
+                province=data.get('province', data.get('state', '')),
+                country=data.get('country', 'India'),
+                zip=pincode,
+                phone=data.get('phone', ''),
+                is_default=is_default
+            )
 
         return Response({
             'id': str(addr.id),
@@ -490,16 +529,30 @@ class CustomerAddressDetailView(APIView):
             return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         data = request.data
-        addr.first_name = data.get('first_name', data.get('firstName', addr.first_name))
-        addr.last_name = data.get('last_name', data.get('lastName', addr.last_name))
-        addr.address1 = data.get('address1', addr.address1)
-        addr.address2 = data.get('address2', addr.address2)
-        addr.city = data.get('city', addr.city)
-        addr.province = data.get('province', data.get('state', addr.province))
-        addr.country = data.get('country', addr.country)
-        addr.zip = data.get('zip', data.get('pincode', addr.zip))
-        addr.phone = data.get('phone', addr.phone)
-        addr.save()
+        if 'address1' in data and not str(data['address1']).strip():
+            return Response({'detail': 'Address line 1 cannot be blank.'}, status=status.HTTP_400_BAD_REQUEST)
+        if 'city' in data and not str(data['city']).strip():
+            return Response({'detail': 'City cannot be blank.'}, status=status.HTTP_400_BAD_REQUEST)
+        if 'zip' in data or 'pincode' in data:
+            pin = str(data.get('zip', data.get('pincode', ''))).strip()
+            if not PINCODE_REGEX.match(pin):
+                return Response({'detail': 'Invalid PIN code. Must be a 6-digit postal code.'}, status=status.HTTP_400_BAD_REQUEST)
+            addr.zip = pin
+
+        with transaction.atomic():
+            if data.get('is_default'):
+                request.user.addresses.exclude(id=addr.id).update(is_default=False)
+                addr.is_default = True
+
+            addr.first_name = data.get('first_name', data.get('firstName', addr.first_name))
+            addr.last_name = data.get('last_name', data.get('lastName', addr.last_name))
+            addr.address1 = data.get('address1', addr.address1)
+            addr.address2 = data.get('address2', addr.address2)
+            addr.city = data.get('city', addr.city)
+            addr.province = data.get('province', data.get('state', addr.province))
+            addr.country = data.get('country', addr.country)
+            addr.phone = data.get('phone', addr.phone)
+            addr.save()
 
         return Response({
             'id': str(addr.id),
@@ -521,7 +574,15 @@ class CustomerAddressDetailView(APIView):
         except CustomerAddress.DoesNotExist:
             return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        addr.delete()
+        with transaction.atomic():
+            was_default = addr.is_default
+            addr.delete()
+            if was_default:
+                remaining = request.user.addresses.order_by('-created_at').first()
+                if remaining:
+                    remaining.is_default = True
+                    remaining.save(update_fields=['is_default'])
+
         return Response({'detail': 'Address deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
 
 
@@ -537,9 +598,10 @@ class CustomerAddressSetDefaultView(APIView):
         except CustomerAddress.DoesNotExist:
             return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        request.user.addresses.update(is_default=False)
-        addr.is_default = True
-        addr.save()
+        with transaction.atomic():
+            request.user.addresses.exclude(id=addr.id).update(is_default=False)
+            addr.is_default = True
+            addr.save(update_fields=['is_default'])
 
         return Response({'detail': 'Default address updated successfully.'})
 
@@ -562,17 +624,20 @@ class CustomerPasswordResetRequestView(APIView):
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
-            # Determine frontend URL
+            # Determine frontend URL with strict origin whitelist validation
+            default_frontend = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+            trusted_origins = set(getattr(settings, 'CORS_ALLOWED_ORIGINS', [])) | \
+                              set(getattr(settings, 'CSRF_TRUSTED_ORIGINS', [])) | \
+                              {default_frontend}
             raw_url = request.data.get('frontend_url') or request.headers.get('Origin') or request.headers.get('Referer')
+            frontend_url = default_frontend
             if raw_url:
                 from urllib.parse import urlparse
                 parsed = urlparse(raw_url)
                 if parsed.scheme and parsed.netloc:
-                    frontend_url = f"{parsed.scheme}://{parsed.netloc}"
-                else:
-                    frontend_url = raw_url.rstrip('/')
-            else:
-                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                    origin = f"{parsed.scheme}://{parsed.netloc}".rstrip('/')
+                    if origin in trusted_origins:
+                        frontend_url = origin
 
             reset_url = f"{frontend_url.rstrip('/')}/account/reset/{uid}/{token}"
 

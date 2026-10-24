@@ -1,6 +1,7 @@
 """
 CMS Views — Page layout JSON endpoints consumed by Next.js
 """
+import os
 import re
 import json
 from rest_framework import permissions, status
@@ -13,7 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
 
 from PIL import Image
-from core.validators import validate_image_upload
+from core.validators import validate_image_upload, validate_media_upload
 from apps.shop.views import format_media_url
 from .models import (
     CMSPage, CMSSection, BlogPost, ContactSubmission, NewsletterSubscriber,
@@ -597,9 +598,8 @@ class NewsletterStatusView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        email = (request.query_params.get('email') or '').strip().lower()
-        if not email and request.user and request.user.is_authenticated:
-            email = request.user.email.strip().lower()
+        # Do not expose subscription or purchase history for arbitrary email addresses.
+        email = request.user.email.strip().lower() if request.user.is_authenticated else ''
 
         if not email:
             return Response({
@@ -668,6 +668,7 @@ class MediaAssetListView(APIView):
         system_folders = [
             {'name': 'All Files', 'slug': 'all', 'count': total_count},
             {'name': 'Banners & Hero', 'slug': 'banners', 'count': folder_counts.get('banners', 0)},
+            {'name': 'Videos & Reels', 'slug': 'videos', 'count': folder_counts.get('videos', 0)},
             {'name': 'Homepage Sections', 'slug': 'homepage', 'count': folder_counts.get('homepage', 0)},
             {'name': 'Categories', 'slug': 'categories', 'count': folder_counts.get('categories', 0)},
             {'name': 'Brand Logos', 'slug': 'brands', 'count': folder_counts.get('brands', 0)},
@@ -701,8 +702,8 @@ class MediaAssetListView(APIView):
 class MediaAssetUploadView(APIView):
     """
     POST /api/cms/media/upload/
-    Multipart file upload endpoint supporting single or multi-image drops.
-    Validates with validate_image_upload, parses dimensions, and returns asset URLs.
+    Multipart file upload endpoint supporting single or multi-media drops (images & streaming videos).
+    Validates with validate_media_upload, parses dimensions for images, and returns asset URLs.
     """
     def get_permissions(self):
         return [permissions.IsAuthenticated(), HasRolePermission()]
@@ -726,32 +727,43 @@ class MediaAssetUploadView(APIView):
         uploaded_assets = []
         for f in files:
             try:
-                validate_image_upload(f)
+                media_kind = validate_media_upload(f)
             except Exception as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
             width = None
             height = None
-            try:
-                f.seek(0)
-                with Image.open(f) as img:
-                    width, height = img.size
-                f.seek(0)
-            except Exception:
-                pass
+            ext = os.path.splitext(f.name)[1].lower()
+            if media_kind == 'image':
+                try:
+                    f.seek(0)
+                    with Image.open(f) as img:
+                        width, height = img.size
+                    f.seek(0)
+                except Exception:
+                    pass
+                file_type = getattr(f, 'content_type', 'image/jpeg') or 'image/jpeg'
+            else:
+                content_type_map = {
+                    '.mp4': 'video/mp4',
+                    '.webm': 'video/webm',
+                    '.mov': 'video/quicktime',
+                    '.m4v': 'video/mp4',
+                }
+                file_type = getattr(f, 'content_type', '') or content_type_map.get(ext, 'video/mp4')
 
             asset = MediaAsset.objects.create(
                 file=f,
                 name=f.name,
                 folder=folder,
-                file_type=getattr(f, 'content_type', 'image/jpeg') or 'image/jpeg',
+                file_type=file_type,
                 file_size=f.size,
                 width=width,
                 height=height,
                 alt_text=alt_text or f.name
             )
 
-            if folder not in ['all', 'banners', 'homepage', 'categories', 'brands', 'gender', 'scent', 'instagram', 'info', 'general']:
+            if folder not in ['all', 'banners', 'videos', 'homepage', 'categories', 'brands', 'gender', 'scent', 'instagram', 'info', 'general']:
                 MediaFolder.objects.get_or_create(slug=folder, defaults={'name': folder.replace('-', ' ').title()})
 
             url = format_media_url(asset.file.url, request)

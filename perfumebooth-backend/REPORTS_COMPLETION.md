@@ -1,5 +1,14 @@
 # Report completion checkpoint
 
+## Analytics dashboard update — 24 October 2026
+
+- The MPS Analytics page contains the 25 requested report panels, date controls, independently handled loading/errors, preview CSV export, charts, and expandable definitions/data. It reuses authenticated report APIs; it does not connect to Shopify.
+- Added `conversion-time`: distinct observed session cohorts with a later qualifying paid INR order. Multiple purchases in a session count once; sessions without a page observation are excluded.
+- Added an implemented `sales-referrer` report: first observed referrer in the selected session/window, joined to qualifying Django paid INR orders. Orders before that observation, pending payments, cancellations and refunds are excluded. Social panels filter recognized hostnames, not arbitrary text matches.
+- These are consent-limited observations, not whole-store causal attribution. Disabled tracking and missing historical data remain explicitly unavailable.
+- Still unavailable: full-order item-level fulfillment completion, historical sales-channel snapshots, visitor geolocation, inventory sell-through, POS staff/location ledgers, item-allocated sales reversals and return fees. Date comparisons and automated insight generation are not implemented.
+- Verification: 23 analytics/report tests passed on the isolated test database; MPS TypeScript validation passed. Browser fixture tests do not establish live business-data accuracy. No schema changes or production records were written by this update.
+
 ## Implemented in this pass
 
 - Additive `orders.0010_paymenttransaction` migration: verified captures and individual processed refunds, protected order reference, positive-amount constraint, provider-reference uniqueness and timestamp provenance.

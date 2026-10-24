@@ -207,6 +207,7 @@ CELERY_TASK_ROUTES = {
 }
 
 CELERY_BEAT_SCHEDULE = {
+    'customer-notifications': {'task': 'apps.cms.tasks.deliver_customer_notifications', 'schedule': 60.0, 'options': {'queue': 'emails'}},
     'analytics-inbox': {'task': 'apps.analytics.tasks.process_pending_events', 'schedule': 10.0},
     'analytics-retention': {'task': 'apps.analytics.tasks.expire_analytics', 'schedule': 86400.0},
     'analytics-provider-refresh': {'task': 'apps.analytics.tasks.refresh_provider_reports', 'schedule': 21600.0},
@@ -334,7 +335,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 
 # Cloudflare R2 / Local Media Storage Dynamic Configuration (R2 active)
-USE_R2 = config('USE_R2', default=False, cast=bool)
+USE_R2 = config('USE_R2', default=False, cast=bool) if 'test' not in sys.argv else False
 
 if USE_R2:
     R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID')
@@ -409,6 +410,11 @@ AUTH_PASSWORD_VALIDATORS = [
 # Email Configuration (SMTP)
 # ─────────────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_TIMEOUT = 15
+# Enable only after setting the public storefront URL and testing your email provider.
+CUSTOMER_NOTIFICATIONS_ENABLED = config('CUSTOMER_NOTIFICATIONS_ENABLED', default=False, cast=bool)
+NOTIFICATION_SITE_URL = config('NOTIFICATION_SITE_URL', default='http://localhost:3001')
+NOTIFICATION_FROM_EMAIL = config('NOTIFICATION_FROM_EMAIL', default='PerfumeBooth <admin@perfumebooth.com>')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.resend.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
@@ -430,3 +436,5 @@ SHIPROCKET_EMAIL = SHIPROCKET_API_EMAIL
 SHIPROCKET_PASSWORD = SHIPROCKET_API_PASSWORD
 SHIPROCKET_PICKUP_PINCODE = config('SHIPROCKET_PICKUP_PINCODE', default='110001')
 SHIPROCKET_PICKUP_LOCATION = config('SHIPROCKET_PICKUP_LOCATION', default='Primary Warehouse')
+
+SHIPROCKET_WEBHOOK_TOKEN = config('SHIPROCKET_WEBHOOK_TOKEN', default='shiprocket-webhook-token')

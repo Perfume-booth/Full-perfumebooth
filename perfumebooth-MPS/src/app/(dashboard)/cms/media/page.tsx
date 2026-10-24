@@ -14,7 +14,8 @@ import {
   Layout, 
   ImageIcon, 
   ExternalLink,
-  Layers
+  Layers,
+  Film
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { MediaAssetItem, FolderItem } from '@/components/cms/MediaLibraryModal';
@@ -192,7 +193,7 @@ export default function MediaManagerPage() {
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*"
+            accept="image/*,video/mp4,video/webm,video/quicktime"
             className="hidden"
             onChange={(e) => {
               if (e.target.files) handleUploadFiles(e.target.files);
@@ -205,7 +206,7 @@ export default function MediaManagerPage() {
             className="flex items-center gap-2 px-5 py-2.5 neu-btn-primary font-bold rounded-2xl transition duration-200 cursor-pointer text-xs disabled:opacity-50"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-            <span>{uploading ? 'Uploading...' : 'Upload Image(s)'}</span>
+            <span>{uploading ? 'Uploading...' : 'Upload Media (R2)'}</span>
           </button>
         </div>
       </div>
@@ -321,13 +322,29 @@ export default function MediaManagerPage() {
                     className="group bg-card border border-border/30 rounded-2xl overflow-hidden hover:border-primary/60 hover:shadow-lg transition flex flex-col"
                   >
                     <div className="relative aspect-square w-full bg-muted/20 dark:bg-black/20 overflow-hidden flex items-center justify-center p-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={asset.url}
-                        alt={asset.name}
-                        className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs"
-                        loading="lazy"
-                      />
+                      {asset.file_type?.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(asset.url) ? (
+                        <>
+                          <video
+                            src={asset.url}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs pointer-events-none"
+                          />
+                          <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded bg-purple-600/90 text-white text-[9px] font-black uppercase flex items-center gap-1 shadow-xs">
+                            <Film className="w-2.5 h-2.5" />
+                            <span>Video</span>
+                          </div>
+                        </>
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={asset.url}
+                          alt={asset.name}
+                          className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs"
+                          loading="lazy"
+                        />
+                      )}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
                         <div className="flex justify-between items-center">
                           <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/70 text-white">

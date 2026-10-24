@@ -11,6 +11,8 @@ import { AnimatedStar as Star } from "@/components/ui/icons/AnimatedStar";
 import type { Product } from "@/app/products/[slug]/page";
 import ProductTrustBadges from "./ProductTrustBadges";
 import ProductPaymentInfo from "./ProductPaymentInfo";
+import RestockNotification from "./RestockNotification";
+import { useProductVariant } from "./ProductVariantContext";
 import { useRecentStore } from "@/store/useRecentStore";
 import { useWishlist } from "@/store/useWishlist";
 import { useCartStore } from "@/store/useCartStore";
@@ -46,15 +48,9 @@ interface Props {
 
 export default function ProductDetailsClient({ product }: Props) {
   const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState<any>(product.variants?.[0] ?? null);
+  const { selectedVariant } = useProductVariant();
 
-  useEffect(() => {
-    if (product.variants && product.variants.length > 0) {
-      setSelectedVariant(product.variants[0]);
-    }
-  }, [product.variants]);
-
-  const activePrice = selectedVariant ? selectedVariant.price : product.price;
+  const activePrice = String(selectedVariant ? selectedVariant.price : product.price);
   const activeComparePrice = selectedVariant ? selectedVariant.compareAtPrice : product.compare_at_price;
   const activeStock = Math.max(0, Number(selectedVariant ? selectedVariant.quantityAvailable : product.stock_count) || 0);
   const isSoldOut = activeStock <= 0 || selectedVariant?.availableForSale === false || product.availableForSale === false;
@@ -308,6 +304,23 @@ export default function ProductDetailsClient({ product }: Props) {
             <h1 className="text-lg md:text-2xl font-bold text-[var(--color-gold)] capitalize">
               {product.title}
             </h1>
+            {selectedVariant && selectedVariant.title && selectedVariant.title !== "Default Title" && (
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">
+                  Selected Edition:
+                </span>
+                <span className="text-xs font-bold text-gray-900 bg-white px-2.5 py-0.5 rounded-md border border-[var(--color-gold)]/40 shadow-xs flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-[var(--color-gold)]"></span>
+                  {selectedVariant.title}
+                  {selectedVariant.option1_value && selectedVariant.option1_value !== selectedVariant.title ? ` • ${selectedVariant.option1_value}` : ""}
+                </span>
+                {selectedVariant.sku && (
+                  <span className="text-[10px] text-gray-400 font-mono">
+                    SKU: {selectedVariant.sku}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {isMounted && (
@@ -387,42 +400,15 @@ export default function ProductDetailsClient({ product }: Props) {
           <span className="text-[8px] uppercase tracking-widest text-[var(--color-text-muted)] font-bold ml-auto md:ml-0">Incl. all taxes</span>
         </div>
 
-        {/* Variant Selector Pills */}
-        {product.variants && product.variants.length > 0 && (
-          <div className="space-y-2 py-1">
-            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">
-              Select {product.variants[0]?.option1_name ? (product.variants[0].option2_name ? `${product.variants[0].option1_name} & ${product.variants[0].option2_name}` : product.variants[0].option1_name) : 'Option'}
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {product.variants.map((v: any, idx: number) => {
-                const isSelected = selectedVariant?.id === v.id || (!selectedVariant && idx === 0);
-                const displayLabel = v.option2_value
-                  ? `${v.option1_value} • ${v.option2_value}`
-                  : (v.option1_value || v.title);
-                return (
-                  <button
-                    key={v.id || idx}
-                    type="button"
-                    onClick={() => setSelectedVariant(v)}
-                    className={`px-3.5 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[var(--color-gold)] bg-[var(--color-gold)]/10 text-[var(--color-gold)] shadow-sm ring-1 ring-[var(--color-gold)]'
-                        : 'border-[var(--color-border)] bg-[#fbfcfa] text-[var(--color-text-secondary)] hover:border-black'
-                    }`}
-                  >
-                    <span>{displayLabel}</span>
-                    <span className="text-[10px] ml-1.5 opacity-80">Rs. {v.price}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         <div className="flex flex-wrap gap-2">
-          {isSoldOut && (
-            <span className="px-3 md:px-4 py-1 md:py-1.5 bg-[#b8924a] text-white text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full shadow-sm animate-pulse">
-              Coming Soon
+          {isSoldOut ? (
+            <span className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 text-white text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full shadow-sm">
+              Sold Out
+            </span>
+          ) : (
+            <span className="px-3 md:px-4 py-1 md:py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              In Stock {activeStock > 0 && activeStock <= 10 ? `(Only ${activeStock} left)` : ""}
             </span>
           )}
           {product.tagline && (
@@ -550,6 +536,7 @@ export default function ProductDetailsClient({ product }: Props) {
             </button>
           </div>
 
+          {isSoldOut && <RestockNotification key={selectedVariant?.id || String(product.id)} productId={product.id} variantId={selectedVariant?.id} variantTitle={selectedVariant?.title} />}
           <button
             onClick={handleBuyNow}
             disabled={isSoldOut || isBuyingNow}

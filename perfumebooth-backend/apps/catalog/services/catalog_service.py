@@ -115,12 +115,19 @@ class CatalogService:
 
         variants_data = []
         for var in product.variants.all():
+            var_image = None
+            if var.image:
+                try:
+                    var_image = request.build_absolute_uri(var.image.url) if request else var.image.url
+                except Exception:
+                    var_image = None
             variants_data.append({
                 'id': str(var.id),
                 'title': var.title,
                 'option1_name': var.option1_name,
                 'option1_value': var.option1_value,
                 'option2_name': var.option2_name,
+                'option2_value': var.option2_value,
                 'sku': var.sku,
                 'barcode': var.barcode or '',
                 'price': str(var.price),
@@ -131,6 +138,7 @@ class CatalogService:
                 'dimensions': var.dimensions or '',
                 'is_default': var.is_default,
                 'is_active': var.is_active,
+                'image': var_image,
             })
 
         stock_val = 0
@@ -543,16 +551,33 @@ class CatalogService:
             else:
                 variants_list = []
 
+            existing_images_by_sku = {
+                var.sku: var.image for var in product.variants.all() if var.image
+            }
+            existing_images_by_title = {
+                var.title.strip().lower(): var.image for var in product.variants.all() if var.image
+            }
             product.variants.all().delete()
             for v_data in variants_list:
+                var_sku = v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}"
+                var_title = v_data.get('title', 'Default Title')
+                existing_img = existing_images_by_sku.get(var_sku) or existing_images_by_title.get(var_title.strip().lower())
+                var_image_val = existing_img
+                if v_data.get('image') and isinstance(v_data.get('image'), str):
+                    img_str = v_data.get('image')
+                    if '/variants/' in img_str:
+                        var_image_val = 'variants/' + img_str.split('/variants/')[-1]
+                    elif not var_image_val and not img_str.startswith('http'):
+                        var_image_val = img_str
+
                 ProductVariant.objects.create(
                     product=product,
-                    title=v_data.get('title', 'Default Title'),
+                    title=var_title,
                     option1_name=v_data.get('option1_name', 'Size'),
                     option1_value=v_data.get('option1_value', '100ml'),
                     option2_name=v_data.get('option2_name', ''),
                     option2_value=v_data.get('option2_value', ''),
-                    sku=v_data.get('sku') or f"{product.sku}-{v_data.get('option1_value', '1')}",
+                    sku=var_sku,
                     barcode=v_data.get('barcode', ''),
                     price=Decimal(str(v_data.get('price') or product.price)),
                     compare_at_price=Decimal(str(v_data.get('compare_at_price'))) if v_data.get('compare_at_price') else None,
@@ -562,6 +587,7 @@ class CatalogService:
                     dimensions=str(v_data.get('dimensions', '')),
                     is_default=bool(v_data.get('is_default', False)),
                     is_active=bool(v_data.get('is_active', True)) if 'is_active' in v_data else True,
+                    image=var_image_val,
                 )
 
         # Manual Collections Sync

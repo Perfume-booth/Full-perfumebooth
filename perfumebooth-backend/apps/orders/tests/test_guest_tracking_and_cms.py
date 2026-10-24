@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 from apps.orders.models import Order, OrderItem
-from apps.cms.models import ContactSubmission, NewsletterSubscriber
+from apps.cms.models import ContactSubmission, NewsletterSubscriber, NotificationSubscription
 from apps.shop.models import Product
 
 
@@ -145,7 +145,8 @@ class GuestTrackingAndCMSTests(TestCase):
         sub_email = 'newsletter_fan@example.com'
         res = self.client.post('/api/cms/newsletter/subscribe/', {
             'email': sub_email,
-            'source': 'homepage_banner'
+            'source': 'homepage_banner',
+            'consent': True
         })
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         res_data = res.json().get('data', res.json())
@@ -154,15 +155,22 @@ class GuestTrackingAndCMSTests(TestCase):
         # Verify DB record
         subscriber = NewsletterSubscriber.objects.filter(email=sub_email).first()
         self.assertIsNotNone(subscriber)
+        self.assertFalse(subscriber.is_active)
+        sub = NotificationSubscription.objects.get(email=sub_email)
+        self.client.post('/api/cms/notifications/manage/', {'token': str(sub.token), 'action': 'confirm'})
+        subscriber.refresh_from_db()
         self.assertTrue(subscriber.is_active)
         self.assertEqual(subscriber.source, 'homepage_banner')
 
         # Check status endpoint
+        self.user.email = sub_email
+        self.user.save(update_fields=['email'])
+        self.client.force_authenticate(user=self.user)
         res = self.client.get(f'/api/cms/newsletter/status/?email={sub_email}')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         data = res.json().get('data', res.json())
         self.assertTrue(data['isSubscribed'])
-        self.assertFalse(data['hasOrders'])
+        self.assertTrue(data['hasOrders'])
 
         # Verify with user having orders
         res = self.client.get(f'/api/cms/newsletter/status/?email=guest@example.com')

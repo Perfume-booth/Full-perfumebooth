@@ -96,3 +96,19 @@ class MediaLibraryTests(TestCase):
     def test_unauthorized_access_rejected(self):
         res = self.anon_client.get('/api/cms/media/')
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_video_upload_supported(self):
+        self.client.force_authenticate(user=self.staff_user)
+        dummy_mp4_bytes = b'\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00isommp42'
+        video_file = SimpleUploadedFile("sample_reel.mp4", dummy_mp4_bytes, content_type="video/mp4")
+        upload_res = self.client.post('/api/cms/media/upload/', {
+            'file': video_file,
+            'folder': 'videos',
+            'alt_text': 'Perfume Commercial Reel'
+        }, format='multipart')
+        self.assertEqual(upload_res.status_code, status.HTTP_201_CREATED)
+        data = unwrap(upload_res)
+        self.assertEqual(data['assets'][0]['name'], 'sample_reel.mp4')
+        self.assertEqual(data['assets'][0]['folder'], 'videos')
+        self.assertEqual(data['assets'][0]['file_type'], 'video/mp4')
+        self.assertIsNone(data['assets'][0]['width'])

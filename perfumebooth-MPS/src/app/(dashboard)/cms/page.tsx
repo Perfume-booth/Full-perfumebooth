@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import ImageUploadPicker from '@/components/cms/ImageUploadPicker';
 import AccordionItem from '@/components/cms/AccordionItem';
+import MediaLibraryModal from '@/components/cms/MediaLibraryModal';
 
 interface CMSSection {
   id?: string;
@@ -50,6 +51,10 @@ export default function CMSBuilderPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeSectionIdx, setActiveSectionIdx] = useState<number>(0);
+
+  // Video Media Library Modal State
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoTargetIdx, setVideoTargetIdx] = useState<number | null>(null);
 
   // Drag and Drop States for Sections
   const [draggedSectionIdx, setDraggedSectionIdx] = useState<number | null>(null);
@@ -722,29 +727,75 @@ export default function CMSBuilderPage() {
                               handleUpdateSectionContent(activeSectionIdx, 'items', items);
                             }}
                           >
-                            <div className="grid grid-cols-2 gap-3">
-                              <input
-                                type="text"
-                                value={vItem.label || ''}
-                                onChange={(e) => {
-                                  const items = [...(activeSec.content.items || [])];
-                                  items[vIdx].label = e.target.value;
-                                  handleUpdateSectionContent(activeSectionIdx, 'items', items);
-                                }}
-                                placeholder="Title / Brand Label"
-                                className="px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
-                              />
-                              <input
-                                type="text"
-                                value={vItem.video || ''}
-                                onChange={(e) => {
-                                  const items = [...(activeSec.content.items || [])];
-                                  items[vIdx].video = e.target.value;
-                                  handleUpdateSectionContent(activeSectionIdx, 'items', items);
-                                }}
-                                placeholder="MP4 Video URL"
-                                className="px-3 py-1.5 neu-input rounded-xl text-xs"
-                              />
+                            <div className="flex flex-col gap-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Title / Brand</label>
+                                  <input
+                                    type="text"
+                                    value={vItem.label || ''}
+                                    onChange={(e) => {
+                                      const items = [...(activeSec.content.items || [])];
+                                      items[vIdx].label = e.target.value;
+                                      handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                    }}
+                                    placeholder="Title / Brand Label"
+                                    className="w-full px-3 py-1.5 neu-input rounded-xl text-xs font-bold"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="flex justify-between items-center mb-1">
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">MP4 Video URL</label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setVideoTargetIdx(vIdx);
+                                        setVideoModalOpen(true);
+                                      }}
+                                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Film className="w-3 h-3 text-purple-500" />
+                                      <span>Choose / Upload Video (R2)</span>
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={vItem.video || ''}
+                                    onChange={(e) => {
+                                      const items = [...(activeSec.content.items || [])];
+                                      items[vIdx].video = e.target.value;
+                                      handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                    }}
+                                    placeholder="https://.../video.mp4"
+                                    className="w-full px-3 py-1.5 neu-input rounded-xl text-xs"
+                                  />
+                                  {vItem.video && (
+                                    <div className="mt-2 flex items-center gap-3 p-2 bg-muted/20 rounded-xl border border-border/20">
+                                      <div className="relative w-16 aspect-[9/16] rounded-lg overflow-hidden bg-black border border-border/40 shadow-xs shrink-0">
+                                        <video src={vItem.video} muted loop autoPlay playsInline className="w-full h-full object-cover" />
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground flex flex-col gap-0.5">
+                                        <span className="font-bold text-foreground">Cloudflare R2 Video Reel</span>
+                                        <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold">✓ Live & streaming</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase">Target Link</label>
+                                <input
+                                  type="text"
+                                  value={vItem.href || ''}
+                                  onChange={(e) => {
+                                    const items = [...(activeSec.content.items || [])];
+                                    items[vIdx].href = e.target.value;
+                                    handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                                  }}
+                                  placeholder="/products/fragrance-name"
+                                  className="w-full px-3 py-1.5 neu-input rounded-xl text-xs"
+                                />
+                              </div>
                             </div>
                           </AccordionItem>
                         ))}
@@ -1179,6 +1230,29 @@ export default function CMSBuilderPage() {
               </div>
             )}
           </div>
+
+          {videoModalOpen && (
+            <MediaLibraryModal
+              isOpen={videoModalOpen}
+              defaultFolder="videos"
+              title="Choose or Upload Video Reel to Cloudflare R2"
+              onClose={() => {
+                setVideoModalOpen(false);
+                setVideoTargetIdx(null);
+              }}
+              onSelect={(url) => {
+                if (videoTargetIdx !== null && activeSec) {
+                  const items = [...(activeSec.content.items || [])];
+                  if (items[videoTargetIdx]) {
+                    items[videoTargetIdx].video = url;
+                    handleUpdateSectionContent(activeSectionIdx, 'items', items);
+                  }
+                }
+                setVideoModalOpen(false);
+                setVideoTargetIdx(null);
+              }}
+            />
+          )}
         </div>
       );
     }

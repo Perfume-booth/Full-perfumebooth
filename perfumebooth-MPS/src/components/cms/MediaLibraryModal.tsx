@@ -12,7 +12,8 @@ import {
   Loader2, 
   ImageIcon, 
   Filter, 
-  Maximize2
+  Maximize2,
+  Film
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
@@ -207,7 +208,7 @@ export default function MediaLibraryModal({
               ref={fileInputRef}
               type="file" 
               multiple 
-              accept="image/*" 
+              accept="image/*,video/mp4,video/webm,video/quicktime" 
               className="hidden" 
               onChange={(e) => {
                 if (e.target.files) handleUploadFiles(e.target.files);
@@ -224,7 +225,7 @@ export default function MediaLibraryModal({
               ) : (
                 <UploadCloud className="w-4 h-4" />
               )}
-              <span>{uploading ? 'Uploading...' : 'Upload Image(s)'}</span>
+              <span>{uploading ? 'Uploading...' : 'Upload Media (R2)'}</span>
             </button>
 
             {/* Close Button */}
@@ -242,7 +243,7 @@ export default function MediaLibraryModal({
         {isDragOver && (
           <div className="absolute inset-0 z-30 bg-primary/15 border-4 border-dashed border-primary backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none">
             <UploadCloud className="w-16 h-16 text-primary animate-bounce mb-3" />
-            <h3 className="text-lg font-black text-foreground">Drop Images Here to Upload</h3>
+            <h3 className="text-lg font-black text-foreground">Drop Media Files Here to Upload</h3>
             <p className="text-xs text-muted-foreground">Uploading directly to folder: {selectedFolder}</p>
           </div>
         )}
@@ -370,15 +371,31 @@ export default function MediaLibraryModal({
                       }}
                       className="group relative bg-card border border-border/30 rounded-2xl overflow-hidden hover:border-primary/60 hover:shadow-lg transition cursor-pointer flex flex-col"
                     >
-                      {/* Image Thumbnail Aspect Container */}
+                      {/* Media Thumbnail Aspect Container */}
                       <div className="relative aspect-square w-full bg-muted/20 dark:bg-black/20 overflow-hidden flex items-center justify-center p-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={asset.url}
-                          alt={asset.alt_text || asset.name}
-                          className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs"
-                          loading="lazy"
-                        />
+                        {asset.file_type?.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(asset.url) ? (
+                          <>
+                            <video
+                              src={asset.url}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs pointer-events-none"
+                            />
+                            <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded bg-purple-600/90 text-white text-[9px] font-black uppercase flex items-center gap-1 shadow-xs">
+                              <Film className="w-2.5 h-2.5" />
+                              <span>Video</span>
+                            </div>
+                          </>
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={asset.url}
+                            alt={asset.alt_text || asset.name}
+                            className="object-contain max-w-full max-h-full group-hover:scale-105 transition-transform duration-300 drop-shadow-xs"
+                            loading="lazy"
+                          />
+                        )}
 
                         {/* Hover Overlay Actions */}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">

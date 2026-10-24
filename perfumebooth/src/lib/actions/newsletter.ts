@@ -9,7 +9,7 @@ const API_URL = isDocker ? "http://django:8000" : "http://localhost:8000";
 export async function checkNewsletterSubscriptionAction() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("customerAccessToken")?.value;
+    const token = cookieStore.get("access_token")?.value || cookieStore.get("customerAccessToken")?.value;
     if (!token) {
       return { isSubscribed: false, hasOrders: false, success: true };
     }
@@ -28,7 +28,8 @@ export async function checkNewsletterSubscriptionAction() {
       return { isSubscribed: false, hasOrders: false, success: true };
     }
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw?.data ?? raw;
     return {
       isSubscribed: Boolean(data.isSubscribed),
       hasOrders: Boolean(data.hasOrders),

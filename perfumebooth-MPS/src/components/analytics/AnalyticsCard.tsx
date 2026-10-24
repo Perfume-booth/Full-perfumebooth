@@ -40,7 +40,7 @@ function Content({ card, report }: { card: CardSpec; report: Report }) {
   if (card.kind === 'bars') {
     const ranked = card.source === 'conversion' ? data : [...data].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
     const max = Math.max(1, ...ranked.map(row => row.value ?? 0));
-    return <div className={styles.bars}>{ranked.slice(0, 6).map(item => <div key={item.name}><div className={styles.barLabel}><span title={item.name}>{item.name.replaceAll('_', ' ')}</span><strong>{display(item.value)}</strong></div><div className={styles.track}><div style={{ width: `${Math.max(0, (item.value ?? 0) / max * 100)}%` }} /></div></div>)}<small>{report.columns[valueIndex]}{ranked.length > 6 ? ' · Top 6 shown' : ''}</small></div>;
+    return <div className={styles.bars}>{ranked.slice(0, 6).map((item, index) => <div key={`${item.name}:${index}`}><div className={styles.barLabel}><span title={item.name}>{item.name.replaceAll('_', ' ')}</span><strong>{display(item.value)}</strong></div><div className={styles.track}><div style={{ width: `${Math.max(0, (item.value ?? 0) / max * 100)}%` }} /></div></div>)}<small>{report.columns[valueIndex]}{ranked.length > 6 ? ' · Top 6 loaded rows shown' : ''}</small></div>;
   }
   if (card.kind === 'cohorts') return <Cohorts report={report} />;
   return <ReportTable report={{ ...report, rows }} />;
@@ -53,7 +53,7 @@ export default function AnalyticsCard({ card, report, error, pending }: { card: 
     {card.note && <p className={styles.note}>{card.note}</p>}
     {report && !pending && !error && <>
       {report.total > report.rows.length && <p className={styles.note}>Preview: first {report.rows.length} of {report.total} rows. Open Reports for the full export. No totals are calculated from truncated rows.</p>}
-      <details className={styles.details}><summary>Definitions &amp; data</summary>{report.notes.map(note => <p key={note}>{note}</p>)}{!reason && !['table', 'cohorts'].includes(card.kind || '') && report.rows.length > 0 && <ReportTable report={report} />}</details>
+      <details className={styles.details}><summary>Definitions &amp; data</summary>{report.notes.map(note => <p key={note}>{note}</p>)}{!reason && !['table', 'cohorts'].includes(card.kind || '') && report.rows.length > 0 && <ReportTable report={card.social ? { ...report, rows: report.rows.filter(row => isSocialReferrer(row[0])), total: report.rows.filter(row => isSocialReferrer(row[0])).length } : report} />}</details>
     </>}
   </section>;
 }

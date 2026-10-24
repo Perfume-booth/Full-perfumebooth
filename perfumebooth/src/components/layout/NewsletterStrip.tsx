@@ -1,21 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Cookies from "js-cookie";
 import { useNewsletterStore } from "@/store/useNewsletterStore";
 import { AnimatedCheck } from "@/components/ui/icons/AnimatedCheck";
 
 export default function NewsletterStrip({ isFooter = false }: { isFooter?: boolean }) {
-    const { isSubscribed, hasOrders, setSubscribed } = useNewsletterStore();
+    const { isSubscribed } = useNewsletterStore();
+    const [message, setMessage] = useState("");
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
-        setIsLoggedIn(Cookies.get("isLoggedIn") === "true");
     }, []);
 
     // Prevent hydration mismatch by not rendering until mounted
@@ -35,13 +33,13 @@ export default function NewsletterStrip({ isFooter = false }: { isFooter?: boole
             const response = await fetch("/api/newsletter", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify({ email, consent: true }),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                setSubscribed(true);
+                setMessage(data.message || "Check your email to confirm your subscription.");
                 setEmail("");
             } else {
                 setError(data.error || "Subscription failed. Please try again.");
@@ -53,7 +51,7 @@ export default function NewsletterStrip({ isFooter = false }: { isFooter?: boole
         }
     };
 
-    if (isLoggedIn && hasOrders) return null;
+    if (message) return <p role="status" className="text-sm py-3">{message}</p>;
 
     return !isSubscribed ? (
         <div className={isFooter ? "w-full" : "bg-gradient-to-r from-[var(--color-maroon)] to-[#a01428]"}>
@@ -63,9 +61,11 @@ export default function NewsletterStrip({ isFooter = false }: { isFooter?: boole
                     <p className={`text-xs ${isFooter ? "text-[var(--color-text-muted)] mt-1" : "text-white/60"}`}>Subscribe to our newsletter for Exclusive deals & fragrance tips</p>
                 </div>
                 <div className="w-full space-y-2">
-                    <form onSubmit={handleSubscribe} className="flex gap-2 w-full">
+                    <form onSubmit={handleSubscribe} aria-label="Newsletter subscription" className="flex flex-wrap gap-2 w-full">
                         <input
                             type="email"
+                            aria-label="Newsletter email address"
+                            maxLength={254}
                             required
                             placeholder="Enter your email..."
                             value={email}
@@ -89,8 +89,9 @@ export default function NewsletterStrip({ isFooter = false }: { isFooter?: boole
                         >
                             {loading ? '...' : 'Subscribe'}
                         </button>
+                        <label className="flex w-full items-start gap-2 text-xs"><input type="checkbox" required className="mt-0.5" />I agree to receive fragrance news and offers. I can unsubscribe at any time.</label>
                     </form>
-                    {error && <p className="text-[10px] text-red-500 font-medium ml-2">{error}</p>}
+                    {error && <p role="alert" className="text-[10px] text-red-500 font-medium ml-2">{error}</p>}
                 </div>
             </div>
         </div>

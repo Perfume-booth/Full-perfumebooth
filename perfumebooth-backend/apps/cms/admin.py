@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CMSPage, CMSSection, BlogPost, ContactSubmission, NewsletterSubscriber
+from .models import CMSPage, CMSSection, BlogPost, ContactSubmission, NewsletterSubscriber, NotificationSubscription
 
 
 class CMSSectionInline(admin.TabularInline):
@@ -55,3 +55,14 @@ class NewsletterSubscriberAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'created_at')
     search_fields = ('email',)
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(NotificationSubscription)
+class NotificationSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('email', 'kind', 'product', 'variant', 'is_active', 'confirmed_at', 'confirmation_state', 'notification_state', 'notified_at', 'last_error')
+    list_filter = ('kind', 'is_active', 'confirmation_state', 'notification_state')
+    search_fields = ('email', 'product__title', 'variant__sku')
+    readonly_fields = tuple(field.name for field in NotificationSubscription._meta.fields)
+
+    def has_add_permission(self, request):
+        return False

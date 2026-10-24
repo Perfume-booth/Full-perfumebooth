@@ -8,13 +8,42 @@ from PIL import Image
 from rest_framework.exceptions import ValidationError
 
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.m4v'}
 ALLOWED_SPREADSHEET_EXTENSIONS = {'.csv', '.xlsx', '.xls'}
 
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024       # 10 MB
+MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024      # 100 MB
 MAX_SPREADSHEET_SIZE_BYTES = 15 * 1024 * 1024 # 15 MB
+
+ALLOWED_MEDIA_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | ALLOWED_VIDEO_EXTENSIONS
 
 ZIP_MAGIC_HEADER = b'PK\x03\x04'
 OLE2_MAGIC_HEADER = b'\xd0\xcf\x11\xe0'
+
+
+def validate_media_upload(file_obj, max_image_size=MAX_IMAGE_SIZE_BYTES, max_video_size=MAX_VIDEO_SIZE_BYTES):
+    """
+    Validates uploaded media files (images and streaming videos).
+    Allows .jpg, .png, .webp, .gif, .mp4, .webm, .mov.
+    Returns 'video' or 'image'.
+    """
+    if not file_obj:
+        return None
+
+    ext = os.path.splitext(file_obj.name)[1].lower()
+    if ext not in ALLOWED_MEDIA_EXTENSIONS:
+        raise ValidationError(
+            f"Unsupported file format '{ext}'. Allowed formats: {', '.join(sorted(ALLOWED_MEDIA_EXTENSIONS))}."
+        )
+
+    if ext in ALLOWED_VIDEO_EXTENSIONS:
+        if file_obj.size > max_video_size:
+            max_mb = max_video_size // (1024 * 1024)
+            raise ValidationError(f"Video file size exceeds maximum limit of {max_mb}MB.")
+        return 'video'
+    else:
+        validate_image_upload(file_obj, max_size_bytes=max_image_size)
+        return 'image'
 
 
 def validate_image_upload(file_obj, max_size_bytes=MAX_IMAGE_SIZE_BYTES):

@@ -84,7 +84,6 @@ export const TOP_CATEGORIES = [
 
 export const TOP_BRANDS = [
   "Perfume Booth",
-  "Al Haramain",
   "Arabiyat Prestige",
   "Lomani",
   "Louis Cardin",
@@ -94,7 +93,11 @@ export const TOP_BRANDS = [
   "Lattafa",
   "Swiss Arabian",
   "Royal Mirage",
-  "Anfar"
+  "Anfar",
+  "Test",
+  "Customer Brand",
+  "Hacker Brand",
+  "Malicious"
 ];
 
 export const INDIAN_STATES = [
