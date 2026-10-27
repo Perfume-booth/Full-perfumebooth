@@ -5,7 +5,7 @@ This file keeps track of completed features, active architecture, test verificat
 ---
 
 ## 🎯 Current Context & Focus
-*   **Judge.me Reviews Migration Complete**: Successfully fetched all historical reviews using `perfumesbooth.myshopify.com` and the provided private token. 70 product reviews imported into PostgreSQL with original dates and verified buyer badges. Product rating averages and counts automatically recalculated.
+*   **Email OTP & Returning Customer Account Activation**: Implemented 2-step in-modal email OTP verification for password resets and old Shopify customer account activation. Dual-verification endpoint verified end-to-end with Redis caching and Resend SMTP dispatch.
 *   **Active Objective**: Production Readiness, Checklist Audit Completion, and Staging Verification.
 *   **System Status**: Full-stack luxury fragrance e-commerce platform fully built and verified across all 49 domains.
 *   **Test Suite Status**: 296/296 automated unit, integration, and security tests passing (100% pass rate) in Docker.
@@ -275,6 +275,18 @@ This file keeps track of completed features, active architecture, test verificat
 45. **Environment Configuration Audit & Social Auth Sync (Google & Facebook)**:
     *   **Frontend Verification**: Confirmed `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_FACEBOOK_APP_ID`, and `FACEBOOK_APP_SECRET` are correctly placed in [`perfumebooth/.env.local`](file:///d:/Full-Perfumebooth/perfumebooth/.env.local) and [`perfumebooth/.env.docker`](file:///d:/Full-Perfumebooth/perfumebooth/.env.docker). Next.js browser-facing OAuth components (`GoogleOAuthProvider`, `FB.init`) require the `NEXT_PUBLIC_` prefix, while server-side route handlers (`/api/auth/callback/facebook`) securely access secret keys.
     *   **Backend Harmonization**: Appended matching `GOOGLE_CLIENT_ID`, `FACEBOOK_APP_ID`, and `FACEBOOK_APP_SECRET` to [`perfumebooth-backend/.env`](file:///d:/Full-Perfumebooth/perfumebooth-backend/.env) to guarantee complete environment parity between Next.js and Django services.
+
+46. **Email OTP Password Reset & Returning Customer Account Activation**:
+    *   **In-Modal Email OTP Flow**:
+        *   **Backend**: Enhanced `CustomerPasswordResetRequestView` in [`perfumebooth-backend/apps/authentication/customer_views.py`](file:///d:/Full-Perfumebooth/perfumebooth-backend/apps/authentication/customer_views.py) to generate a 6-digit cryptographic OTP code, cache it in Redis for 15 minutes (`pwd_reset_otp:{email}`), and dispatch it via Resend SMTP in a luxury branded email with both the prominent OTP badge and direct link fallback.
+        *   **Dual-Verification Endpoint**: Enhanced `CustomerPasswordResetConfirmView` in `customer_views.py` to support dual verification. Verifies `{ email, otp, password }` directly from the modal, sets the new password, evicts the Redis OTP cache, and returns SimpleJWT `access` and `refresh` tokens for instant seamless login. Legacy URL-token fallback (`uid`, `token`, `password`) remains 100% supported.
+        *   **Next.js Server Actions**: Added `verifyEmailOtpAndResetAction` and updated `forgotPasswordAction` in [`perfumebooth/src/lib/actions/auth.ts`](file:///d:/Full-Perfumebooth/perfumebooth/src/lib/actions/auth.ts) with unified response unwrapping, >=8 char password validation, and HTTP-only cookie setting.
+    *   **Returning Customer Guidance & Two-Step UI**:
+        *   **Luxury Notification Banners**: Embedded dedicated callout banners in [`perfumebooth/src/components/ui/cloud-watch-form.tsx`](file:///d:/Full-Perfumebooth/perfumebooth/src/components/ui/cloud-watch-form.tsx) across Sign In, Sign Up, and Forgot Password modes, clearly informing existing Shopify shoppers that their accounts and order histories are safely preserved and guiding them to use "Forgot Password?" or Google Sign-In to activate.
+        *   **Two-Step Modal Experience**: In Forgot Password mode, the form seamlessly transitions from step 1 (Email Request) to step 2 (OTP Verification): displays the target email with "Change Email" button, 6-digit monospace code input, new password input with cartoon eye-closing animation, "Verify Code & Set Password" action button, and a 60-second Resend Code cooldown timer.
+    *   **Verification**:
+        *   Automated end-to-end Python test in Docker verified: OTP request (HTTP 200), Redis cache key generation, bad OTP rejection (HTTP 400), correct OTP verification (HTTP 200) with SimpleJWT issuance, Redis cache eviction, and successful login with the newly set password.
+        *   TypeScript compiler check (`npx tsc --noEmit`) passed with 0 errors.
 
 ---
 

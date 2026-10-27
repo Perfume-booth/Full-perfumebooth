@@ -10,6 +10,7 @@ import {
   loginAction, 
   registerAction, 
   forgotPasswordAction,
+  verifyEmailOtpAndResetAction,
   socialAuthAction
 } from "@/lib/actions/auth";
 import { AnimatedLoader2 as Loader2 } from "@/components/ui/icons/AnimatedLoader2";
@@ -37,9 +38,6 @@ function FacebookIcon() {
   );
 }
 
-
-
-
 interface CloudWatchFormProps {
   type?: "signin" | "signup" | "forgot";
   returnUrl?: string;
@@ -55,8 +53,34 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">(type);
+  const [forgotStep, setForgotStep] = useState<"request" | "verify">("request");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
+  const handleResendOtp = async () => {
+    if (!resetEmail || resendCooldown > 0 || loading) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    const fd = new FormData();
+    fd.append("email", resetEmail);
+    const result = await forgotPasswordAction(null, fd);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccess("A new 6-digit verification code has been sent to your email.");
+      setResendCooldown(60);
+    }
+  };
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -82,6 +106,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
 
   const handleModeChange = (newMode: "signin" | "signup" | "forgot") => {
     setMode(newMode);
+    setForgotStep("request");
     setError(null);
     setSuccess(null);
     onModeChange?.(newMode);
@@ -89,6 +114,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
 
   useEffect(() => {
     setMode(type);
+    setForgotStep("request");
     setError(null);
     setSuccess(null);
   }, [type]);
@@ -166,48 +192,61 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
       window.location.href = oauthUrl;
       return;
     }
-
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-     e.preventDefault();
-     setLoading(true);
-     setError(null);
-     setSuccess(null);
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
 
-     const formData = new FormData(e.currentTarget);
-     
-     let result: { error?: string; success?: string | boolean; redirectUrl?: string } | undefined;
-     if (mode === "signup") {
-        result = await registerAction(null, formData);
-     } else if (mode === "signin") {
-        result = await loginAction(null, formData);
-     } else {
-        result = await forgotPasswordAction(null, formData);
-     }
-
-     if (result?.error) {
+    const formData = new FormData(e.currentTarget);
+    
+    if (mode === "signup") {
+      const result = await registerAction(null, formData);
+      setLoading(false);
+      if (result.error) {
         setError(result.error);
+      } else {
+        window.location.href = result.redirectUrl || "/";
+      }
+    } else if (mode === "signin") {
+      const result = await loginAction(null, formData);
+      setLoading(false);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        window.location.href = result.redirectUrl || "/";
+      }
+    } else if (mode === "forgot") {
+      if (forgotStep === "request") {
+        const result = await forgotPasswordAction(null, formData);
         setLoading(false);
-     } else if (result?.success) {
-        if (mode === "forgot" && typeof result.success === "string") {
-          setSuccess(result.success);
-          handleModeChange("signin");
-          setLoading(false);
+        if (result.error) {
+          setError(result.error);
         } else {
-          window.location.href = result.redirectUrl || "/";
+          const emailInput = ((formData.get("email") as string) || "").trim().toLowerCase();
+          setResetEmail(emailInput);
+          setForgotStep("verify");
+          setSuccess(typeof result.success === "string" ? result.success : "A 6-digit verification code has been sent to your email.");
+          setResendCooldown(60);
         }
-     }
+      } else {
+        const result = await verifyEmailOtpAndResetAction(null, formData);
+        setLoading(false);
+        if (result.error) {
+          setError(result.error);
+        } else {
+          setSuccess("Password successfully set! Signing you in...");
+          window.location.href = result.redirectUrl || returnUrl || "/account";
+        }
+      }
+    }
   };
 
   return (
     <div className="flex items-center justify-center">
       <div className="flex flex-col items-center w-full max-w-md">
-        {mode === "forgot" && (
-          <p className="text-xs text-[var(--color-text-muted)] text-center max-w-xs mt-2 mb-1 leading-relaxed">
-            Lost your password? Please enter your email address. You will receive a link to create a new password via email.
-          </p>
-        )}
        
         {/* Cartoon Face */}
         <div className="relative w-64 h-32 mb-4">
@@ -255,6 +294,79 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
           ))}
         </div>
 
+        {/* Short Note for Old / Existing Customers */}
+        {mode === "signin" && (
+          <div className="w-full mb-4 p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl text-left text-xs leading-relaxed text-neutral-800 shadow-sm">
+            <div className="flex items-center gap-1.5 font-bold text-[var(--color-maroon)] text-[11px] uppercase tracking-wider mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-gold)] inline-block"></span>
+              Existing PerfumeBooth Customer?
+            </div>
+            <p className="text-[11px] text-neutral-600">
+              Your previous account &amp; order history are safely preserved! To access the new store, click{" "}
+              <button 
+                type="button" 
+                onClick={() => handleModeChange("forgot")} 
+                className="font-bold text-[var(--color-maroon)] underline hover:text-black transition-colors"
+              >
+                Forgot Password?
+              </button>{" "}
+              to receive an email code and set your password, or sign in directly with Google.
+            </p>
+          </div>
+        )}
+
+        {mode === "signup" && (
+          <div className="w-full mb-4 p-3.5 bg-neutral-50 border border-neutral-200 rounded-2xl text-left text-xs leading-relaxed text-neutral-700 shadow-sm">
+            <div className="flex items-center gap-1.5 font-bold text-[var(--color-gold)] text-[11px] uppercase tracking-wider mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-gold)] inline-block"></span>
+              Shopped with us before?
+            </div>
+            <p className="text-[11px] text-neutral-600">
+              No need to register a new account! Switch to{" "}
+              <button 
+                type="button" 
+                onClick={() => handleModeChange("signin")} 
+                className="font-bold text-[var(--color-maroon)] underline hover:text-black transition-colors"
+              >
+                Sign In
+              </button>{" "}
+              and use Forgot Password or Google to activate your existing profile.
+            </p>
+          </div>
+        )}
+
+        {mode === "forgot" && forgotStep === "request" && (
+          <div className="w-full mb-4 p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl text-left text-xs leading-relaxed text-neutral-800 shadow-sm">
+            <div className="flex items-center gap-1.5 font-bold text-[var(--color-maroon)] text-[11px] uppercase tracking-wider mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-gold)] inline-block"></span>
+              Account Activation &amp; Password Reset
+            </div>
+            <p className="text-[11px] text-neutral-600">
+              Enter your registered email below. We'll send an instant 6-digit verification code directly to your email inbox so you can quickly set your new password and sign in.
+            </p>
+          </div>
+        )}
+
+        {mode === "forgot" && forgotStep === "verify" && (
+          <div className="w-full mb-4 p-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-left text-xs leading-relaxed text-neutral-700 flex items-center justify-between shadow-sm">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider block">Verification code sent to</span>
+              <span className="font-semibold text-neutral-900 text-xs">{resetEmail}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setForgotStep("request");
+                setError(null);
+                setSuccess(null);
+              }}
+              className="text-[11px] font-bold text-[var(--color-maroon)] hover:underline ml-2"
+            >
+              Change Email
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-600 text-xs">   
             <AlertCircle size={16} animateOn="view" />
@@ -269,64 +381,141 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
           </div>
         )}
 
-        
         {/* Forms */}
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
           <input type="hidden" name="returnUrl" value={returnUrl} />
-          {mode === "signup" && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="name" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Full Name</Label>
-              <Input name="name" id="name" placeholder="John Doe" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
-            </div>
-          )}
-          
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Email Address</Label>
-            <Input name="email" id="email" type="email" placeholder="john@example.com" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
-          </div>
 
-          {mode !== "forgot" && (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="password" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Password</Label>
-                {mode === "signin" && (
-                  <button 
-                    type="button" 
-                    onClick={() => handleModeChange("forgot")}
-                    className="text-[10px] font-bold text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
-                  >
-                    Forgot Password?
-                  </button>
-                )}
+          {mode === "forgot" && forgotStep === "verify" ? (
+            <>
+              <input type="hidden" name="email" value={resetEmail} />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="otp" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">
+                  6-Digit Verification Code
+                </Label>
+                <Input 
+                  name="otp" 
+                  id="otp" 
+                  type="text" 
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  required 
+                  placeholder="123456" 
+                  autoFocus
+                  className="rounded-full px-5 h-11 text-center font-mono tracking-[0.4em] text-lg font-bold border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" 
+                />
               </div>
-              <Input
-                name="password"
-                id="password"
-                type="password"
-                required
-                placeholder="••••••••"
-                onFocus={() => setIsTyping(true)}
-                onBlur={() => setIsTyping(false)}
-                className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all"
-              />
-            </div>
-          )}
 
-          <Button 
-            disabled={loading}
-            className="mt-2 w-full h-11 rounded-full bg-[var(--color-maroon)] hover:bg-[var(--color-black)] text-white hover:text-white font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-maroon/20"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : (mode === "signup" ? "Sign Up" : mode === "signin" ? "Sign In" : "Send Recovery Email")}
-          </Button>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="password" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">
+                  New Password
+                </Label>
+                <Input
+                  name="password"
+                  id="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="•••••••• (min 8 characters)"
+                  onFocus={() => setIsTyping(true)}
+                  onBlur={() => setIsTyping(false)}
+                  className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all"
+                />
+              </div>
 
-          {mode === "forgot" && (
-            <button 
-              type="button" 
-              onClick={() => handleModeChange("signin")}
-              className="mt-2 text-[10px] font-black text-center text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
-            >
-              Back to Sign In
-            </button>
+              <Button 
+                disabled={loading}
+                className="mt-2 w-full h-11 rounded-full bg-[var(--color-maroon)] hover:bg-[var(--color-black)] text-white hover:text-white font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-maroon/20"
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : "Verify Code & Set Password"}
+              </Button>
+
+              <div className="flex items-center justify-between mt-2 px-1 text-[11px]">
+                <button 
+                  type="button" 
+                  onClick={() => handleModeChange("signin")}
+                  className="text-neutral-400 hover:text-[var(--color-gold)] font-semibold uppercase tracking-wider transition-colors"
+                >
+                  Cancel
+                </button>
+                <div>
+                  {resendCooldown > 0 ? (
+                    <span className="text-neutral-400 font-medium">Resend code in {resendCooldown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                      className="text-[var(--color-maroon)] hover:underline font-bold"
+                    >
+                      Resend Code
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {mode === "signup" && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="name" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Full Name</Label>
+                  <Input name="name" id="name" placeholder="John Doe" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
+                </div>
+              )}
+              
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="email" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Email Address</Label>
+                <Input name="email" id="email" type="email" placeholder="john@example.com" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
+              </div>
+
+              {mode !== "forgot" && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="password" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Password</Label>
+                    {mode === "signin" && (
+                      <button 
+                        type="button" 
+                        onClick={() => handleModeChange("forgot")}
+                        className="text-[10px] font-bold text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
+                  <Input
+                    name="password"
+                    id="password"
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    onFocus={() => setIsTyping(true)}
+                    onBlur={() => setIsTyping(false)}
+                    className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all"
+                  />
+                </div>
+              )}
+
+              <Button 
+                disabled={loading}
+                className="mt-2 w-full h-11 rounded-full bg-[var(--color-maroon)] hover:bg-[var(--color-black)] text-white hover:text-white font-bold tracking-widest uppercase text-xs transition-all duration-300 shadow-lg shadow-maroon/20"
+              >
+                {loading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  mode === "signup" ? "Sign Up" : mode === "signin" ? "Sign In" : "Send Verification Code"
+                )}
+              </Button>
+
+              {mode === "forgot" && (
+                <button 
+                  type="button" 
+                  onClick={() => handleModeChange("signin")}
+                  className="mt-2 text-[10px] font-black text-center text-neutral-400 hover:text-[var(--color-gold)] uppercase tracking-widest transition-colors"
+                >
+                  Back to Sign In
+                </button>
+              )}
+            </>
           )}
         </form>
 

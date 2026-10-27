@@ -289,7 +289,7 @@ export const requireCustomer = cache(async () => {
 });
 
 export async function forgotPasswordAction(prevState: any, formData: FormData) {
-  const email = formData.get("email") as string;
+  const email = (formData.get("email") as string)?.trim().toLowerCase();
   if (!email) {
     return { error: "Email is required." };
   }
@@ -306,12 +306,61 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
       body: JSON.stringify({ email, frontend_url: siteUrl }),
     });
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw.data || raw;
     if (!res.ok) {
-      return { error: data.detail || "Failed to process request." };
+      return { error: raw.error?.message || raw.detail || data.detail || "Failed to process request." };
     }
 
-    return { success: data.detail || "If an account exists with that email, a recovery link has been sent." };
+    return { 
+      success: data.detail || "Verification code sent to your email.",
+      email,
+      otpSent: true 
+    };
+  } catch {
+    return { error: "Network error. Please try again later." };
+  }
+}
+
+export async function verifyEmailOtpAndResetAction(prevState: any, formData: FormData) {
+  const email = (formData.get("email") as string)?.trim().toLowerCase();
+  const otp = (formData.get("otp") as string)?.trim();
+  const password = formData.get("password") as string;
+  const returnUrl = (formData.get("returnUrl") as string) || "/account";
+
+  if (!email || !otp || !password) {
+    return { error: "Email, 6-digit verification code, and new password are required." };
+  }
+
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters long." };
+  }
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/customer/password-reset-confirm/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, otp, password }),
+    });
+
+    const raw = await res.json();
+    const data = raw.data || raw;
+    if (!res.ok) {
+      return { error: raw.error?.message || raw.detail || data.detail || "Verification failed." };
+    }
+
+    const access = data.access || raw.access;
+    const refresh = data.refresh || raw.refresh;
+
+    if (access && refresh) {
+      await setAuthCookies(access, refresh);
+      return { success: true, redirectUrl: returnUrl };
+    }
+
+    return { 
+      success: data.detail || "Your password has been successfully reset.",
+      redirectUrl: "/auth?mode=signin"
+    };
   } catch {
     return { error: "Network error. Please try again later." };
   }

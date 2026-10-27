@@ -19,6 +19,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
+from django.core.cache import cache
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -599,6 +600,10 @@ class CustomerPasswordResetRequestView(APIView):
 
         user = CustomUser.objects.filter(email=email, is_active=True).first()
         if user:
+            # Generate 6-digit OTP code stored in cache for 15 minutes
+            code = f"{secrets.randbelow(900000) + 100000}"
+            cache.set(f"pwd_reset_otp:{email}", code, timeout=900)
+
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
@@ -619,18 +624,25 @@ class CustomerPasswordResetRequestView(APIView):
 
             reset_url = f"{frontend_url.rstrip('/')}/account/reset/{uid}/{token}"
 
-            subject = "Reset Your Password — PerfumeBooth"
-            message = f"Hello {user.first_name or 'Valued Customer'},\n\nPlease click the link below to reset your password:\n{reset_url}\n\nIf you did not request this, please ignore this email."
+            subject = f"Your PerfumeBooth Verification Code: {code}"
+            message = f"Hello {user.first_name or 'Valued Customer'},\n\nYour 6-digit verification code to set your password is: {code}\n\nValid for 15 minutes.\n\nOr click here to reset: {reset_url}\n\nIf you did not request this, please ignore this email."
             html_message = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
-                <h2 style="color: #5B0612;">Reset Your Password</h2>
-                <p>Hello {user.first_name or 'Valued Customer'},</p>
-                <p>We received a request to reset your PerfumeBooth account password. Click the button below to proceed:</p>
-                <p style="margin: 25px 0;">
-                    <a href="{reset_url}" style="background-color: #5B0612; color: #ffffff; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Set New Password</a>
+            <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px; background: #ffffff; border: 1px solid #e8e8e8; border-radius: 12px; color: #1a1a1a;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <h1 style="color: #5B0612; font-size: 22px; font-weight: bold; letter-spacing: 2px; margin: 0 0 6px 0;">PERFUMEBOOTH</h1>
+                    <p style="color: #B8924A; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0;">100% Authentic Luxury Fragrances</p>
+                </div>
+                <p style="font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">Hello {user.first_name or 'Valued Customer'},</p>
+                <p style="font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">Use the 6-digit verification code below to set your password and activate your account:</p>
+                <div style="background: #fdfaf3; border: 1.5px dashed #B8924A; border-radius: 10px; padding: 18px; text-align: center; margin: 24px 0;">
+                    <span style="font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #5B0612; font-family: monospace;">{code}</span>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px;">Valid for 15 minutes</p>
+                </div>
+                <p style="font-size: 13px; color: #666; margin: 24px 0 12px 0;">Or if you prefer, click the button below to reset your password via direct link:</p>
+                <p style="text-align: center; margin: 20px 0;">
+                    <a href="{reset_url}" style="background-color: #5B0612; color: #ffffff; padding: 12px 28px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block; letter-spacing: 1px;">Set New Password</a>
                 </p>
-                <p style="font-size: 12px; color: #666;">Or copy and paste this link into your browser:<br/><a href="{reset_url}" style="color: #B8924A;">{reset_url}</a></p>
-                <p style="font-size: 12px; color: #999; margin-top: 30px;">If you did not request a password reset, you can safely ignore this email.</p>
+                <p style="font-size: 11px; color: #999; margin-top: 24px; border-top: 1px solid #eee; padding-top: 16px;">If you did not request this verification, you can safely ignore this email.</p>
             </div>
             """
 
@@ -644,22 +656,52 @@ class CustomerPasswordResetRequestView(APIView):
                     fail_silently=False
                 )
             except Exception as e:
-                logger.warning(f"Could not send password reset email via SMTP ({e}). Dev Reset Link: {reset_url}")
+                logger.warning(f"Could not send password reset email via SMTP ({e}). Dev Reset Link: {reset_url} Code: {code}")
 
         return Response({
-            'detail': 'If an account exists with that email, a password reset link has been sent.'
+            'detail': 'A 6-digit verification code has been sent to your email.',
+            'email': email,
+            'otp_sent': True
         })
 
 
 class CustomerPasswordResetConfirmView(APIView):
     """
     POST /api/auth/customer/password-reset-confirm/
-    Verify token and update password.
+    Verify OTP or token and update password.
     """
     permission_classes = [permissions.AllowAny]
     throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        otp = request.data.get('otp') or request.data.get('code')
+        password = request.data.get('password')
+
+        # 1. In-modal Email OTP flow
+        if email and otp and password:
+            if len(password) < 8:
+                return Response({'detail': 'Password must be at least 8 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+            cached_code = cache.get(f"pwd_reset_otp:{email}")
+            if not cached_code or str(cached_code).strip() != str(otp).strip():
+                return Response({'detail': 'Invalid or expired verification code. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user = CustomUser.objects.filter(email=email, is_active=True).first()
+            if not user:
+                return Response({'detail': 'Customer account not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            user.set_password(password)
+            user.save(update_fields=['password'])
+            cache.delete(f"pwd_reset_otp:{email}")
+
+            tokens = get_tokens_for_user(user)
+            return Response({
+                'detail': 'Your password has been successfully set. You are now logged in.',
+                'access': tokens['access'],
+                'refresh': tokens['refresh']
+            })
+
+        # 2. Direct URL reset link fallback
         uid = request.data.get('uid') or request.data.get('id')
         token = request.data.get('token')
         password = request.data.get('password')

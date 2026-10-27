@@ -1,13 +1,18 @@
 import { useAuthStore } from '@/store/useAuthStore';
 
 export function getApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  let url = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!url && typeof window !== 'undefined') {
+    url = `${window.location.protocol}//${window.location.hostname}:8000/api`;
   }
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
+  if (!url) {
+    url = 'http://localhost:8000/api';
   }
-  return 'http://localhost:8000/api';
+  url = url.replace(/\/$/, '');
+  if (!url.endsWith('/api')) {
+    url = `${url}/api`;
+  }
+  return url;
 }
 
 export function formatProductImageUrl(url?: string | null): string {
@@ -25,7 +30,12 @@ export function formatProductImageUrl(url?: string | null): string {
 }
 
 function apiUrl(path: string): string {
-  return `${getApiBaseUrl().replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  const base = getApiBaseUrl();
+  const cleanPath = path.replace(/^\//, '');
+  if (cleanPath.startsWith('api/')) {
+    return `${base}/${cleanPath.slice(4)}`;
+  }
+  return `${base}/${cleanPath}`;
 }
 
 function connectionError(error: unknown): Error {
@@ -98,10 +108,10 @@ export async function apiFetch<T = any>(
   }
 
   if (!response.ok) {
-    let errorMsg = `Error: ${response.statusText}`;
+    let errorMsg = `Error ${response.status}: ${response.statusText}`;
     try {
       const errorJson = await response.json();
-      errorMsg = errorJson?.error?.message || errorJson?.detail || errorJson?.message || JSON.stringify(errorJson);
+      errorMsg = errorJson?.error?.message || errorJson?.detail || errorJson?.message || (typeof errorJson === 'string' ? errorJson : JSON.stringify(errorJson));
     } catch {
       // Ignore JSON parse error
     }
