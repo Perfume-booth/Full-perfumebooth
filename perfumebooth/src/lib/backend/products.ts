@@ -206,7 +206,7 @@ export async function searchProducts(
     if (!res.ok) return { totalCount: 0, products: [] };
     const rawData = await res.json();
     const data = ensureArray(rawData);
-    let products = data.map(mapDjangoProductToProduct);
+    const products = data.map(mapDjangoProductToProduct);
 
     if (sortKey === "PRICE") {
       products.sort((a: { priceRange: { minVariantPrice: { amount: string; }; }; }, b: { priceRange: { minVariantPrice: { amount: string; }; }; }) => parseFloat(a.priceRange.minVariantPrice.amount) - parseFloat(b.priceRange.minVariantPrice.amount));

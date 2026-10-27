@@ -77,13 +77,12 @@ function ResponsiveHeroImage({ slide, eager }: { slide: HeroSlide; eager: boolea
 export default function HeroBanner({ title, subtitle, imageUrl, slides = [] }: HeroBannerProps) {
   const [current, setCurrent] = useState(0);
   const [isInteractionPaused, setIsInteractionPaused] = useState(false);
-  const [autoplayPreference, setAutoplayPreference] = useState<boolean | null>(null);
   const prefersReducedMotion = useSyncExternalStore(
     subscribeToReducedMotion,
     getReducedMotionSnapshot,
     getReducedMotionServerSnapshot,
   );
-  const isAutoplaying = autoplayPreference ?? !prefersReducedMotion;
+  const isAutoplaying = !prefersReducedMotion;
 
   const next = useCallback(() => {
     setCurrent((index) => (slides.length ? (index + 1) % slides.length : 0));

@@ -184,12 +184,7 @@ async function getProduct(slug: string): Promise<Product | null> {
                 quantityAvailable: availableUnits(variant),
                 requiresShipping: true,
                 image: cleanImageUrl(variant.image) || (images.length > 0 ? images[0].image : null)
-            })) : [{
-                id: String(p.id), title: "Default Title", price: priceVal, compareAtPrice: comparePriceVal,
-                availableForSale: catalogAvailable(p),
-                quantityAvailable: availableUnits(p), requiresShipping: true,
-                image: cleanImageUrl(p.image) || (images.length > 0 ? images[0].image : null)
-            }],
+            })) : [],
             coupons: []
         };
     } catch (err) {
@@ -348,7 +343,7 @@ export default async function ProductPage({
     };
 
     return (
-        <main className="min-h-screen bg-[var(--color-bg)] pb-0 w-full text-[var(--color-text-primary)] font-sans md:pt-28 overflow-x-hidden">
+        <main className="min-h-screen bg-[var(--color-bg)] pb-24 md:pb-12 w-full text-[var(--color-text-primary)] font-sans pt-14 md:pt-28 overflow-x-hidden">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -359,6 +354,7 @@ export default async function ProductPage({
             />
 
             {/* Breadcrumbs */}
+            <div className="hidden md:block">
             <Suspense fallback={
                 <div className="max-w-7xl mx-auto md:py-4 px-4 md:px-6 md:mt-3 text-[8px] md:text-[9px] uppercase tracking-[0.2em] text-[var(--color-text-muted)] font-semibold border-l-[3px] border-[#b8924a] bg-gradient-to-r from-[#b8924a]/5">
                     <div className="flex flex-wrap items-center animate-pulse">
@@ -372,27 +368,33 @@ export default async function ProductPage({
             }>
                 <ProductBreadcrumbs brandName={brandName} brandSlug={brandSlug} productTitle={product.title} />
             </Suspense>
+            </div>
 
 
             {/* Layout Container */}
-            <div className="max-w-7xl mx-auto px-4 md:px-6 pt-16 md:pt-8">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 pt-2 md:pt-3">
                 <ProductVariantProvider key={String(product.id)} product={product}>
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-start">
 
                     {/* Left Column Stack (Gallery + Narrative) */}
-                    <div className="contents lg:flex lg:flex-col lg:col-span-7 gap-8 lg:gap-12">
+                    <div className="contents lg:flex lg:flex-col lg:col-span-7 gap-4 lg:gap-6">
                         {/* 1. Gallery - Always Top */}
                         <div className="w-full h-fit order-1">
-                            <ProductGallery images={product.images} title={product.title}>
+                            <ProductGallery images={product.images} title={product.title} product={product}>
                                 <ProductVariantSelector product={product} />
                             </ProductGallery>
                         </div>
 
                         {/* 3. Narrative - 3rd on Mobile, Below Gallery on Desktop */}
                         <div className="w-full h-fit order-3">
-                            <article className="max-w-2xl md:border-l border-none md:border-[var(--color-gold)]/20 pl-0 md:pl-8 py-4">
+                            <article className="max-w-2xl md:border-l border-none md:border-[var(--color-gold)]/20 pl-0 md:pl-5 py-2">
                                 <ExpandableNarrative
                                     description={product.description}
+                                    notes={{
+                                        top: product.top_notes,
+                                        middle: product.middle_notes,
+                                        base: product.base_notes,
+                                    }}
                                     details={{
                                         fragrance: product.fragrance || product.title,
                                         gender: product.gender,
@@ -423,7 +425,7 @@ export default async function ProductPage({
                 <ProductReviews productHandle={product.slug} />
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6">
                 <FaqSection
                     title="Frequently Asked Questions"
                     description="Everything you need to know about our products, authenticity, shipping, and policies."
@@ -461,7 +463,7 @@ export default async function ProductPage({
             </div>
 
             {/* Product Discovery Sections */}
-            <div className="w-full mt-12">
+            <div className="w-full mt-4 md:mt-6">
                 <RecentlyViewed currentProductId={product.id} />
                 <RelatedProducts products={relatedProducts} />
             </div>

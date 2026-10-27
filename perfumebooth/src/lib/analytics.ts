@@ -121,10 +121,10 @@ export const trackBeginCheckout = (items: any[], total: number) => {
  * Track purchase (Order Confirmation / Thank You Page)
  */
 export const trackPurchase = (
-  orderId: string,
-  items: any[],
-  total: number,
-  coupon?: string
+  _orderId: string,
+  _items: any[],
+  _total: number,
+  _coupon?: string
 ) => {
   // The thank-you page is not proof of payment. Purchases are derived from Django.
   return;

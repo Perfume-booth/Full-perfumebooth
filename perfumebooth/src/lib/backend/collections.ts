@@ -1,4 +1,4 @@
-import { Collection, Product, unwrapApiData, ensureArray } from './types';
+import { Collection, unwrapApiData, ensureArray } from './types';
 import { getProducts, getFacets, mapDjangoProductToProduct } from './products';
 import { cleanImageUrl } from '../transformers';
 
@@ -15,7 +15,7 @@ export interface CollectionProductsResult {
   filters: any[];
 }
 
-export async function getAllCollections(first: number = 250): Promise<Collection[]> {
+export async function getAllCollections(_first: number = 250): Promise<Collection[]> {
   const isServer = typeof window === 'undefined';
   const isDocker = process.env.WATCHPACK_POLLING === "true";
   const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
@@ -196,10 +196,10 @@ export async function getCollection(
     title: handle.replace(/-/g, ' ').toUpperCase(),
     description: `Luxury collection of ${handle.replace(/-/g, ' ')}`,
     products: {
-      edges: products.slice(0, first).map(p => ({ node: p })),
+      edges: pageProducts.map(p => ({ node: p })),
       pageInfo: {
-        hasNextPage: products.length > first,
-        endCursor: null
+        hasNextPage: products.length > nextOffset,
+        endCursor: products.length > nextOffset ? String(nextOffset) : null
       }
     }
   };

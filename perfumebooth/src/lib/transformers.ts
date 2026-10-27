@@ -1,4 +1,3 @@
-import { Product } from "@/types/product";
 import { METAFIELD_MAPPINGS } from "./product-fields.config";
 import { cleanImageUrl } from './media-url';
 export { cleanImageUrl } from './media-url';
@@ -18,7 +17,7 @@ export function cleanMetafieldValue(val: any): string {
                     return JSON.stringify(item);
                 }).filter(Boolean).join(", ");
             }
-        } catch (e) {
+        } catch {
             // ignore and fallback
         }
     }
@@ -36,7 +35,7 @@ export function cleanMetafieldValue(val: any): string {
                     return obj.value.toString();
                 }
             }
-        } catch (e) {
+        } catch {
             // ignore and fallback
         }
     }
@@ -162,7 +161,7 @@ export function parseRating(product: any): { rating: number, reviewCount: number
             const val = (r && r.value !== undefined) ? r.value : product.rating.value;
             rating = parseFloat(val) || 0;
             reviewCount = parseInt(product.rating_count?.value || "0") || 0;
-        } catch (e) {
+        } catch {
             rating = parseFloat(product.rating.value) || 0;
             reviewCount = parseInt(product.rating_count?.value || "0") || 0;
         }

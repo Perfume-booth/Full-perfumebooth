@@ -21,6 +21,8 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  Star,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import PerfumeLogo from '@/components/Logo';
@@ -41,7 +43,7 @@ export default function Sidebar() {
     setMounted(true);
   }, []);
 
-  // Auto-expand CMS when user visits /cms or /cms/pages or /cms/media
+  // Auto-expand CMS when user visits /cms or /cms/pages or /cms/media or /cms/inquiries
   useEffect(() => {
     if (pathname.startsWith('/cms') && !pathname.startsWith('/cms/blog')) {
       setCmsOpen(true);
@@ -78,6 +80,7 @@ export default function Sidebar() {
     { name: 'Inventory', href: '/inventory', icon: Package, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Orders', href: '/orders', icon: FileText, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Customers', href: '/customers', icon: Users, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
+    { name: 'Reviews', href: '/reviews', icon: Star, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive', 'Content Manager'] },
     { name: 'Analytics', href: '/analytics', icon: BarChart2, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Reports', href: '/reports', icon: FileSpreadsheet, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
     { name: 'Coupons & Deals', href: '/coupons', icon: Ticket, allowedRoles: ['Super Admin', 'Admin', 'E-commerce Executive'] },
@@ -200,7 +203,25 @@ export default function Sidebar() {
                   </div>
                 </Link>
 
-                {/* 3. Media Library */}
+                {/* 3. Inquiries & Leads */}
+                <Link
+                  href="/cms/inquiries"
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    pathname === '/cms/inquiries'
+                      ? 'neu-inset text-primary font-bold border border-primary/25'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Inquiries</span>
+                  </div>
+                  {pathname === '/cms/inquiries' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+                </Link>
+
+                {/* 4. Media Library */}
                 <Link
                   href="/cms/media"
                   className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${

@@ -7,7 +7,7 @@ import Image from "next/image";
 import { AnimatedShoppingBag as ShoppingBag } from "@/components/ui/icons/AnimatedShoppingBag";
 import { AnimatedX as X } from "@/components/ui/icons/AnimatedX";
 import { useCartStore } from "@/store/useCartStore";
-import { cn, formatPrice } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 
 // ─── Animation Variants ───────────────────────────────────────────────────────
 

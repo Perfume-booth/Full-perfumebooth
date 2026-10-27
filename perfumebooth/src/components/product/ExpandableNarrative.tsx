@@ -9,6 +9,11 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
   description: string;
+  notes?: {
+    top?: string;
+    middle?: string;
+    base?: string;
+  };
   details?: {
     fragrance?: string;
     type?: string;
@@ -26,7 +31,7 @@ interface Props {
 type Tab = "narrative" | "returns" | "details";
 const TABS: Tab[] = ["narrative", "returns", "details"];
 
-export default function ExpandableNarrative({ description, details }: Props) {
+export default function ExpandableNarrative({ description, notes, details }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("narrative");
   const [prevTab, setPrevTab] = useState<Tab>("narrative");
   const [isExpanded, setIsExpanded] = useState(false);
@@ -60,73 +65,66 @@ export default function ExpandableNarrative({ description, details }: Props) {
 
   const slideVariants = {
     enter: (dir: number) => ({
-      x: dir > 0 ? "100%" : "-100%",
-      opacity: 0
+      x: dir > 0 ? 30 : -30,
+      opacity: 0,
+      scale: 0.99,
     }),
     center: {
       x: 0,
-      opacity: 1
+      opacity: 1,
+      scale: 1,
     },
     exit: (dir: number) => ({
-      x: dir > 0 ? "-100%" : "100%",
-      opacity: 0
-    })
+      x: dir > 0 ? -30 : 30,
+      opacity: 0,
+      scale: 0.99,
+    }),
   };
 
-  // Helper to strip ChatGPT and other unwanted utility classes from pasted descriptions
+  // Helper to preserve original Shopify description HTML
   const cleanDescriptionHTML = (html: string) => {
     if (!html) return '';
-    return html
-      .replace(/border-token-[^\s"']+/g, '')
-      .replace(/bg-token-[^\s"']+/g, '')
-      .replace(/corner-[^\s"']+/g, '')
-      .replace(/cm-[^\s"']+/g, '')
-      .replace(/q9tKkq[^\s"']*/g, '')
-      .replace(/lxnfua[^\s"']*/g, '')
-      .replace(/\bbg-[a-z0-9-]+\b/g, '')
-      .replace(/\bborder\b/g, '')
-      .replace(/\bborder-[a-z0-9-]+\b/g, '')
-      .replace(/\brounded-[a-z0-9-]+\b/g, '')
-      .replace(/\bshadow-[a-z0-9-]+\b/g, '')
-      .replace(/class="\s*"/g, '');
+    return html;
   };
 
   const detailFields = [
     { label: "Fragrance", value: details?.fragrance },
     { label: "Type", value: details?.type },
     { label: "Gender", value: details?.gender },
-    { label: "Bottle Material", value: details?.material },
-    { label: "Item Form", value: details?.form },
     { label: "Season", value: details?.season },
     { label: "Ideal for", value: details?.idealFor },
     { label: "Size", value: details?.size },
     { label: "Category", value: details?.category },
     { label: "Occasion", value: details?.occasion },
+    { label: "Material", value: details?.material },
+    { label: "Product Form", value: details?.form },
   ].filter(field => field.value);
 
   return (
     <div className="relative w-full">
       {/* Tab Switcher */}
-      <div className="w-full flex justify-start mb-8 overflow-x-auto no-scrollbar scroll-smooth">
-        <div className="relative inline-flex p-1">
+      <div className="w-full flex mb-3.5 sm:mb-5 overflow-x-auto no-scrollbar scroll-smooth border-b border-[var(--color-border)]/60 pb-1">
+        <div className="relative inline-flex p-1 gap-1.5 sm:gap-2">
           {(["narrative", "returns", "details"] as Tab[]).map((tab) => (
             <button
               key={tab}
+              type="button"
               onClick={() => handleTabChange(tab)}
-              className={`relative px-2 py-2 md:px-6 md:py-2.5 text-[9px] md:text-[10px] uppercase tracking-[0.2em] font-bold transition-colors duration-300 whitespace-nowrap shrink-0 z-10 ${
+              className={`relative px-3.5 py-2 sm:px-6 sm:py-2.5 text-[10px] sm:text-[11px] uppercase tracking-[0.16em] sm:tracking-[0.2em] font-bold transition-all duration-300 whitespace-nowrap shrink-0 z-10 rounded-lg cursor-pointer select-none ${
                 activeTab === tab
-                  ? "text-black"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                  ? "text-[#1a1410]"
+                  : "text-[var(--color-text-muted)] hover:text-[#1a1410] hover:bg-black/5"
               }`}
             >
-              {tab === "narrative" && "The Narrative"}
+              {tab === "narrative" && "The Description"}
               {tab === "returns" && "Returns & Replacement"}
               {tab === "details" && "Details"}
               
               {activeTab === tab && (
                 <motion.div
                   layoutId="activeTabPill"
-                  className="absolute inset-0 z-[-1]"
+                  className="absolute inset-0 bg-[#b8924a]/15 border-b-2 border-[#b8924a] rounded-lg -z-10 shadow-xs"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
             </button>
@@ -148,26 +146,37 @@ export default function ExpandableNarrative({ description, details }: Props) {
             animate="center"
             exit="exit"
             transition={{
-              x: { type: "spring", stiffness: 300, damping: 30 },
-              opacity: { duration: 0.15 }
+              x: { type: "spring", stiffness: 350, damping: 28 },
+              opacity: { duration: 0.2 },
+              scale: { duration: 0.2 },
             }}
             className="w-full"
           >
             {activeTab === "narrative" && (
               <div className="w-full animate-fadeIn">
-                <div
-                  className={`prose prose-stone prose-sm font-light leading-relaxed text-[var(--color-text-secondary)] 
-                             [&>p]:mb-4 md:[&>p]:mb-6 [&>p]:last:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-6 [&>li]:mb-2
-                             first-letter:text-3xl md:first-letter:text-3xl first-letter:text-[var(--color-text-primary)]
-                             ${!isExpanded ? 'max-md:line-clamp-4 max-md:overflow-hidden' : ''}`}
-                  dangerouslySetInnerHTML={{ __html: cleanDescriptionHTML(description) }}
-                />
+                <div className="relative">
+                  <div
+                    className={`w-full text-sm font-light leading-relaxed text-[var(--color-text-secondary)] 
+                               [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-[var(--color-text-primary)] [&_h1]:mb-3 [&_h1]:mt-4
+                               [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-[var(--color-text-primary)] [&_h2]:mb-3 [&_h2]:mt-4
+                               [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-[var(--color-text-primary)] [&_h3]:mb-2 [&_h3]:mt-3
+                               [&_h4]:text-base [&_h4]:font-semibold [&_h4]:text-[var(--color-text-primary)] [&_h4]:mb-2 [&_h4]:mt-3
+                               [&_h5]:text-sm [&_h5]:font-bold [&_h5]:text-[var(--color-text-primary)] [&_h5]:mb-2 [&_h5]:mt-2
+                               [&_h6]:text-xs [&_h6]:font-bold [&_h6]:text-[var(--color-text-primary)] [&_h6]:mb-1 [&_h6]:mt-2
+                               [&_p]:mb-4 [&_p]:last:mb-0
+                               [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4
+                               [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4
+                               [&_li]:mb-1
+                               ${!isExpanded ? 'max-md:line-clamp-4 max-md:overflow-hidden' : ''}`}
+                    dangerouslySetInnerHTML={{ __html: cleanDescriptionHTML(description) }}
+                  />
 
-                {!isExpanded && (
-                  <div className="md:hidden absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[var(--color-bg)] to-transparent pointer-events-none" />
-                )}
+                  {!isExpanded && (
+                    <div className="md:hidden absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[var(--color-bg)] to-transparent pointer-events-none" />
+                  )}
+                </div>
 
-                <div className="md:hidden mt-4">
+                <div className="md:hidden mt-2">
                   <button
                     onClick={() => setIsExpanded(!isExpanded)}
                     className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)] hover:text-[var(--color-text-primary)] transition-colors"
@@ -182,6 +191,72 @@ export default function ExpandableNarrative({ description, details }: Props) {
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* Scent Profile Area (Olfactory Pyramid) */}
+                <div className="py-4 space-y-4 w-full">
+                  <h5 className="text-[11px] text-center sm:text-left sm:text-[12px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">These are the scent notes of the product</h5>
+                  <div className="flex sm:flex-row items-center sm:items-start gap-4 sm:gap-6 py-1 w-full">
+                    {/* Visual Pyramid */}
+                    <div className="relative w-32 h-24 sm:w-36 sm:h-28 shrink-0 flex items-center justify-center mx-auto sm:mx-0">
+                      <svg viewBox="0 0 100 80" className="w-full h-full drop-shadow-sm overflow-visible">
+                        {/* Top Section (Triangle) */}
+                        <path d="M50 5 L33 30 L67 30 Z" fill="url(#topGrad)" className="transition-all duration-300 hover:opacity-90 cursor-pointer" />
+                        <text x="50" y="23" textAnchor="middle" fill="#7b0d1e" fontSize="5.5" fontWeight="900" letterSpacing="0.5">TOP</text>
+
+                        {/* Middle Section (Trapezoid) */}
+                        <path d="M31 33 L18 55 L82 55 L69 33 Z" fill="url(#midGrad)" className="transition-all duration-300 hover:opacity-90 cursor-pointer" />
+                        <text x="50" y="47" textAnchor="middle" fill="#ffffff" fontSize="5.5" fontWeight="900" letterSpacing="0.5">HEART</text>
+
+                        {/* Base Section (Trapezoid) */}
+                        <path d="M16 58 L3 80 L97 80 L84 58 Z" fill="url(#baseGrad)" className="transition-all duration-300 hover:opacity-90 cursor-pointer" />
+                        <text x="50" y="72" textAnchor="middle" fill="#ffffff" fontSize="5.5" fontWeight="900" letterSpacing="0.5">BASE</text>
+
+                        <defs>
+                          <linearGradient id="topGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#fdfcfb" />
+                            <stop offset="100%" stopColor="#d4bfa0" />
+                          </linearGradient>
+                          <linearGradient id="midGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#d4a96a" />
+                            <stop offset="100%" stopColor="#b8924a" />
+                          </linearGradient>
+                          <linearGradient id="baseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#a01428" />
+                            <stop offset="100%" stopColor="#7b0d1e" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                    </div>
+
+                    {/* Scent Description List */}
+                    <div className="flex-1 space-y-3 w-full min-w-0">
+                      <div className="flex items-start gap-3 border-l-2 border-[#b8924a]/30 pl-3 sm:pl-3.5 py-0.5">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] uppercase tracking-[0.18em] font-black text-[var(--color-gold)]">Top Notes</span>
+                          <span className="text-xs sm:text-[13px] font-light text-[var(--color-text-primary)] leading-snug break-words">
+                            {notes?.top || "Citrus, Bergamot & Fresh Ozone"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 border-l-2 border-[#b8924a]/60 pl-3 sm:pl-3.5 py-0.5">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] uppercase tracking-[0.18em] font-black text-[var(--color-gold)]">Heart (Middle) Notes</span>
+                          <span className="text-xs sm:text-[13px] font-light text-[var(--color-text-primary)] leading-snug break-words">
+                            {notes?.middle || "Jasmine, Lavender & Soft Floral Accords"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 border-l-2 border-[#7b0d1e]/80 pl-3 sm:pl-3.5 py-0.5">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] uppercase tracking-[0.18em] font-black text-[var(--color-maroon)]">Base Notes</span>
+                          <span className="text-xs sm:text-[13px] font-light text-[var(--color-text-primary)] leading-snug break-words">
+                            {notes?.base || "Warm Amber, Patchouli, Sensual Musk & Cedarwood"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -198,7 +273,7 @@ export default function ExpandableNarrative({ description, details }: Props) {
                       This item is non-returnable due to hygiene and authenticity reasons. If you receive a damaged, defective, incorrect, or expired item, you may request a replacement or refund within 5 days of delivery.
                     </p>
                     <p className="text-sm font-light text-[var(--color-text-secondary)] leading-relaxed pt-3">
-                      Please provide an <strong className="font-bold">unboxing video and clear images</strong>for verification.
+                      Please provide an <strong className="font-bold">unboxing video and clear images</strong> for verification.
                     </p>
                   </div>
                 </div>

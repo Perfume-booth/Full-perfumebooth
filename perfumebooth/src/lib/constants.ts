@@ -97,7 +97,8 @@ export const TOP_BRANDS = [
   "Test",
   "Customer Brand",
   "Hacker Brand",
-  "Malicious"
+  "Malicious",
+  "Al Haramain"
 ];
 
 export const INDIAN_STATES = [

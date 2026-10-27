@@ -206,7 +206,7 @@ export interface Coupon {
   isFirstTime?: boolean;
 }
 
-export async function getAvailableCoupons(customerEmail?: string): Promise<Coupon[]> {
+export async function getAvailableCoupons(_customerEmail?: string): Promise<Coupon[]> {
   // TODO: Replace with your own backend API call
   const publicCoupons: Coupon[] = [
     { code: "SAVE10", description: "Save 10% on your order", discount: 10 },
@@ -221,7 +221,7 @@ export interface ProductOffer {
   type: 'global' | 'specific' | 'new_user';
 }
 
-export async function getProductOffers(productId: string, productTags: string[] = [], collections: string[] = [], customerEmail?: string): Promise<ProductOffer[]> {
+export async function getProductOffers(productId: string, productTags: string[] = [], collections: string[] = [], _customerEmail?: string): Promise<ProductOffer[]> {
   const offers: ProductOffer[] = [];
 
   // Universal Coupons
@@ -243,7 +243,7 @@ export async function getProductOffers(productId: string, productTags: string[] 
   return offers;
 }
 
-export async function cancelOrder(orderId: string, customerId?: string) {
+export async function cancelOrder(orderId: string, _customerId?: string) {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get("customerAccessToken")?.value;

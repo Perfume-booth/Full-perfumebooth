@@ -26,14 +26,14 @@ export default function RecentlyViewed({ currentProductId }: Props) {
   if (!displayItems.length) return null;
 
   return (
-    <section className="py-4 md:py-10 bg-[var(--color-bg)] overflow-hidden">
+    <section className="py-3 md:py-5 bg-[var(--color-bg)] overflow-hidden">
       <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
         <SectionHeader 
           title="Recently" 
           italicPart="Viewed" 
         />
         
-        <div className="mt-8">
+        <div className="mt-4">
           <Carousel 
             containerClassName="gap-6"
             slideClassName="basis-[calc(50%-12px)] md:basis-[300px]"

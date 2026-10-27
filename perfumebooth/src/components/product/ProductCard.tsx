@@ -33,7 +33,7 @@ export default function ProductCard({
     const [isAdding, setIsAdding] = useState(false);
     const { addToCart, openCart } = useCartStore();
     const [isMounted, setIsMounted] = useState(false);
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    // const [isLoggedIn, setIsLoggedIn] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
     const [pincode, setPincode] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export default function ProductCard({
     };
 
     useEffect(() => {
-        setIsLoggedIn(Cookies.get("isLoggedIn") === "true");
+        // setIsLoggedIn(Cookies.get("isLoggedIn") === "true");
         setIsMounted(true);
     }, []);
 
@@ -86,14 +86,14 @@ export default function ProductCard({
 
     const {
         title,
-        handle,
+        // handle,
         images: allImages,
         price: sellingPrice,
         compareAtPrice: comparePrice,
         discountPercentage: discountPct,
         isSoldOut,
         rating,
-        deliveryDate
+        // deliveryDate
     } = product;
 
     // Filter out empty images once

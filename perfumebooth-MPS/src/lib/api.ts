@@ -101,7 +101,7 @@ export async function apiFetch<T = any>(
     let errorMsg = `Error: ${response.statusText}`;
     try {
       const errorJson = await response.json();
-      errorMsg = errorJson.detail || errorJson.message || JSON.stringify(errorJson);
+      errorMsg = errorJson?.error?.message || errorJson?.detail || errorJson?.message || JSON.stringify(errorJson);
     } catch {
       // Ignore JSON parse error
     }

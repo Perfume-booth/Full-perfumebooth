@@ -5,6 +5,7 @@ from rest_framework.response import Response
 # pyrefly: ignore [missing-import]
 from rest_framework.views import APIView
 # pyrefly: ignore [missing-import]
+from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from django.db import transaction
 import json
@@ -24,7 +25,7 @@ from apps.authentication.views import HasRolePermission
 # pyrefly: ignore [missing-import]
 from apps.authentication.helpers import log_action
 # pyrefly: ignore [missing-import]
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Avg
 from .services import CollectionSyncService
 # pyrefly: ignore [missing-import]
 from django.utils import timezone
@@ -848,15 +849,32 @@ class CartValidationAPIView(APIView):
 class ProductReviewAPIView(APIView):
     """
     Product Reviews & Ratings API (GET, POST).
+    100% Native, self-hosted review engine with zero third-party SaaS cost.
+    Supports authenticated and verified guest reviewers, with automatic
+    order verification against customer email or user profile.
     """
     def get_permissions(self):
-        if self.request.method == 'POST':
-            return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
 
-    def get(self, request, product_id):
+    def _get_product(self, product_identifier):
+        import uuid
+        try:
+            val = uuid.UUID(str(product_identifier))
+            p = Product.objects.filter(id=val, is_online=True).first()
+            if p:
+                return p
+        except (ValueError, TypeError, AttributeError):
+            pass
+        return Product.objects.filter(slug__iexact=str(product_identifier), is_online=True).first()
+
+    def get(self, request, product_id=None, slug=None):
+        identifier = slug or product_id
+        product = self._get_product(identifier)
+        if not product:
+            return Response({'detail': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
         reviews = ProductReview.objects.filter(
-            product_id=product_id,
+            product=product,
             is_approved=True
         ).select_related('user').order_by('-created_at')
 
@@ -871,7 +889,7 @@ class ProductReviewAPIView(APIView):
 
             reviews_list.append({
                 'id': str(r.id),
-                'user_name': r.user.full_name or r.user.email.split('@')[0],
+                'user_name': r.display_name,
                 'rating': r.rating,
                 'title': r.title,
                 'comment': r.comment,
@@ -883,36 +901,70 @@ class ProductReviewAPIView(APIView):
         avg_rating = round(total_rating_sum / count, 1) if count > 0 else 5.0
 
         return Response({
-            'product_id': str(product_id),
+            'product_id': str(product.id),
+            'product_slug': product.slug,
             'average_rating': avg_rating,
             'review_count': count,
             'rating_distribution': distribution,
             'reviews': reviews_list
         })
 
-    def post(self, request, product_id):
-        try:
-            product = Product.objects.get(id=product_id, is_online=True)
-        except Product.DoesNotExist:
+    def post(self, request, product_id=None, slug=None):
+        identifier = slug or product_id
+        product = self._get_product(identifier)
+        if not product:
             return Response({'detail': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        rating = int(request.data.get('rating', 5))
-        if rating < 1 or rating > 5:
-            return Response({'detail': 'Rating must be between 1 and 5'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            raw_rating = int(request.data.get('rating', 5))
+            if raw_rating < 1 or raw_rating > 5:
+                return Response({'detail': 'Rating must be an integer between 1 and 5'}, status=status.HTTP_400_BAD_REQUEST)
+            rating = raw_rating
+        except (ValueError, TypeError):
+            return Response({'detail': 'Rating must be an integer between 1 and 5'}, status=status.HTTP_400_BAD_REQUEST)
 
-        title = request.data.get('title', '')
-        comment = request.data.get('comment', '')
+        title = str(request.data.get('title', '')).strip()
+        comment = str(request.data.get('comment', request.data.get('text', ''))).strip()
 
-        # Check verified buyer via Orders
-        is_verified = Order.objects.filter(
-            user=request.user,
-            status__in=['COMPLETED', 'DELIVERED', 'PAID'],
-            items__product=product
-        ).exists()
+        # Handle user (authenticated user or verified guest account)
+        user = None
+        is_verified = False
+
+        if request.user and request.user.is_authenticated:
+            user = request.user
+            is_verified = Order.objects.filter(
+                user=user,
+                status__in=['Paid', 'Processing', 'Shipped', 'Delivered', 'PAID', 'DELIVERED'],
+                items__product=product
+            ).exists()
+        else:
+            email = str(request.data.get('email', '')).strip().lower()
+            name = str(request.data.get('name', '')).strip()
+            if not email:
+                return Response({'detail': 'Email is required to submit a review'}, status=status.HTTP_400_BAD_REQUEST)
+
+            from apps.authentication.models import CustomUser
+            user = CustomUser.objects.filter(email=email).first()
+            if not user:
+                name_parts = name.split(' ', 1)
+                first_name = name_parts[0] or 'Customer'
+                last_name = name_parts[1] if len(name_parts) > 1 else ''
+                user = CustomUser.objects.create_user(
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_active=False
+                )
+
+            is_verified = Order.objects.filter(
+                Q(customer_email__iexact=email) | Q(user=user),
+                status__in=['Paid', 'Processing', 'Shipped', 'Delivered', 'PAID', 'DELIVERED'],
+                items__product=product
+            ).exists()
 
         review, created = ProductReview.objects.update_or_create(
             product=product,
-            user=request.user,
+            user=user,
             defaults={
                 'rating': rating,
                 'title': title,
@@ -938,6 +990,8 @@ class ProductReviewAPIView(APIView):
             'detail': 'Review submitted successfully',
             'review': {
                 'id': str(review.id),
+                'user_name': review.display_name,
+                'created_at': review.created_at.isoformat(),
                 'rating': review.rating,
                 'title': review.title,
                 'comment': review.comment,
@@ -1249,6 +1303,244 @@ class AnalyticsAPIView(APIView):
     def get(self, request):
         from .reporting import build_report
         return Response(build_report(request.query_params.get('timeframe', '7d')))
+
+
+class ProductReviewAdminListView(APIView):
+    """
+    GET /api/shop/admin/reviews/
+    Merchant management endpoint for customer product reviews.
+    """
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def get(self, request):
+        status_filter = request.query_params.get('status', 'all').strip().lower()
+        rating_filter = request.query_params.get('rating', 'all').strip()
+        search = request.query_params.get('search', '').strip()
+
+        qs = ProductReview.objects.all().select_related('product', 'user').order_by('-created_at')
+
+        if status_filter == 'approved':
+            qs = qs.filter(is_approved=True)
+        elif status_filter in ['pending', 'hidden', 'unapproved']:
+            qs = qs.filter(is_approved=False)
+
+        if rating_filter and rating_filter != 'all':
+            try:
+                r_val = int(rating_filter)
+                qs = qs.filter(rating=r_val)
+            except ValueError:
+                pass
+
+        if search:
+            qs = qs.filter(
+                Q(product__title__icontains=search) |
+                Q(product__slug__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(user__first_name__icontains=search) |
+                Q(imported_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(title__icontains=search) |
+                Q(comment__icontains=search)
+            )
+
+        total_reviews = ProductReview.objects.count()
+        approved_count = ProductReview.objects.filter(is_approved=True).count()
+        pending_count = total_reviews - approved_count
+
+        avg_rating = ProductReview.objects.filter(is_approved=True).aggregate(avg=Avg('rating'))['avg'] or 5.0
+
+        raw_dist = dict(ProductReview.objects.values('rating').annotate(c=Count('id')).values_list('rating', 'c'))
+        distribution = {str(i): raw_dist.get(i, 0) for i in range(1, 6)}
+
+        reviews = []
+        for r in qs[:200]:
+            prod = r.product
+            prod_img = ''
+            if prod:
+                first_img = prod.images.filter(is_primary=True).first() or prod.images.first()
+                if first_img:
+                    prod_img = format_media_url(first_img.image.url if first_img.image else None, request)
+
+            reviews.append({
+                'id': str(r.id),
+                'product_id': str(prod.id) if prod else None,
+                'product_title': prod.title if prod else 'Unknown Product',
+                'product_slug': prod.slug if prod else '',
+                'product_image': prod_img,
+                'user_id': str(r.user.id) if r.user else None,
+                'user_name': r.display_name,
+                'user_email': r.user.email if r.user else '',
+                'rating': r.rating,
+                'title': r.title,
+                'comment': r.comment,
+                'is_verified_buyer': r.is_verified_buyer,
+                'is_approved': r.is_approved,
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'updated_at': r.updated_at.isoformat() if r.updated_at else None,
+            })
+
+        return Response({
+            'reviews': reviews,
+            'total': qs.count(),
+            'summary': {
+                'total_reviews': total_reviews,
+                'approved_count': approved_count,
+                'pending_count': pending_count,
+                'average_rating': round(float(avg_rating), 1)
+            },
+            'distribution': distribution
+        })
+
+
+class ProductReviewAdminDetailView(APIView):
+    """
+    PATCH /api/shop/admin/reviews/<uuid:pk>/ - Toggle approval
+    DELETE /api/shop/admin/reviews/<uuid:pk>/ - Delete review
+    """
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def patch(self, request, pk):
+        review = get_object_or_404(ProductReview, id=pk)
+        if 'is_approved' in request.data:
+            review.is_approved = bool(request.data['is_approved'])
+            review.save(update_fields=['is_approved', 'updated_at'])
+
+            if review.product:
+                all_revs = ProductReview.objects.filter(product=review.product, is_approved=True)
+                rcount = all_revs.count()
+                rsum = sum([r.rating for r in all_revs])
+                new_avg = round(rsum / rcount, 1) if rcount > 0 else 5.0
+                attrs = review.product.attributes or {}
+                attrs['rating'] = new_avg
+                attrs['rating_count'] = rcount
+                review.product.attributes = attrs
+                review.product.save(update_fields=['attributes'])
+
+            log_action(request.user, f"Set review {review.id} approved={review.is_approved}", request)
+
+        return Response({
+            'success': True,
+            'id': str(review.id),
+            'is_approved': review.is_approved
+        })
+
+    def delete(self, request, pk):
+        review = get_object_or_404(ProductReview, id=pk)
+        product = review.product
+        review_id = str(review.id)
+        review.delete()
+
+        if product:
+            all_revs = ProductReview.objects.filter(product=product, is_approved=True)
+            rcount = all_revs.count()
+            rsum = sum([r.rating for r in all_revs])
+            new_avg = round(rsum / rcount, 1) if rcount > 0 else 5.0
+            attrs = product.attributes or {}
+            attrs['rating'] = new_avg
+            attrs['rating_count'] = rcount
+            product.attributes = attrs
+            product.save(update_fields=['attributes'])
+
+        log_action(request.user, f"Deleted product review {review_id}", request)
+        return Response({'success': True, 'deleted_id': review_id})
+
+
+class ProductReviewExportExcelView(APIView):
+    """
+    GET /api/shop/admin/reviews/export/
+    Exports customer reviews into Excel workbook (.xlsx).
+    """
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def get(self, request):
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from django.http import HttpResponse
+        import io
+
+        status_filter = request.query_params.get('status', 'all').strip().lower()
+        rating_filter = request.query_params.get('rating', 'all').strip()
+
+        qs = ProductReview.objects.all().select_related('product', 'user').order_by('-created_at')
+        if status_filter == 'approved':
+            qs = qs.filter(is_approved=True)
+        elif status_filter in ['pending', 'hidden']:
+            qs = qs.filter(is_approved=False)
+
+        if rating_filter and rating_filter != 'all':
+            try:
+                qs = qs.filter(rating=int(rating_filter))
+            except ValueError:
+                pass
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Customer Reviews"
+
+        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='1A1410', end_color='1A1410', fill_type='solid')
+        border_thin = Side(style='thin', color='E5E7EB')
+        cell_border = Border(left=border_thin, right=border_thin, top=border_thin, bottom=border_thin)
+
+        headers = [
+            "Review ID", "Date (UTC)", "Product Title", "Product Slug",
+            "Customer Name", "Customer Email", "Rating (1-5)", "Verified Buyer",
+            "Review Headline", "Review Comment", "Status"
+        ]
+        ws.append(headers)
+
+        for col_num in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for r in qs:
+            date_str = r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else ''
+            ws.append([
+                str(r.id),
+                date_str,
+                r.product.title if r.product else '',
+                r.product.slug if r.product else '',
+                r.display_name,
+                r.user.email if r.user else '',
+                r.rating,
+                "YES" if r.is_verified_buyer else "NO",
+                r.title or '',
+                r.comment or '',
+                "APPROVED" if r.is_approved else "PENDING / HIDDEN"
+            ])
+
+        for col in ws.columns:
+            max_len = 0
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            for cell in col:
+                cell.border = cell_border
+                val_len = len(str(cell.value or ''))
+                if val_len > max_len:
+                    max_len = val_len
+            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 60)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"perfumebooth_reviews_{timezone.now().strftime('%Y%m%d')}.xlsx"
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 

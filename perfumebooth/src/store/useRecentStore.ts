@@ -11,7 +11,7 @@ interface RecentState {
 
 export const useRecentStore = create<RecentState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       recentItems: [],
 
       addRecent: (product: Product) => {

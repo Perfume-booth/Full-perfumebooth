@@ -62,9 +62,13 @@ class Command(BaseCommand):
                     if rel_key not in existing_keys:
                         local_files_to_upload.append((full_path, rel_key))
 
+        concurrency = options['concurrency']
+
         if local_files_to_upload:
-            self.stdout.write(self.style.NOTICE(f'Uploading {len(local_files_to_upload)} local media files to R2...'))
-            for full_path, rel_key in local_files_to_upload:
+            self.stdout.write(self.style.NOTICE(f'Uploading {len(local_files_to_upload)} local media files to R2 ({concurrency} threads)...'))
+
+            def _upload_local(item):
+                full_path, rel_key = item
                 try:
                     content_type, _ = mimetypes.guess_type(full_path)
                     content_type = content_type or 'application/octet-stream'
@@ -75,12 +79,28 @@ class Command(BaseCommand):
                             Body=f.read(),
                             ContentType=content_type
                         )
-                    existing_keys.add(rel_key)
-                    self.stdout.write(f'  Uploaded local file: {rel_key}')
+                    return True, rel_key, None
                 except Exception as exc:
-                    self.stderr.write(self.style.WARNING(f'  Failed uploading {rel_key}: {exc}'))
+                    return False, rel_key, str(exc)
+
+            up_success = 0
+            up_fail = 0
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+                futures = {executor.submit(_upload_local, item): item for item in local_files_to_upload}
+                for future in concurrent.futures.as_completed(futures):
+                    ok, rel_key, err = future.result()
+                    if ok:
+                        up_success += 1
+                        existing_keys.add(rel_key)
+                        if up_success % 50 == 0 or up_success == len(local_files_to_upload):
+                            self.stdout.write(f'  [Local Upload Progress] {up_success}/{len(local_files_to_upload)} uploaded to R2...')
+                    else:
+                        up_fail += 1
+                        self.stderr.write(self.style.WARNING(f'  Failed uploading {rel_key}: {err}'))
+
+            self.stdout.write(self.style.SUCCESS(f'Local upload complete: {up_success} uploaded to R2 (Failed: {up_fail}).'))
         else:
-            self.stdout.write('No pending local media files to upload.')
+            self.stdout.write(self.style.SUCCESS('All local media files already exist in Cloudflare R2!'))
 
         # -------------------------------------------------------------
         # 2. Sync product images from source_url (Shopify CDN)
@@ -129,6 +149,16 @@ class Command(BaseCommand):
                     ContentType=ctype
                 )
 
+                # Save to local media directory so all images exist in both media and R2
+                try:
+                    local_path = os.path.join(media_root, target_key)
+                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                    if not os.path.exists(local_path):
+                        with open(local_path, 'wb') as lf:
+                            lf.write(content)
+                except Exception:
+                    pass
+
                 # ONLY upload to Product.image if this is the primary product image
                 if is_prim and product and product.image:
                     prod_key = str(product.image)
@@ -139,6 +169,14 @@ class Command(BaseCommand):
                             Body=content,
                             ContentType=ctype
                         )
+                        try:
+                            prod_local = os.path.join(media_root, prod_key)
+                            os.makedirs(os.path.dirname(prod_local), exist_ok=True)
+                            if not os.path.exists(prod_local):
+                                with open(prod_local, 'wb') as lf:
+                                    lf.write(content)
+                        except Exception:
+                            pass
 
                 return True, target_key, None
             except Exception as e:

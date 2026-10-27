@@ -49,11 +49,13 @@ interface Props {
 export default function ProductDetailsClient({ product }: Props) {
   const [quantity, setQuantity] = useState(1);
   const { selectedVariant } = useProductVariant();
+  const needsVariantSelection = Boolean(product.variants?.length) && !selectedVariant;
+  const chooseVariant = () => document.getElementById("product-variants")?.scrollIntoView({ behavior: "smooth", block: "center" });
 
   const activePrice = String(selectedVariant ? selectedVariant.price : product.price);
   const activeComparePrice = selectedVariant ? selectedVariant.compareAtPrice : product.compare_at_price;
   const activeStock = Math.max(0, Number(selectedVariant ? selectedVariant.quantityAvailable : product.stock_count) || 0);
-  const isSoldOut = activeStock <= 0 || selectedVariant?.availableForSale === false || product.availableForSale === false;
+  const isSoldOut = !needsVariantSelection && (activeStock <= 0 || selectedVariant?.availableForSale === false || product.availableForSale === false);
   useEffect(() => { setQuantity(1); }, [selectedVariant?.id]);
 
   const { isInWishlist, addItem, removeItem } = useWishlist();
@@ -64,12 +66,12 @@ export default function ProductDetailsClient({ product }: Props) {
   const [isAdding, setIsAdding] = useState(false);
 
   // Pincode & Delivery Date State
-  const [pincode, setPincode] = useState<string | null>(null);
-  const [city, setCity] = useState<string>("");
-  const [inputPincode, setInputPincode] = useState<string>("");
+  const [pincode, setPincode] = useState<string | null>("110059");
+  const [city, setCity] = useState<string>("West Delhi");
+  const [inputPincode, setInputPincode] = useState<string>("110059");
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [pincodeError, setPincodeError] = useState<string>("");
-  const [isCheckerExpanded, setIsCheckerExpanded] = useState<boolean>(true);
+  const [isCheckerExpanded, setIsCheckerExpanded] = useState<boolean>(false);
 
   // Initialize and load saved pincode
   useEffect(() => {
@@ -170,7 +172,10 @@ export default function ProductDetailsClient({ product }: Props) {
 
   const router = useRouter();
 
-  const isInCart = items.some(item => item.id.toString() === product.id.toString());
+  const isInCart = !needsVariantSelection && items.some(item =>
+    item.id.toString() === product.id.toString() &&
+    (item.selectedVariantId || "") === (selectedVariant?.id || "")
+  );
 
   const isWishlisted = isInWishlist(product.id.toString());
 
@@ -210,10 +215,11 @@ export default function ProductDetailsClient({ product }: Props) {
   };
 
   const handleBuyNow = async () => {
+    if (needsVariantSelection) { chooseVariant(); return; }
     if (isSoldOut || quantity > activeStock) return;
     setIsBuyingNow(true);
 
-    const variantId = selectedVariant?.id || product.variants?.[0]?.id;
+    const variantId = selectedVariant?.id;
     if (!variantId && product.variants && product.variants.length > 0) {
       alert("Product variant not found.");
       setIsBuyingNow(false);
@@ -261,6 +267,7 @@ export default function ProductDetailsClient({ product }: Props) {
   };
 
   const handleAddToCart = async () => {
+    if (needsVariantSelection) { chooseVariant(); return; }
     if (isInCart) {
       router.push("/cart");
       return;
@@ -268,7 +275,7 @@ export default function ProductDetailsClient({ product }: Props) {
     if (isSoldOut || isAdding || quantity > activeStock) return;
     setIsAdding(true);
     try {
-      const variantId = selectedVariant?.id || product.variants?.[0]?.id;
+      const variantId = selectedVariant?.id;
       const normalized = normalizeProduct({
         ...product,
         selectedVariantId: variantId,
@@ -290,14 +297,14 @@ export default function ProductDetailsClient({ product }: Props) {
   const brandSlug = brandName.toLowerCase().replace(/\s+/g, '-');
 
   return (
-    <div className="flex flex-col w-full h-full space-y-6 md:space-y-8 text-gray-900 md:pt-4">
+    <div className="flex flex-col w-full h-full space-y-3.5 md:space-y-4 text-gray-900 md:pt-1">
 
       {/* 1. Brand & Title Area */}
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <Link href={`/${brandSlug}`} className="inline-block">
-              <span className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-text-primary)]  font-bold mb-2 block hover:underline">
+              <span className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-text-primary)]  font-bold mb-0.5 block hover:underline">
                 {brandName}
               </span>
             </Link>
@@ -305,11 +312,11 @@ export default function ProductDetailsClient({ product }: Props) {
               {product.title}
             </h1>
             {selectedVariant && selectedVariant.title && selectedVariant.title !== "Default Title" && (
-              <div className="flex flex-wrap items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
                 <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">
                   Selected Edition:
                 </span>
-                <span className="text-xs font-bold text-gray-900 bg-white px-2.5 py-0.5 rounded-md border border-[var(--color-gold)]/40 shadow-xs flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-900 bg-white px-2 py-0.5 rounded-md border border-[var(--color-gold)]/40 shadow-xs flex items-center gap-1.5">
                   <span className="size-1.5 rounded-full bg-[var(--color-gold)]"></span>
                   {selectedVariant.title}
                   {selectedVariant.option1_value && selectedVariant.option1_value !== selectedVariant.title ? ` • ${selectedVariant.option1_value}` : ""}
@@ -322,42 +329,12 @@ export default function ProductDetailsClient({ product }: Props) {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {isMounted && (
-              <button
-                onClick={toggleWishlist}
-                aria-label={isWishlisted ? `Remove ${product.title} from your wishlist` : `Add ${product.title} to your wishlist`}
-                className={`w-10 h-10 flex items-center justify-center rounded-full border transition-all ${isWishlisted
-                  ? 'border-[#b03a2e] bg-[#b03a2e]/10 text-[#b03a2e]'
-                  : 'border-[var(--color-border)] bg-[#fbfcfa] text-[var(--color-text-secondary)] hover:border-[#1a1410] hover:text-[#1a1410]'
-                  }`}
-                title={isWishlisted ? "In Wishlist" : "Add to Wishlist"}
-              >
-                <Heart size={16} animateOn="click" className={isWishlisted ? "fill-[#b03a2e] text-[#b03a2e]" : ""} />
-              </button>
-            )}
-            <div className="relative">
-              <button
-                onClick={handleShare}
-                aria-label={isCopied ? "Link copied to clipboard" : `Share ${product.title}`}
-                className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--color-border)] bg-[#fbfcfa] text-[var(--color-text-secondary)] hover:border-[#1a1410] hover:text-[#1a1410] transition-all"
-                title="Share"
-              >
-                <Share2 size={16} animateOn="hover" />
-              </button>
-              {isCopied && (
-                <span className="absolute -top-8 -left-6 bg-black text-white text-[9px] uppercase tracking-widest px-2 py-1 rounded shadow-lg whitespace-nowrap animate-fade-in">
-                  Link Copied
-                </span>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Rating & Reviews Summary (Tightened) */}
         {(product.rating_count && product.rating_count > 0) ? (
           <div
-            className="flex items-center gap-3 py-1 cursor-pointer hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => document.getElementById('product-reviews')?.scrollIntoView({ behavior: 'smooth' })}
           >
             <div className="flex items-center gap-0.5 scale-90 origin-left">
@@ -377,7 +354,7 @@ export default function ProductDetailsClient({ product }: Props) {
           </div>
         ) : (
           <div
-            className="flex items-center gap-2 py-1 cursor-pointer hover:opacity-80 transition-opacity text-xs text-[var(--color-text-muted)] italic font-light"
+            className="flex items-center gap-2 py-0.5 cursor-pointer hover:opacity-80 transition-opacity text-xs text-[var(--color-text-muted)] italic font-light"
             onClick={() => document.getElementById('product-reviews')?.scrollIntoView({ behavior: 'smooth' })}
           >
             <span>No reviews yet</span>
@@ -386,7 +363,7 @@ export default function ProductDetailsClient({ product }: Props) {
       </div>
 
       {/* 2. Price & Badges Area (Compact) */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         <div className="flex items-baseline gap-3">
           <span className="text-lg md:text-3xl text-[var(--color-text-primary)]">Rs. {activePrice}</span>
           {activeComparePrice && parseFloat(activeComparePrice) > parseFloat(activePrice) && (
@@ -401,14 +378,9 @@ export default function ProductDetailsClient({ product }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {isSoldOut ? (
+          {isSoldOut && (
             <span className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 text-white text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full shadow-sm">
               Sold Out
-            </span>
-          ) : (
-            <span className="px-3 md:px-4 py-1 md:py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              In Stock {activeStock > 0 && activeStock <= 10 ? `(Only ${activeStock} left)` : ""}
             </span>
           )}
           {product.tagline && (
@@ -424,98 +396,33 @@ export default function ProductDetailsClient({ product }: Props) {
         </div>
       </div>
 
-      {/* 3. Scent Profile Area (Olfactory Pyramid) */}
-      <div className="py-4 border-y border-[var(--color-border)]/50 space-y-4">
-        <h5 className="text-[12px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)]">Olfactory Pyramid</h5>
-        <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
-          {/* Visual Pyramid */}
-          <div className="relative w-36 h-28 shrink-0 flex items-center justify-center">
-            <svg viewBox="0 0 100 80" className="w-full h-full drop-shadow-sm">
-              {/* Top Section (Triangle) */}
-              <path d="M50 5 L33 30 L67 30 Z" fill="url(#topGrad)" className="transition-all duration-300 hover:opacity-90 cursor-help" />
-              <text x="50" y="23" textAnchor="middle" fill="#7b0d1e" fontSize="5.5" fontWeight="900" letterSpacing="0.5">TOP</text>
-
-              {/* Middle Section (Trapezoid) */}
-              <path d="M31 33 L18 55 L82 55 L69 33 Z" fill="url(#midGrad)" className="transition-all duration-300 hover:opacity-90 cursor-help" />
-              <text x="50" y="47" textAnchor="middle" fill="#ffffff" fontSize="5.5" fontWeight="900" letterSpacing="0.5">HEART</text>
-
-              {/* Base Section (Trapezoid) */}
-              <path d="M16 58 L3 80 L97 80 L84 58 Z" fill="url(#baseGrad)" className="transition-all duration-300 hover:opacity-90 cursor-help" />
-              <text x="50" y="72" textAnchor="middle" fill="#ffffff" fontSize="5.5" fontWeight="900" letterSpacing="0.5">BASE</text>
-
-              <defs>
-                <linearGradient id="topGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#fdfcfb" />
-                  <stop offset="100%" stopColor="#d4bfa0" />
-                </linearGradient>
-                <linearGradient id="midGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#d4a96a" />
-                  <stop offset="100%" stopColor="#b8924a" />
-                </linearGradient>
-                <linearGradient id="baseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#a01428" />
-                  <stop offset="100%" stopColor="#7b0d1e" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-
-          {/* Scent Description List */}
-          <div className="flex-1 space-y-3 w-full">
-            <div className="flex items-start gap-3 border-l-2 border-[#b8924a]/30 pl-3">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-[var(--color-gold)]">Top Notes</span>
-                <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">
-                  {product.top_notes || "Citrus, Bergamot & Fresh Ozone"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 border-l-2 border-[#b8924a]/60 pl-3">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-[var(--color-gold)]">Heart (Middle) Notes</span>
-                <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">
-                  {product.middle_notes || "Jasmine, Lavender & Soft Floral Accords"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 border-l-2 border-[#7b0d1e]/80 pl-3">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-[var(--color-maroon)]">Base Notes</span>
-                <span className="text-[13px] font-light text-[var(--color-text-primary)] leading-tight">
-                  {product.base_notes || "Warm Amber, Patchouli, Sensual Musk & Cedarwood"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 3. Trust Signals (4-Column Badges Card) */}
+      <ProductTrustBadges />
 
       {/* 4. Persistence & Cart Controls */}
-      <div className="space-y-3 pt-2">
-          <div className="flex gap-4">
+      <div className="space-y-2 pt-0.5">
+          <div className="flex gap-2 sm:gap-3">
             {/* Quantity Picker */}
             <div
-              className={`flex items-center justify-between border border-[var(--color-border)] px-6 py-4 min-w-[140px] bg-[#fbfcfa] ${isSoldOut ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`flex items-center justify-between border border-[var(--color-border)] px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-xl min-w-[88px] sm:min-w-[115px] bg-[#fbfcfa] shadow-xs ${isSoldOut ? 'opacity-50 pointer-events-none' : ''}`}
               aria-label="Select quantity"
             >
               <button
                 onClick={decreaseQuantity}
-                disabled={isSoldOut || quantity <= 1}
-                className="text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={needsVariantSelection || isSoldOut || quantity <= 1}
+                className="p-1 text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 aria-label={`Decrease quantity of ${product.title}`}
               >
-                <Minus size={14} animateOn="hover" />
+                <Minus size={13} animateOn="hover" />
               </button>
-              <span className="text-sm font-bold text-[var(--color-text-primary)]" aria-live="polite">{quantity}</span>
+              <span className="text-xs sm:text-sm font-bold text-[var(--color-text-primary)] px-1" aria-live="polite">{quantity}</span>
               <button
                 onClick={increaseQuantity}
-                disabled={isSoldOut || quantity >= maxQuantity}
-                className="text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={needsVariantSelection || isSoldOut || quantity >= maxQuantity}
+                className="p-1 text-[#8a7968] hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 aria-label={`Increase quantity of ${product.title}`}
               >
-                <Plus size={14} animateOn="hover" />
+                <Plus size={13} animateOn="hover" />
               </button>
             </div>
 
@@ -523,31 +430,31 @@ export default function ProductDetailsClient({ product }: Props) {
             <button
               disabled={isAdding || (isSoldOut && !isInCart)}
               onClick={handleAddToCart}
-              aria-label={isSoldOut ? `Cannot add ${product.title} to cart - Sold Out` : isInCart ? `Go to cart` : `Add ${product.title} to your collection`}
-              className={`flex-grow py-4 gap-2 flex flex-row justify-center items-center text-[11px] md:text-[15px] uppercase tracking-[0.25em] font-bold transition-all shadow-xl shadow-black/5 ${(isSoldOut && !isInCart) || isAdding
+              aria-label={needsVariantSelection ? "Choose an edition" : isSoldOut ? `Cannot add ${product.title} to cart - Sold Out` : isInCart ? `Go to cart` : `Add ${product.title} to your collection`}
+              className={`flex-grow py-2.5 sm:py-3 px-3 gap-2 flex flex-row justify-center items-center text-xs sm:text-[13px] uppercase tracking-[0.12em] sm:tracking-[0.18em] font-bold rounded-xl transition-all shadow-md active:scale-[0.98] ${(isSoldOut && !isInCart) || isAdding
                 ? 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] cursor-not-allowed'
                 : isInCart
                   ? 'bg-[var(--color-gold)] text-white hover:bg-[#1a1410]'
                   : 'bg-[#1a1410] text-white hover:bg-[#b8924a]'
                 }`}
             >
-              <AnimatedShoppingCart size={14} />
-              {isAdding ? 'Adding...' : (isSoldOut && !isInCart) ? 'Sold Out' : isInCart ? 'Go to Cart' : 'Add to Collection'}
+              <AnimatedShoppingCart size={15} />
+              <span className="truncate">{needsVariantSelection ? 'Choose an edition' : isAdding ? 'Adding...' : (isSoldOut && !isInCart) ? 'Sold Out' : isInCart ? 'Go to Cart' : 'Add to Cart'}</span>
             </button>
           </div>
 
-          {isSoldOut && <RestockNotification key={selectedVariant?.id || String(product.id)} productId={product.id} variantId={selectedVariant?.id} variantTitle={selectedVariant?.title} />}
+          {isSoldOut && <div id="restock-notification"><RestockNotification key={selectedVariant?.id || String(product.id)} productId={product.id} variantId={selectedVariant?.id} variantTitle={selectedVariant?.title} /></div>}
           <button
             onClick={handleBuyNow}
             disabled={isSoldOut || isBuyingNow}
             aria-disabled={isBuyingNow || isSoldOut}
-            className={`w-full py-4 text-[11px] md:text-[15px] uppercase tracking-[0.25em] font-bold border transition-all duration-500 flex items-center justify-center gap-2 ${isSoldOut
+            className={`w-full py-2.5 sm:py-3 px-4 text-xs sm:text-[13px] uppercase tracking-[0.12em] sm:tracking-[0.2em] font-bold rounded-xl border transition-all duration-300 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] ${isSoldOut
               ? "border-[var(--color-border)] bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] cursor-not-allowed opacity-80"
               : "border-[#1a1410] text-white bg-[#1a1410] hover:bg-[#b8924a] hover:border-[#b8924a]"
               }`}
           >
             <span aria-live="polite" className="flex items-center gap-2">
-              {isBuyingNow ? (
+              {needsVariantSelection ? "Choose an edition" : isBuyingNow ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
                   Finalizing...
@@ -583,22 +490,22 @@ export default function ProductDetailsClient({ product }: Props) {
         </div>
 
         {/* Delivery Status and Pincode Checkers */}
-        <div className="space-y-4 pt-1">
+        <div className="space-y-2 pt-0.5">
           {pincode && (
-            <div className="p-4 bg-[#fdfcfb] border border-[#ede8e0] rounded-xl flex items-start gap-3.5 transition-all shadow-sm">
-              <div className="w-8 h-8 rounded-full bg-[#b8924a]/10 flex items-center justify-center text-[#b8924a] shrink-0 mt-0.5 animate-fadeIn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="p-2.5 sm:p-3 bg-[#fdfcfb] border border-[#ede8e0] rounded-xl flex items-start gap-3 transition-all shadow-sm">
+              <div className="w-7 h-7 rounded-full bg-[#b8924a]/10 flex items-center justify-center text-[#b8924a] shrink-0 mt-0.5 animate-fadeIn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="1" y="3" width="15" height="13" />
                   <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
                   <circle cx="5.5" cy="18.5" r="2.5" />
                   <circle cx="18.5" cy="18.5" r="2.5" />
                 </svg>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <p className="text-xs font-bold text-gray-900 leading-normal">
                   FREE delivery <span className="text-[#b8924a]">{getDeliveryDateStr()}</span>.
                 </p>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#807667] font-medium uppercase tracking-wider">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[#807667] font-medium uppercase tracking-wider">
                   <span className="flex items-center gap-1">
                     <MapPin size={11} className="text-[#b8924a] inline" />
                     Delivering to {city || "India"} {pincode}
@@ -625,7 +532,7 @@ export default function ProductDetailsClient({ product }: Props) {
             <button
               type="button"
               onClick={() => setIsCheckerExpanded(!isCheckerExpanded)}
-              className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#faf7f2] transition-colors"
+              className="w-full px-4 py-2.5 sm:py-3 flex items-center justify-between hover:bg-[#faf7f2] transition-colors"
             >
               <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-900">
                 Check Delivery Date
@@ -681,14 +588,63 @@ export default function ProductDetailsClient({ product }: Props) {
           </div>
         </div>
 
-        {/* 5. Trust Signals */}
+        {/* 5. Payment Methods */}
         <div className="pt-2">
-          <ProductTrustBadges />
-          <div className="mt-6 border-t border-[var(--color-border)] pt-8 mb-[10px]">
+          <div className="border-t border-[var(--color-border)] pt-6 mb-[10px]">
             <ProductPaymentInfo />
           </div>
         </div>
+      {/* Mobile Sticky Bottom Action Bar (Fixed, 1-Tap Checkout/Cart) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[var(--color-border)] px-4 py-2.5 flex items-center justify-between gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-extrabold text-[var(--color-text-primary)]">Rs. {activePrice}</span>
+            {activeComparePrice && parseFloat(activeComparePrice) > parseFloat(activePrice) && (
+              <span className="text-[10px] text-[var(--color-text-muted)] line-through">
+                Rs. {activeComparePrice}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-[var(--color-gold)] font-bold truncate max-w-[130px]">
+            {selectedVariant?.title && selectedVariant.title !== "Default Title" ? selectedVariant.title : (isSoldOut ? "Out of Stock" : "Free Delivery")}
+          </span>
+        </div>
 
+        <div className="flex items-center gap-2 shrink-0">
+          {needsVariantSelection ? (
+            <button type="button" onClick={chooseVariant} className="px-4 py-2.5 bg-[#1a1410] text-white text-xs font-bold rounded-xl">
+              Choose an edition
+            </button>
+          ) : isSoldOut ? (
+            <button
+              onClick={() => {
+                document.getElementById('restock-notification')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs"
+            >
+              Notify Me
+            </button>
+          ) : (
+            <>
+              <button
+                disabled={isAdding}
+                onClick={handleAddToCart}
+                className="px-3.5 py-2.5 bg-gray-100 text-gray-900 border border-gray-200 text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-xs"
+              >
+                <AnimatedShoppingCart size={13} />
+                <span>{isInCart ? 'In Cart' : 'Add'}</span>
+              </button>
+              <button
+                disabled={isBuyingNow}
+                onClick={handleBuyNow}
+                className="px-4 py-2.5 bg-[#1a1410] text-[var(--color-gold)] hover:bg-[#b8924a] hover:text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-md flex items-center gap-1"
+              >
+                {isBuyingNow ? <Loader2 size={13} className="animate-spin" /> : <span>Buy Now</span>}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

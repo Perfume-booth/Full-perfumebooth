@@ -1,137 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { readJsonDb, appendToJsonDb } from "@/lib/json-db";
 
-const BACKEND_URL = process.env.BACKEND_API_URL || "http://django:8000/api";
-const REVIEWS_FILE = "reviews.json";
-
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const productId = searchParams.get("productId") || searchParams.get("id");
-  const handle = searchParams.get("handle");
-
-  if (productId) {
-    try {
-      const res = await fetch(`${BACKEND_URL}/shop/products/${productId}/reviews/`, {
-        headers: { "Content-Type": "application/json" }
-      });
-      if (res.ok) {
-        const raw = await res.json();
-        const data = (raw && typeof raw === 'object' && 'data' in raw && 'meta' in raw) ? raw.data : raw;
-        const reviewsList = Array.isArray(data?.reviews) ? data.reviews : (Array.isArray(data) ? data : []);
-        return NextResponse.json({
-          success: true,
-          reviews: reviewsList.map((r: any) => ({
-            id: r.id,
-            name: r.user_name || r.name,
-            text: r.comment || r.text,
-            rating: r.rating,
-            isVerified: r.is_verified_buyer || r.isVerified,
-            date: r.created_at || r.date
-          })),
-          rating: data?.average_rating || data?.rating || 5,
-          ratingCount: data?.review_count || data?.ratingCount || reviewsList.length
-        });
-      }
-    } catch (e) {
-      console.error("Backend reviews fetch error:", e);
-    }
-  }
-
-  // Fallback to local reviews DB
-  const dynamicReviews = await readJsonDb<any>(REVIEWS_FILE);
-  const localReviews = handle 
-    ? dynamicReviews.filter((r: any) => r.productHandle === handle)
-    : dynamicReviews;
-
-  let rating = 4.5;
-  let ratingCount = localReviews.length;
-
-  if (localReviews.length > 0) {
-    const sum = localReviews.reduce((acc: any, r: any) => acc + (r.rating || 5), 0);
-    rating = parseFloat((sum / localReviews.length).toFixed(1));
-  }
-
-  return NextResponse.json({
-    success: true,
-    reviews: localReviews,
-    rating,
-    ratingCount,
-    handle
-  });
+const rawBackend = (process.env.BACKEND_API_URL || "http://django:8000").replace(/\/$/, "");
+const BACKEND_URL = rawBackend.endsWith("/api") ? rawBackend : `${rawBackend}/api`;
+const unwrap = (raw: any) => raw && typeof raw === "object" && "data" in raw && "meta" in raw ? raw.data : raw;
+function present(r: any, handle: string) {
+  return { id: String(r.id), productHandle: handle, name: r.user_name || "Customer",
+    text: r.comment || "", title: r.title || "", rating: Number(r.rating),
+    isVerified: r.is_verified_buyer === true, date: r.created_at?.split("T")[0] || "",
+    role: r.is_verified_buyer === true ? "Verified Buyer" : "Customer" };
 }
-
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  const identifier = params.get("handle") || params.get("productId") || params.get("id");
+  if (!identifier) {
+    return NextResponse.json({ success: true, reviews: [], rating: 5, ratingCount: 0, handle: "" });
+  }
   try {
-    const contentType = request.headers.get("content-type") || "";
-    let productId = "";
-    let rating = "5";
-    let title = "";
-    let text = "";
-    let name = "";
-
-    if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
-      productId = (formData.get("productId") || formData.get("id") || formData.get("productHandle")) as string;
-      rating = (formData.get("rating") || "5") as string;
-      title = (formData.get("title") || "") as string;
-      text = (formData.get("text") || formData.get("comment") || "") as string;
-      name = (formData.get("name") || "") as string;
-    } else {
-      const body = await request.json();
-      productId = body.productId || body.id || body.productHandle;
-      rating = body.rating || 5;
-      title = body.title || "";
-      text = body.text || body.comment || "";
-      name = body.name || "";
-    }
-
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get("access_token")?.value;
-
-    if (accessToken && productId) {
-      const res = await fetch(`${BACKEND_URL}/shop/products/${productId}/reviews/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({ rating, title, comment: text })
-      });
-
-      if (res.ok) {
-        const raw = await res.json();
-        const data = (raw && typeof raw === 'object' && 'data' in raw && 'meta' in raw) ? raw.data : raw;
-        const reviewObj = data?.review || data || {};
+    const response = await fetch(`${BACKEND_URL}/shop/products/${encodeURIComponent(identifier)}/reviews/`, { cache: "no-store" });
+    if (!response.ok) {
+      if (response.status === 404) {
         return NextResponse.json({
           success: true,
-          review: {
-            id: reviewObj.id,
-            name: name || "You",
-            text: reviewObj.comment || text,
-            rating: reviewObj.rating || rating,
-            isVerified: reviewObj.is_verified_buyer || false,
-            date: new Date().toISOString()
-          }
+          reviews: [],
+          rating: 0,
+          ratingCount: 0,
+          handle: identifier,
+          system: "native-self-hosted"
         });
       }
+      return NextResponse.json({ success: false, error: "Reviews unavailable" }, { status: response.status });
     }
-
-    // Local fallback
-    const newReview = {
-      id: `dr-${Date.now()}`,
-      productHandle: productId,
-      name: name || "Anonymous Connoisseur",
-      text,
-      rating: Number(rating),
-      isVerified: false,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    await appendToJsonDb(REVIEWS_FILE, newReview);
-    return NextResponse.json({ success: true, review: newReview });
-  } catch (error: any) {
-    console.error("Reviews API Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const data = unwrap(await response.json());
+    if (!Array.isArray(data?.reviews)) {
+      return NextResponse.json({
+        success: true,
+        reviews: [],
+        rating: 0,
+        ratingCount: 0,
+        handle: identifier,
+        system: "native-self-hosted"
+      });
+    }
+    return NextResponse.json({
+      success: true,
+      reviews: data.reviews.map((r: any) => present(r, data.product_slug || identifier)),
+      rating: data.review_count ? Number(data.average_rating) : 0,
+      ratingCount: Number(data.review_count || 0),
+      handle: data.product_slug || identifier,
+      system: "native-self-hosted"
+    });
+  } catch (err) {
+    console.error("Reviews GET fetch error:", err);
+    return NextResponse.json({
+      success: true,
+      reviews: [],
+      rating: 0,
+      ratingCount: 0,
+      handle: identifier,
+      system: "native-self-hosted",
+      fallback: true
+    });
+  }
+}
+export async function POST(request: NextRequest) {
+  let body: any;
+  try {
+    body = (request.headers.get("content-type") || "").includes("multipart/form-data")
+      ? Object.fromEntries(await request.formData()) : await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid request" }, { status: 400 });
+  }
+  const identifier = body?.productId || body?.id || body?.productHandle;
+  const rating = Number(body?.rating);
+  if (typeof identifier !== "string" || !identifier.trim() || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return NextResponse.json({ success: false, error: "Product and rating (1-5) required" }, { status: 400 });
+  }
+  try {
+    const token = (await cookies()).get("access_token")?.value;
+    const response = await fetch(`${BACKEND_URL}/shop/products/${encodeURIComponent(identifier)}/reviews/`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ rating, title: body.title || "", comment: body.text || body.comment || "", name: body.name || "", email: body.email || "" })
+    });
+    const data = unwrap(await response.json());
+    if (!response.ok) return NextResponse.json({ success: false, error: data?.detail || "Review submission failed" }, { status: response.status });
+    return NextResponse.json({ success: true, review: present(data.review, identifier), backendSynced: true }, { status: response.status });
+  } catch {
+    // Never fabricate a saved/verified review when Django is unavailable.
+    return NextResponse.json({ success: false, error: "Unable to save review. Please try again." }, { status: 503 });
   }
 }

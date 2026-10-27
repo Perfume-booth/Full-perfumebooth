@@ -15,7 +15,6 @@ import {
 import { AnimatedLoader2 as Loader2 } from "@/components/ui/icons/AnimatedLoader2";
 import { AnimatedAlertCircle as AlertCircle } from "@/components/ui/icons/AnimatedAlertCircle";
 import { AnimatedCheckCircle2 as CheckCircle2 } from "@/components/ui/icons/AnimatedCheckCircle2";
-import { useRouter } from "next/navigation";
 
 // Dynamic SVG Icons for Social logins
 function GoogleIcon() {
@@ -55,7 +54,6 @@ interface CloudWatchFormProps {
 }
 
 function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }: CloudWatchFormProps) {
-  const router = useRouter();
   const [isTyping, setIsTyping] = useState(false);
   const [eyePos, setEyePos] = useState({ x: 0, y: 0 });
   const [blink, setBlink] = useState(false);

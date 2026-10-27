@@ -1,8 +1,7 @@
 "use client";
 
-import React from "react";
 import { motion } from "framer-motion";
-import { IconWrapper, IconProps, pathVariants } from "./icon-wrapper";
+import { IconWrapper, IconProps } from "./icon-wrapper";
 
 export const AnimatedLoader2 = (props: IconProps) => (
   <IconWrapper {...props}>

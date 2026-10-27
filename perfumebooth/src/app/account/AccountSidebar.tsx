@@ -17,6 +17,7 @@ interface AccountSidebarProps {
 }
 
 export default function AccountSidebar({ ordersCount }: AccountSidebarProps) {
+  void ordersCount;
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loggingOut, setLoggingOut] = useState(false);

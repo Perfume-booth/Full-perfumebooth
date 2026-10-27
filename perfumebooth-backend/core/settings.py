@@ -218,6 +218,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.inventory.tasks.release_expired_inventory_reservations',
         'schedule': 60.0,
     },
+    'auto-sync-media-to-r2': {
+        'task': 'apps.shop.tasks.sync_media_files_to_r2_task',
+        'schedule': 300.0,
+    },
 }
 
 INVENTORY_RESERVATION_MINUTES = config('INVENTORY_RESERVATION_MINUTES', default=15, cast=int)

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { AnimatedChevronDown as ChevronDown } from "@/components/ui/icons/AnimatedChevronDown";
-import { AnimatedChevronUp as ChevronUp } from "@/components/ui/icons/AnimatedChevronUp";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+//
+//
 import { AnimatedStar as Star } from "@/components/ui/icons/AnimatedStar";
 import { AnimatedTag as Tag } from "@/components/ui/icons/AnimatedTag";
 import { AnimatedUsers as Users } from "@/components/ui/icons/AnimatedUsers";
@@ -50,7 +50,7 @@ export default function SideFilter({
   description,
   globalBrands,
   children,
-}: SideFilterProps) {
+}: SideFilterProps) { void description;
   const {
     products,
     pageInfo,
@@ -171,9 +171,9 @@ export default function SideFilter({
     });
 
   // Helper for case-insensitive check
-  const isTypeSelected = (typeLabel: string) => {
-    return selectedTypes.some(t => t.toLowerCase() === typeLabel.toLowerCase());
-  };
+  // const isTypeSelected
+  // return selectedTypes.some(t => t.toLowerCase() === typeLabel.toLowerCase());
+  // };
 
   const hasActiveFilters = selectedTypes.length > 0 || selectedBrands.length > 0 || selectedAvailability.length > 0 || selectedGender.length > 0 || selectedRating !== null || priceRange[0] > 0 || priceRange[1] < 10000;
 

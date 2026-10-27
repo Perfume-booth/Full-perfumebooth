@@ -1,40 +1,9 @@
 import { Article, BlogData, unwrapApiData, ensureArray } from "./types";
 
 
-const MOCK_ARTICLES: Article[] = [
-  {
-    id: "art-1",
-    handle: "how-to-make-your-perfume-last-longer",
-    title: "How to Make Your Perfume Last All Day",
-    excerpt: "Discover the secrets of fragrance layering, pulse points application, and proper storage methods to keep your signature scent active from morning to night.",
-    content: "Full guide here...",
-    contentHtml: "<p>Apply perfume to your pulse points. These areas emit heat, which helps diffuse the fragrance across your skin.</p><p>Layering with scented body lotion is another great tip.</p>",
-    publishedAt: new Date().toISOString(),
-    authorV2: { name: "Perfume Expert" },
-    image: {
-      url: "/placeholder-review-img.jpg",
-      altText: "How to apply perfume"
-    }
-  },
-  {
-    id: "art-2",
-    handle: "guide-to-fragrance-notes-for-beginners",
-    title: "The Beginner's Guide to Fragrance Notes",
-    excerpt: "Understand the scent pyramid. Learn how top, middle, and base notes interact to create your favorite perfume combinations.",
-    content: "Full guide here...",
-    contentHtml: "<p>Fragrances are composed of three layers: top, middle (heart), and base notes.</p><p>Top notes are what you smell initially, middle notes emerge after a few minutes, and base notes linger for hours.</p>",
-    publishedAt: new Date().toISOString(),
-    authorV2: { name: "Master Perfumer" },
-    image: {
-      url: "/placeholder-review-img.jpg",
-      altText: "Fragrance scent pyramid"
-    }
-  }
-];
-
 const DJANGO_URL = process.env.NEXT_PUBLIC_DJANGO_URL || 'http://localhost:8000';
 
-export async function getBlog(handle: string = 'news', first: number = 20): Promise<BlogData> {
+export async function getBlog(_handle: string = 'news', first: number = 20): Promise<BlogData> {
   try {
     const res = await fetch(`${DJANGO_URL}/api/cms/blogs/`, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error('Failed to fetch blog posts');

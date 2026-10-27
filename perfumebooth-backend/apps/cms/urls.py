@@ -2,7 +2,8 @@ from django.urls import path
 from .notification_views import SubscribeView, RestockSubscribeView, ManageNotificationView
 from .views import (
     CMSPageListView, CMSPageView, BlogPostListView, BlogPostDetailView,
-    ContactSubmissionCreateView, NewsletterSubscribeView, NewsletterStatusView,
+    ContactSubmissionCreateView, ContactSubmissionAdminListView, ContactSubmissionAdminDetailView,
+    ContactSubmissionExportExcelView, NewsletterSubscribeView, NewsletterStatusView,
     MediaAssetListView, MediaAssetUploadView, MediaAssetDeleteView, MediaFolderCreateView
 )
 
@@ -12,6 +13,9 @@ urlpatterns = [
     path('blogs/', BlogPostListView.as_view(), name='cms-blog-list'),
     path('blogs/<path:slug_or_id>/', BlogPostDetailView.as_view(), name='cms-blog-detail'),
     path('contact/', ContactSubmissionCreateView.as_view(), name='cms-contact-submit'),
+    path('inquiries/', ContactSubmissionAdminListView.as_view(), name='cms-inquiries-list'),
+    path('inquiries/export/', ContactSubmissionExportExcelView.as_view(), name='cms-inquiries-export'),
+    path('inquiries/<uuid:pk>/', ContactSubmissionAdminDetailView.as_view(), name='cms-inquiries-detail'),
     path('newsletter/subscribe/', SubscribeView.as_view(), name='cms-newsletter-subscribe'),
     path('notifications/restock/', RestockSubscribeView.as_view(), name='cms-restock-subscribe'),
     path('notifications/manage/', ManageNotificationView.as_view(), name='cms-notification-manage'),

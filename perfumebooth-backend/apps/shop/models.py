@@ -423,8 +423,14 @@ class ProductReview(models.Model):
     user = models.ForeignKey(
         'authentication.CustomUser',
         on_delete=models.CASCADE,
-        related_name='reviews'
+        related_name='reviews',
+        null=True,
+        blank=True,
     )
+    # Imported reviews are historical records, not new customer accounts.
+    import_key = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    imported_name = models.CharField(max_length=255, blank=True, default='')
+    import_metadata = models.JSONField(default=dict, blank=True)
     rating = models.PositiveSmallIntegerField(help_text="1 to 5 star rating")
     title = models.CharField(max_length=255, blank=True, default='')
     comment = models.TextField(blank=True, default='')
@@ -439,4 +445,10 @@ class ProductReview(models.Model):
         ordering = ['-created_at']
 
     def __str__(self) -> str:
-        return f"{self.rating}* Review for {self.product.title} by {self.user.email}"
+        return f"{self.rating}* Review for {self.product.title} by {self.display_name}"
+
+    @property
+    def display_name(self):
+        if self.import_key:
+            return self.imported_name or 'Customer'
+        return (self.user.full_name or 'Customer') if self.user else 'Customer'

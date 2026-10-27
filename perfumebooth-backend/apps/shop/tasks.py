@@ -263,3 +263,21 @@ def check_and_send_low_stock_alerts(self, threshold: int = 5) -> dict:
 
     return {'status': 'completed', 'low_stock_count': count}
 
+
+@shared_task(queue='default', name='apps.shop.tasks.sync_media_files_to_r2_task')
+def sync_media_files_to_r2_task():
+    """
+    Automated periodic task to ensure any new images placed directly into
+    local media/ are uploaded to Cloudflare R2 automatically.
+    """
+    from django.conf import settings
+    if not getattr(settings, 'USE_R2', False):
+        return 'USE_R2 disabled'
+    from django.core.management import call_command
+    try:
+        call_command('sync_media_to_r2', concurrency=8)
+        return 'Synced to R2'
+    except Exception as exc:
+        return f'Sync error: {exc}'
+
+

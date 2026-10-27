@@ -5,6 +5,9 @@ export interface CheckoutLineItem {
   quantity: number;
 }
 
-export async function createCheckout(items: CheckoutLineItem[], discountCode?: string, buyerIdentity?: any): Promise<string | null> {
+export async function createCheckout(_items?: CheckoutLineItem[], _discountCode?: string, _buyerIdentity?: unknown): Promise<string | null> {
+  void _items;
+  void _discountCode;
+  void _buyerIdentity;
   return "/checkout";
 }

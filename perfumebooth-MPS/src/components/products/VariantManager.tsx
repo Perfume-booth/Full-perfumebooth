@@ -16,7 +16,10 @@ import {
   Maximize2,
   Minimize2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Image as ImageIcon,
+  X,
+  Camera
 } from 'lucide-react';
 
 export interface VariantItem {
@@ -46,6 +49,7 @@ interface VariantManagerProps {
   baseStock: number;
   initialVariants?: VariantItem[];
   onChange: (variants: VariantItem[]) => void;
+  galleryImages?: { url: string; altText?: string }[];
 }
 
 export default function VariantManager({
@@ -55,9 +59,12 @@ export default function VariantManager({
   baseStock,
   initialVariants = [],
   onChange,
+  galleryImages = [],
 }: VariantManagerProps) {
   const [variants, setVariants] = useState<VariantItem[]>(initialVariants);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [imagePickerIndex, setImagePickerIndex] = useState<number | null>(null);
+  const [customImageUrl, setCustomImageUrl] = useState('');
 
   // Quick Manual Bulk-Add Helper State
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -341,40 +348,138 @@ export default function VariantManager({
                           </button>
                         </td>
 
-                        {/* Variant Image Preview */}
-                        <td className="p-3 text-center">
-                          {v.image ? (
-                            <div className="relative group/thumb inline-block">
-                              <img
-                                src={v.image}
-                                alt={v.title}
-                                className="w-10 h-10 object-contain rounded-xl neu-inset-sm border border-border/30 bg-card p-0.5 mx-auto"
-                                onError={(e) => {
-                                  // Fallback gracefully on broken images
-                                  const target = e.currentTarget;
-                                  target.style.display = 'none';
-                                  const fallback = target.nextElementSibling as HTMLElement;
-                                  if (fallback) fallback.classList.remove('hidden');
-                                }}
-                              />
-                              <div className="hidden w-10 h-10 rounded-xl neu-inset-sm border border-border/20 flex-col items-center justify-center text-muted-foreground/60 mx-auto text-[9px] font-bold">
-                                <span>No Img</span>
+                        {/* Variant Image Preview & Interactive Picker */}
+                        <td className="p-3 text-center relative">
+                          {(() => {
+                            const effectiveImg = v.image || (galleryImages[idx]?.url ?? null);
+                            const isAuto = !v.image && Boolean(effectiveImg);
+
+                            return (
+                              <div className="relative inline-block">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setImagePickerIndex(imagePickerIndex === idx ? null : idx);
+                                    setCustomImageUrl(v.image || '');
+                                  }}
+                                  className="group/btn relative block focus:outline-none cursor-pointer"
+                                  title="Click to assign or change variant image"
+                                >
+                                  {effectiveImg ? (
+                                    <div className="relative">
+                                      <img
+                                        src={effectiveImg}
+                                        alt={v.title}
+                                        className="w-10 h-10 object-contain rounded-xl neu-inset-sm border border-border/30 bg-card p-0.5 mx-auto group-hover/btn:border-primary transition"
+                                      />
+                                      {isAuto && (
+                                        <span className="absolute -bottom-1 -right-1 bg-primary text-[8px] font-extrabold text-white px-1 rounded-md shadow-sm">
+                                          Auto
+                                        </span>
+                                      )}
+                                      <span className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover/btn:opacity-100 flex items-center justify-center text-white text-[9px] font-bold transition">
+                                        Edit
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl neu-inset-sm border border-dashed border-border/40 flex flex-col items-center justify-center text-muted-foreground/60 mx-auto text-[9px] font-bold hover:text-primary hover:border-primary transition group-hover/btn:neu-inset">
+                                      <Camera className="w-3.5 h-3.5 mb-0.5" />
+                                      <span>+Img</span>
+                                    </div>
+                                  )}
+                                </button>
+
+                                {/* Popover Picker */}
+                                {imagePickerIndex === idx && (
+                                  <div className="absolute left-1/2 -translate-x-1/2 top-12 z-50 w-64 bg-card rounded-2xl neu-extruded border border-border/40 p-3 shadow-2xl text-left animate-in fade-in zoom-in-95 duration-150">
+                                    <div className="flex items-center justify-between pb-2 border-b border-border/30">
+                                      <span className="text-[11px] font-bold text-foreground">Select Variant Image</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setImagePickerIndex(null)}
+                                        className="text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    {/* Gallery Images to pick from */}
+                                    {galleryImages.length > 0 && (
+                                      <div className="mt-2">
+                                        <span className="text-[9px] font-bold uppercase text-muted-foreground block mb-1.5">
+                                          From Product Gallery ({galleryImages.length})
+                                        </span>
+                                        <div className="grid grid-cols-4 gap-1.5 max-h-32 overflow-y-auto p-1 neu-inset rounded-xl">
+                                          {galleryImages.map((gImg, gIdx) => (
+                                            <button
+                                              key={gIdx}
+                                              type="button"
+                                              onClick={() => {
+                                                handleUpdateRow(idx, 'image', gImg.url);
+                                                setImagePickerIndex(null);
+                                              }}
+                                              className={`relative aspect-square rounded-lg p-0.5 border cursor-pointer hover:border-primary transition ${
+                                                v.image === gImg.url ? 'border-primary ring-2 ring-primary/30' : 'border-border/30 bg-card'
+                                              }`}
+                                              title={`Assign image ${gIdx + 1}`}
+                                            >
+                                              <img
+                                                src={gImg.url}
+                                                alt={gImg.altText || `Gallery image ${gIdx + 1}`}
+                                                className="w-full h-full object-contain rounded"
+                                              />
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Custom URL Input */}
+                                    <div className="mt-2.5">
+                                      <span className="text-[9px] font-bold uppercase text-muted-foreground block mb-1">
+                                        Or Image URL
+                                      </span>
+                                      <div className="flex gap-1">
+                                        <input
+                                          type="text"
+                                          value={customImageUrl}
+                                          onChange={(e) => setCustomImageUrl(e.target.value)}
+                                          placeholder="https://... or /media/..."
+                                          className="flex-1 px-2 py-1 neu-input rounded-lg text-[10px] text-foreground"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (customImageUrl.trim()) {
+                                              handleUpdateRow(idx, 'image', customImageUrl.trim());
+                                              setImagePickerIndex(null);
+                                            }
+                                          }}
+                                          className="px-2 py-1 neu-btn font-semibold rounded-lg text-[10px] cursor-pointer"
+                                        >
+                                          Set
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Remove image */}
+                                    {v.image && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleUpdateRow(idx, 'image', null);
+                                          setImagePickerIndex(null);
+                                        }}
+                                        className="mt-2 w-full text-center text-[10px] text-red-500 hover:text-red-400 py-1 font-semibold cursor-pointer"
+                                      >
+                                        Remove Custom Image
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              <div className="absolute left-12 top-0 z-50 hidden group-hover/thumb:block w-36 h-36 bg-card rounded-2xl neu-extruded border border-border p-1.5 shadow-2xl pointer-events-none">
-                                <img
-                                  src={v.image}
-                                  alt={v.title}
-                                  className="w-full h-full object-contain rounded-xl bg-black/5"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                                <span className="block text-[9px] text-center font-bold mt-1 text-foreground truncate">{v.title}</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded-xl neu-inset-sm border border-border/20 flex flex-col items-center justify-center text-muted-foreground/60 mx-auto text-[9px] font-bold" title="No image assigned to this variant">
-                              <span>No Img</span>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </td>
 
                         {/* 114. Variant Attributes (Option 1 Value & Name) */}

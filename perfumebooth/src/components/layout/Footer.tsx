@@ -16,7 +16,7 @@ import { COMPANY, NAV_LINKS } from "@/lib/constants";
 import Dock from "@/components/ui/dock";
 import NewsletterStrip from "./NewsletterStrip";
 import { SiRazorpay } from "react-icons/si";
-import { TextHoverEffect, FooterBackgroundGradient } from "@/components/ui/hover-footer";
+import { FooterBackgroundGradient } from "@/components/ui/hover-footer";
 
 const POLICY_LINKS = [
     { label: "Blog", href: "/blog" },
@@ -220,10 +220,6 @@ export default function Footer() {
                         </div>
                     </div>
 
-                    {/* Text hover effect centered/stretched at the bottom */}
-                    <div className="hidden md:block px-6 flex justify-center h-[5rem] md:h-[19rem] relative z-10 pointer-events-none select-none -mt-4 md:-mt-10 pb-20">
-                        <TextHoverEffect text="PERFUME BOOTH" className="w-full h-full pointer-events-auto" />
-                    </div>
                 </div>
             </div>
         </footer>

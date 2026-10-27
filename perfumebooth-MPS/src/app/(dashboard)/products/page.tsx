@@ -1621,6 +1621,10 @@ export default function ProductsPage() {
               baseStock={stockLevel}
               initialVariants={variantsList}
               onChange={(updated) => setVariantsList(updated)}
+              galleryImages={editingProduct?.images?.map((img) => ({
+                url: formatProductImageUrl(img.url),
+                altText: img.altText,
+              })) || []}
             />
 
             {/* Shipping Features Component */}
@@ -2100,7 +2104,7 @@ export default function ProductsPage() {
                                 {product.variants.filter((v: any) => v.image).slice(0, 6).map((v: any, vIdx: number) => (
                                   <img
                                     key={v.id || vIdx}
-                                    src={v.image!}
+                                    src={formatProductImageUrl(v.image)}
                                     alt={v.title}
                                     title={`${v.title} (₹${v.price})`}
                                     className="inline-block w-6 h-6 rounded-full ring-2 ring-card object-contain bg-white border border-border/30"

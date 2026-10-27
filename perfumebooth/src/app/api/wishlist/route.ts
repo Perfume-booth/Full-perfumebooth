@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-const BACKEND_URL = process.env.BACKEND_API_URL || "http://django:8000/api";
+const rawBackend = (process.env.BACKEND_API_URL || "http://django:8000").replace(/\/$/, "");
+const BACKEND_URL = rawBackend.endsWith("/api") ? rawBackend : `${rawBackend}/api`;
 
 export async function POST(req: NextRequest) {
   try {

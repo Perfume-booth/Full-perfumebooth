@@ -7,7 +7,7 @@ import { PageInfo } from "./useCollection";
 import { loadMoreCollectionProducts } from "@/lib/actions/actions";
 import { getCollectionProducts } from "@/lib/catalog";
 import { buildCatalogFilters, getSortConfig } from "@/lib/catalog-filters";
-import { SORT_OPTIONS, TOP_BRANDS } from "@/lib/constants";
+import { SORT_OPTIONS } from "@/lib/constants";
 
 interface UseFilterLogicProps {
   initialProducts: Product[];
@@ -25,7 +25,7 @@ export const useFilterLogic = ({
   initialTotalCount,
   collectionHandle,
   title,
-}: UseFilterLogicProps) => {
+}: UseFilterLogicProps) => { void title;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

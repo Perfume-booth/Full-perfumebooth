@@ -27,7 +27,7 @@ export default function Breadcrumb({ items, title, totalProducts: propTotalProdu
   try {
     const collection = useCollection();
     contextTotalProducts = collection.totalCount;
-  } catch (e) {
+  } catch {
     // Not within a CollectionContext
   }
 
@@ -43,7 +43,7 @@ export default function Breadcrumb({ items, title, totalProducts: propTotalProdu
     );
 
     // Build items from the remaining segments
-    const mappedItems = filtered.map((segment, index) => {
+    const mappedItems = filtered.map((segment) => {
       // Reconstruct the actual href using the original pathSegments
       const originalIndex = pathSegments.indexOf(segment);
       const href = "/" + pathSegments.slice(0, originalIndex + 1).join("/");

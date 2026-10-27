@@ -3,7 +3,13 @@ CMS Views — Page layout JSON endpoints consumed by Next.js
 """
 import os
 import re
+import io
 import json
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from django.http import HttpResponse
+from django.utils import timezone
+from django.db.models import Q, Count
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -561,6 +567,168 @@ class ContactSubmissionCreateView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+class ContactSubmissionAdminListView(APIView):
+    """
+    GET /api/cms/inquiries/
+    Merchant list and search endpoint for customer contact inquiries.
+    """
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def get(self, request):
+        status_filter = request.query_params.get('status', 'all').strip().lower()
+        search = request.query_params.get('search', '').strip()
+
+        qs = ContactSubmission.objects.all().order_by('-created_at')
+
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(subject__icontains=search) |
+                Q(message__icontains=search)
+            )
+
+        raw_counts = dict(ContactSubmission.objects.values('status').annotate(c=Count('id')).values_list('status', 'c'))
+        counts = {
+            'all': ContactSubmission.objects.count(),
+            'pending': raw_counts.get('pending', 0),
+            'read': raw_counts.get('read', 0),
+            'replied': raw_counts.get('replied', 0),
+            'archived': raw_counts.get('archived', 0),
+        }
+
+        inquiries = []
+        for item in qs[:200]:
+            inquiries.append({
+                'id': str(item.id),
+                'name': item.name,
+                'email': item.email,
+                'phone': item.phone,
+                'subject': item.subject,
+                'message': item.message,
+                'status': item.status,
+                'ip_address': item.ip_address,
+                'created_at': item.created_at.isoformat() if item.created_at else None,
+                'updated_at': item.updated_at.isoformat() if item.updated_at else None,
+            })
+
+        return Response({
+            'inquiries': inquiries,
+            'total': qs.count(),
+            'counts': counts
+        })
+
+
+class ContactSubmissionAdminDetailView(APIView):
+    """
+    PATCH /api/cms/inquiries/<uuid:pk>/ - Update status
+    DELETE /api/cms/inquiries/<uuid:pk>/ - Delete inquiry
+    """
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def patch(self, request, pk):
+        inquiry = get_object_or_404(ContactSubmission, id=pk)
+        new_status = (request.data.get('status') or '').strip().lower()
+        if new_status not in [c[0] for c in ContactSubmission.Status.choices]:
+            return Response({'error': f"Invalid status. Choose from: {[c[0] for c in ContactSubmission.Status.choices]}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        inquiry.status = new_status
+        inquiry.save(update_fields=['status', 'updated_at'])
+        log_action(request.user, f"Updated inquiry {inquiry.id} status to '{new_status}'", request)
+        return Response({'success': True, 'status': inquiry.status})
+
+    def delete(self, request, pk):
+        inquiry = get_object_or_404(ContactSubmission, id=pk)
+        inquiry_id = str(inquiry.id)
+        inquiry.delete()
+        log_action(request.user, f"Deleted inquiry {inquiry_id}", request)
+        return Response({'success': True, 'deleted_id': inquiry_id})
+
+
+class ContactSubmissionExportExcelView(APIView):
+    """
+    GET /api/cms/inquiries/export/
+    Streams all contact inquiries into an Excel workbook (.xlsx).
+    """
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), HasRolePermission()]
+
+    allowed_roles = ['Super Admin', 'Admin', 'Content Manager', 'E-commerce Executive']
+
+    def get(self, request):
+        status_filter = request.query_params.get('status', 'all').strip().lower()
+        qs = ContactSubmission.objects.all().order_by('-created_at')
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Contact Inquiries"
+
+        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='1A1410', end_color='1A1410', fill_type='solid')
+        border_thin = Side(style='thin', color='E5E7EB')
+        cell_border = Border(left=border_thin, right=border_thin, top=border_thin, bottom=border_thin)
+
+        headers = [
+            "Inquiry ID", "Date Submitted (UTC)", "Customer Name", "Email Address",
+            "Phone Number", "Subject", "Message", "Status", "IP Address"
+        ]
+        ws.append(headers)
+
+        for col_num in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for item in qs:
+            date_str = item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else ''
+            ws.append([
+                str(item.id),
+                date_str,
+                item.name,
+                item.email,
+                item.phone or '',
+                item.subject or '',
+                item.message or '',
+                item.status.upper(),
+                item.ip_address or ''
+            ])
+
+        for col in ws.columns:
+            max_len = 0
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            for cell in col:
+                cell.border = cell_border
+                val_len = len(str(cell.value or ''))
+                if val_len > max_len:
+                    max_len = val_len
+            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 60)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"perfumebooth_inquiries_{timezone.now().strftime('%Y%m%d')}.xlsx"
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+
 class NewsletterSubscribeView(APIView):
     """
     POST /api/cms/newsletter/subscribe/
@@ -635,38 +803,172 @@ class MediaAssetListView(APIView):
         folder = request.query_params.get('folder', 'all').strip()
         search = request.query_params.get('search', '').strip()
 
-        qs = MediaAsset.objects.all()
-        if folder and folder != 'all':
-            qs = qs.filter(folder=folder)
-        if search:
-            qs = qs.filter(name__icontains=search)
+        from apps.shop.models import ProductImage, ProductVariant
+        from django.db.models import Q
 
         assets = []
-        for asset in qs[:200]:
-            url = format_media_url(asset.file.url if asset.file else None, request)
-            assets.append({
-                'id': str(asset.id),
-                'name': asset.name,
-                'folder': asset.folder,
-                'url': url,
-                'file_type': asset.file_type,
-                'file_size': asset.file_size,
-                'width': asset.width,
-                'height': asset.height,
-                'alt_text': asset.alt_text,
-                'created_at': asset.created_at.isoformat() if asset.created_at else None,
-            })
+
+        if folder == 'variants':
+            pv_qs = ProductVariant.objects.exclude(image='').exclude(image__isnull=True).select_related('product')
+            if search:
+                pv_qs = pv_qs.filter(
+                    Q(product__title__icontains=search) | 
+                    Q(title__icontains=search) | 
+                    Q(sku__icontains=search) | 
+                    Q(image__icontains=search)
+                )
+            for pv in pv_qs[:300]:
+                url = format_media_url(pv.image.url if pv.image else None, request)
+                name = os.path.basename(pv.image.name) if pv.image else f"{pv.sku}.jpg"
+                alt = f"{pv.product.title} - {pv.title or pv.sku}" if pv.product else (pv.title or pv.sku)
+                assets.append({
+                    'id': str(pv.id),
+                    'name': name,
+                    'folder': 'variants',
+                    'url': url,
+                    'file_type': 'image/jpeg',
+                    'file_size': None,
+                    'width': None,
+                    'height': None,
+                    'alt_text': alt,
+                    'created_at': pv.created_at.isoformat() if pv.created_at else None,
+                })
+        elif folder == 'products':
+            pi_qs = ProductImage.objects.select_related('product')
+            if search:
+                pi_qs = pi_qs.filter(
+                    Q(product__title__icontains=search) | 
+                    Q(image__icontains=search) | 
+                    Q(alt_text__icontains=search)
+                )
+            for pi in pi_qs[:300]:
+                url = format_media_url(pi.image.url if pi.image else None, request)
+                name = os.path.basename(pi.image.name) if pi.image else (f"{pi.product.title}.jpg" if pi.product else "product.jpg")
+                assets.append({
+                    'id': str(pi.id),
+                    'name': name,
+                    'folder': 'products',
+                    'url': url,
+                    'file_type': 'image/jpeg',
+                    'file_size': None,
+                    'width': pi.width,
+                    'height': pi.height,
+                    'alt_text': pi.alt_text or (pi.product.title if pi.product else name),
+                    'created_at': pi.created_at.isoformat() if pi.created_at else None,
+                })
+
+            # Also include matching variant images in Products folder
+            pv_qs = ProductVariant.objects.exclude(image='').exclude(image__isnull=True).select_related('product')
+            if search:
+                pv_qs = pv_qs.filter(
+                    Q(product__title__icontains=search) | 
+                    Q(title__icontains=search) | 
+                    Q(sku__icontains=search) | 
+                    Q(image__icontains=search)
+                )
+            for pv in pv_qs[:100]:
+                url = format_media_url(pv.image.url if pv.image else None, request)
+                name = os.path.basename(pv.image.name) if pv.image else f"{pv.sku}.jpg"
+                alt = f"{pv.product.title} - {pv.title or pv.sku}" if pv.product else (pv.title or pv.sku)
+                assets.append({
+                    'id': str(pv.id),
+                    'name': name,
+                    'folder': 'variants',
+                    'url': url,
+                    'file_type': 'image/jpeg',
+                    'file_size': None,
+                    'width': None,
+                    'height': None,
+                    'alt_text': alt,
+                    'created_at': pv.created_at.isoformat() if pv.created_at else None,
+                })
+        else:
+            qs = MediaAsset.objects.all()
+            if folder and folder != 'all':
+                qs = qs.filter(folder=folder)
+            if search:
+                qs = qs.filter(name__icontains=search)
+
+            for asset in qs[:200]:
+                url = format_media_url(asset.file.url if asset.file else None, request)
+                assets.append({
+                    'id': str(asset.id),
+                    'name': asset.name,
+                    'folder': asset.folder,
+                    'url': url,
+                    'file_type': asset.file_type,
+                    'file_size': asset.file_size,
+                    'width': asset.width,
+                    'height': asset.height,
+                    'alt_text': asset.alt_text,
+                    'created_at': asset.created_at.isoformat() if asset.created_at else None,
+                })
+
+            if folder == 'all':
+                pi_qs = ProductImage.objects.select_related('product')
+                if search:
+                    pi_qs = pi_qs.filter(
+                        Q(product__title__icontains=search) | 
+                        Q(image__icontains=search) | 
+                        Q(alt_text__icontains=search)
+                    )
+                for pi in pi_qs[:150]:
+                    url = format_media_url(pi.image.url if pi.image else None, request)
+                    name = os.path.basename(pi.image.name) if pi.image else (f"{pi.product.title}.jpg" if pi.product else "product.jpg")
+                    assets.append({
+                        'id': str(pi.id),
+                        'name': name,
+                        'folder': 'products',
+                        'url': url,
+                        'file_type': 'image/jpeg',
+                        'file_size': None,
+                        'width': pi.width,
+                        'height': pi.height,
+                        'alt_text': pi.alt_text or (pi.product.title if pi.product else name),
+                        'created_at': pi.created_at.isoformat() if pi.created_at else None,
+                    })
+
+                pv_qs = ProductVariant.objects.exclude(image='').exclude(image__isnull=True).select_related('product')
+                if search:
+                    pv_qs = pv_qs.filter(
+                        Q(product__title__icontains=search) | 
+                        Q(title__icontains=search) | 
+                        Q(sku__icontains=search) | 
+                        Q(image__icontains=search)
+                    )
+                for pv in pv_qs[:50]:
+                    url = format_media_url(pv.image.url if pv.image else None, request)
+                    name = os.path.basename(pv.image.name) if pv.image else f"{pv.sku}.jpg"
+                    alt = f"{pv.product.title} - {pv.title or pv.sku}" if pv.product else (pv.title or pv.sku)
+                    assets.append({
+                        'id': str(pv.id),
+                        'name': name,
+                        'folder': 'variants',
+                        'url': url,
+                        'file_type': 'image/jpeg',
+                        'file_size': None,
+                        'width': None,
+                        'height': None,
+                        'alt_text': alt,
+                        'created_at': pv.created_at.isoformat() if pv.created_at else None,
+                    })
 
         # Calculate counts per folder
         from django.db.models import Count
         folder_counts = dict(
             MediaAsset.objects.values('folder').annotate(c=Count('id')).values_list('folder', 'c')
         )
-        total_count = MediaAsset.objects.count()
+        product_images_count = ProductImage.objects.count()
+        variant_images_count = ProductVariant.objects.exclude(image='').exclude(image__isnull=True).count()
+        folder_counts['products'] = product_images_count
+        folder_counts['variants'] = variant_images_count
+        total_count = MediaAsset.objects.count() + product_images_count + variant_images_count
 
         # System default folders
         system_folders = [
             {'name': 'All Files', 'slug': 'all', 'count': total_count},
+            {'name': 'Products', 'slug': 'products', 'count': product_images_count},
+            {'name': 'Product Variants', 'slug': 'variants', 'count': variant_images_count},
             {'name': 'Banners & Hero', 'slug': 'banners', 'count': folder_counts.get('banners', 0)},
             {'name': 'Videos & Reels', 'slug': 'videos', 'count': folder_counts.get('videos', 0)},
             {'name': 'Homepage Sections', 'slug': 'homepage', 'count': folder_counts.get('homepage', 0)},
@@ -804,18 +1106,35 @@ class MediaAssetDeleteView(APIView):
     allowed_roles = ['Super Admin', 'Admin', 'Content Manager']
 
     def delete(self, request, asset_id):
-        asset = get_object_or_404(MediaAsset, id=asset_id)
-        file_name = asset.name
-        if asset.file:
-            try:
-                asset.file.delete(save=False)
-            except Exception:
-                pass
-        asset.delete()
+        from apps.shop.models import ProductImage, ProductVariant
+        asset = MediaAsset.objects.filter(id=asset_id).first()
+        if asset:
+            file_name = asset.name
+            if asset.file:
+                try:
+                    asset.file.delete(save=False)
+                except Exception:
+                    pass
+            asset.delete()
+            log_action(request.user, f"Deleted media asset {file_name}", request)
+            return Response({'success': True, 'detail': 'Media asset deleted successfully.'})
 
-        log_action(request.user, f"Deleted media asset {file_name}", request)
+        pi = ProductImage.objects.filter(id=asset_id).first()
+        if pi:
+            file_name = str(pi.image)
+            pi.delete()
+            log_action(request.user, f"Deleted product image {file_name}", request)
+            return Response({'success': True, 'detail': 'Product image deleted successfully.'})
 
-        return Response({'success': True, 'detail': 'Media asset deleted successfully.'})
+        pv = ProductVariant.objects.filter(id=asset_id).first()
+        if pv:
+            file_name = str(pv.image)
+            pv.image = None
+            pv.save(update_fields=['image'])
+            log_action(request.user, f"Cleared image from variant {pv.sku}", request)
+            return Response({'success': True, 'detail': 'Variant image removed successfully.'})
+
+        return Response({'detail': 'Media asset not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class MediaFolderCreateView(APIView):

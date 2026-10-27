@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { EmblaOptionsType, EmblaPluginType } from "embla-carousel";
 import Autoplay from "embla-carousel-autoplay";
@@ -21,11 +21,12 @@ interface CarouselProps {
   onSelect?: (index: number) => void;
 }
 
+const DEFAULT_OPTIONS: EmblaOptionsType = { align: "start", containScroll: "trimSnaps" };
 const NO_PLUGINS: EmblaPluginType[] = [];
 
 export default function Carousel({
   children,
-  options = { align: "start", containScroll: "trimSnaps" },
+  options = DEFAULT_OPTIONS,
   plugins = NO_PLUGINS,
   autoplay = false,
   autoplayDelay = 4000,
@@ -36,22 +37,37 @@ export default function Carousel({
   slideClassName,
   onSelect,
 }: CarouselProps) {
-  // Plugin instances hold state. Recreating them on every render forces Embla to
-  // do unnecessary teardown/setup work on the main thread.
-  const allPlugins = useMemo(() => {
-    if (!autoplay) return plugins;
-    return [
-      ...plugins,
-      Autoplay({ delay: autoplayDelay, stopOnInteraction: false }) as EmblaPluginType,
-    ];
-  }, [autoplay, autoplayDelay, plugins]);
+  // Memoize options by value to prevent unnecessary Embla re-inits when callers pass inline objects
+  const optionsKey = JSON.stringify(options);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const memoizedOptions = useMemo(() => options, [optionsKey]);
 
-  const [emblaRef, emblaApi] = useEmblaCarousel(options, allPlugins);
+  // Plugin instances hold state. Recreating them on every render forces Embla to teardown/setup.
+  const autoplayPlugin = useMemo(() => {
+    if (!autoplay) return null;
+    return Autoplay({ delay: autoplayDelay, stopOnInteraction: false }) as EmblaPluginType;
+  }, [autoplay, autoplayDelay]);
+
+  const allPlugins = useMemo(() => {
+    const list = [...plugins];
+    if (autoplayPlugin) list.push(autoplayPlugin);
+    return list;
+  }, [plugins, autoplayPlugin]);
+
+  const [emblaRef, emblaApi] = useEmblaCarousel(memoizedOptions, allPlugins);
 
   const [prevBtnEnabled, setPrevBtnEnabled] = useState(false);
   const [nextBtnEnabled, setNextBtnEnabled] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
+
+  // Keep a stable ref to onSelect to decouple it from onSelectHandler's dependency tree
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+
+  const lastIndexRef = useRef<number>(-1);
 
   const scrollPrev = useCallback(() => emblaApi && emblaApi.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi && emblaApi.scrollNext(), [emblaApi]);
@@ -60,18 +76,33 @@ export default function Carousel({
   const onSelectHandler = useCallback(() => {
     if (!emblaApi) return;
     const index = emblaApi.selectedScrollSnap();
-    setSelectedIndex(index);
-    setPrevBtnEnabled(emblaApi.canScrollPrev());
-    setNextBtnEnabled(emblaApi.canScrollNext());
-    if (onSelect) onSelect(index);
-  }, [emblaApi, onSelect]);
+
+    // Guard state updates against no-op changes to prevent infinite update depth
+    setSelectedIndex((prev) => (prev !== index ? index : prev));
+
+    const canPrev = emblaApi.canScrollPrev();
+    setPrevBtnEnabled((prev) => (prev !== canPrev ? canPrev : prev));
+
+    const canNext = emblaApi.canScrollNext();
+    setNextBtnEnabled((prev) => (prev !== canNext ? canNext : prev));
+
+    if (lastIndexRef.current !== index) {
+      lastIndexRef.current = index;
+      if (onSelectRef.current) {
+        onSelectRef.current(index);
+      }
+    }
+  }, [emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
+
     onSelectHandler();
     setScrollSnaps(emblaApi.scrollSnapList());
+
     emblaApi.on("select", onSelectHandler);
     emblaApi.on("reInit", onSelectHandler);
+
     return () => {
       emblaApi.off("select", onSelectHandler);
       emblaApi.off("reInit", onSelectHandler);
@@ -137,7 +168,7 @@ export default function Carousel({
               onClick={() => scrollTo(index)}
               aria-label={`Go to slide ${index + 1}`}
               className={cn(
-                "h-1.5 rounded-full ",
+                "h-1.5 rounded-full transition-all duration-300",
                 index === selectedIndex ? "w-6 bg-[var(--color-gold)]" : "w-1.5 bg-[var(--color-gold)]/30"
               )}
             />

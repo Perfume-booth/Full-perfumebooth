@@ -249,8 +249,6 @@ export function UserProfileAvatar({
 }
 
 export default function AccountHero({ customer }: AccountHeroProps) {
-  const memberYear = new Date(customer.createdAt).getFullYear();
-
   return (
     <div
       className="w-full relative overflow-hidden"

@@ -10,7 +10,7 @@ from .views import (
     ProductExcelImportRetryView, PageBannerDetailView,
     PageBannerListCreateView, PageBannerDeleteView, PageBannerImageDeleteView,
     WishlistAPIView, WishlistDeleteView, CartValidationAPIView, ProductReviewAPIView,
-    ProductRecommendationVectorView
+    ProductRecommendationVectorView, ProductReviewAdminListView, ProductReviewAdminDetailView, ProductReviewExportExcelView
 )
 
 urlpatterns = [
@@ -27,8 +27,12 @@ urlpatterns = [
     path('products/excel-import/<uuid:job_id>/retry/', ProductExcelImportRetryView.as_view(), name='product-excel-import-retry'),
     path('products/excel-import/<uuid:job_id>/errors/', ProductExcelImportErrorsView.as_view(), name='product-excel-import-errors'),
     path('products/<slug:slug>/recommendations/', ProductRecommendationVectorView.as_view(), name='product-recommendations'),
+    path('products/<slug:slug>/reviews/', ProductReviewAPIView.as_view(), name='product-reviews-by-slug'),
     path('products/<slug:slug>/', ProductDetailView.as_view(), name='product-detail'),
     path('products/<uuid:product_id>/reviews/', ProductReviewAPIView.as_view(), name='product-reviews'),
+    path('admin/reviews/', ProductReviewAdminListView.as_view(), name='admin-reviews-list'),
+    path('admin/reviews/export/', ProductReviewExportExcelView.as_view(), name='admin-reviews-export'),
+    path('admin/reviews/<uuid:pk>/', ProductReviewAdminDetailView.as_view(), name='admin-reviews-detail'),
     path('dashboard/', DashboardAnalyticsView.as_view(), name='dashboard-analytics'),
     path('analytics/', AnalyticsAPIView.as_view(), name='shop-analytics'),
     path('brands/', BrandListView.as_view(), name='brand-list'),

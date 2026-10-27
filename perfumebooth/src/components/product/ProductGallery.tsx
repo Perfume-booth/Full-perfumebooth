@@ -7,14 +7,75 @@ import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import { AnimatedChevronLeft as ChevronLeft } from "@/components/ui/icons/AnimatedChevronLeft";
 import { AnimatedChevronRight as ChevronRight } from "@/components/ui/icons/AnimatedChevronRight";
 import { useProductVariant } from "./ProductVariantContext";
+import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
+import { AnimatedShare2 as Share2 } from "@/components/ui/icons/AnimatedShare2";
+import { AnimatedHeart as Heart } from "@/components/ui/icons/AnimatedHeart";
+import { useWishlist } from "@/store/useWishlist";
+import type { Product } from "@/app/products/[slug]/page";
+import { normalizeProduct, toStoreProduct } from "@/lib/transformers";
 
 interface ProductGalleryProps {
   images: { id: number; image: string; alt_text: string }[];
   title: string;
+  product?: Product;
   children?: ReactNode;
 }
 
-export default function ProductGallery({ images, title, children }: ProductGalleryProps) {
+export default function ProductGallery({ images, title, product, children }: ProductGalleryProps) {
+  const [isMounted, setIsMounted] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const router = useRouter();
+  const { isInWishlist, addItem, removeItem } = useWishlist();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const isWishlisted = product ? isInWishlist(product.id.toString()) : false;
+
+  const toggleWishlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!product) return;
+    if (isWishlisted) {
+      removeItem(product.id.toString());
+    } else {
+      const isLoggedIn = Cookies.get("isLoggedIn") === "true";
+      if (!isLoggedIn) {
+        const normalized = normalizeProduct(product);
+        localStorage.setItem("pending_wishlist_product", JSON.stringify(toStoreProduct(normalized)));
+        router.push("/auth?mode=signin&returnUrl=/wishlist");
+        return;
+      }
+      const normalized = normalizeProduct(product);
+      addItem(toStoreProduct(normalized) as any);
+    }
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareData = {
+      title: title || product?.title || "PerfumeBooth",
+      text: `Check out ${title || product?.title} at The Scent of Silence`,
+      url: typeof window !== "undefined" ? window.location.href : "",
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // Ignored or user cancelled
+      }
+    } else if (typeof window !== "undefined" && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        console.error("Failed to copy link:", err);
+      }
+    }
+  };
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomStyle, setZoomStyle] = useState({ display: "none", transformOrigin: "center", transform: "scale(1)" });
 
@@ -30,7 +91,12 @@ export default function ProductGallery({ images, title, children }: ProductGalle
 
   // Switch main gallery image when selected variant changes
   useEffect(() => {
-    if (!emblaApi || !selectedVariant) return;
+    if (!emblaApi) return;
+    if (!selectedVariant) {
+      emblaApi.scrollTo(0);
+      setActiveIndex(0);
+      return;
+    }
 
     if (selectedVariant.image) {
       const idx = images.findIndex((img) => img.image === selectedVariant.image);
@@ -113,12 +179,10 @@ export default function ProductGallery({ images, title, children }: ProductGalle
   };
 
   return (
-    <div className={`grid gap-3 md:gap-5 w-full items-start ${images.length > 1 ? "grid-cols-[3.5rem_minmax(0,1fr)] md:grid-cols-[4.5rem_minmax(0,1fr)]" : "grid-cols-1"}`}>
+    <div className={`grid gap-3 md:gap-5 w-full items-start ${images.length > 1 ? "grid-cols-1 md:grid-cols-[4.5rem_minmax(0,1fr)]" : "grid-cols-1"}`}>
       {/* Thumbnails */}
       {images.length > 1 && (
-        <div
-          aria-label="Product images"
-          className="flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[min(65vw,500px)] py-1 px-1 snap-y snap-mandatory"
+        <div aria-label="Product images" className="hidden md:flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[min(65vw,500px)] py-1 px-1 snap-y snap-mandatory no-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {images.map((img, idx) => (
             <button
@@ -146,8 +210,57 @@ export default function ProductGallery({ images, title, children }: ProductGalle
       )}
 
       {/* Main Image Slider */}
-      <div className="min-w-0 w-full max-w-[500px] mx-auto space-y-5">
-      <div data-testid="product-main-image" className="relative group aspect-square w-full overflow-hidden bg-white border border-[var(--color-border)]/40">
+      <div className="min-w-0 w-full max-w-[500px] mx-auto space-y-2.5">
+      <div data-testid="product-main-image" className="relative group aspect-square w-full overflow-hidden bg-white border border-[var(--color-border)]/50 rounded-2xl md:rounded-xl shadow-xs">
+        {/* Floating Top-Right Wishlist & Share Action Buttons */}
+        {product && (
+          <div className="absolute top-3.5 right-3.5 z-20 flex items-center gap-2">
+            {/* Share Button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label={isCopied ? "Link copied to clipboard" : `Share ${title}`}
+                className="size-9 sm:size-10 flex items-center justify-center rounded-full bg-white/90 hover:bg-white text-gray-700 hover:text-black border border-black/10 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Share"
+              >
+                <Share2 size={16} animateOn="hover" />
+              </button>
+              {isCopied && (
+                <span className="absolute -bottom-8 right-0 bg-black/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap animate-fade-in pointer-events-none">
+                  Copied!
+                </span>
+              )}
+            </div>
+
+            {/* Wishlist Button */}
+            <button
+              type="button"
+              onClick={toggleWishlist}
+              aria-label={isMounted && isWishlisted ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}
+              className={`size-9 sm:size-10 flex items-center justify-center rounded-full border shadow-md backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer ${
+                isMounted && isWishlisted
+                  ? "bg-white/95 border-[#b03a2e]/40 text-[#b03a2e]"
+                  : "bg-white/90 hover:bg-white border-black/10 text-gray-700 hover:text-[#b03a2e]"
+              }`}
+              title={isMounted && isWishlisted ? "In Wishlist" : "Add to Wishlist"}
+              suppressHydrationWarning
+            >
+              <Heart
+                size={17}
+                animateOn="click"
+                className={isMounted && isWishlisted ? "fill-[#b03a2e] text-[#b03a2e]" : ""}
+              />
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Slide Counter (Top-Left) */}
+        {images.length > 1 && (
+          <div className="md:hidden absolute top-3.5 left-3.5 z-10 text-[10px] font-bold bg-black/60 backdrop-blur-md text-white px-2.5 py-1 rounded-full shadow-sm">
+            {activeIndex + 1} / {images.length}
+          </div>
+        )}
         <div className="overflow-hidden h-full w-full" ref={emblaRef}>
           <div className="flex h-full">
             {images.map((img, idx) => (
@@ -167,7 +280,7 @@ export default function ProductGallery({ images, title, children }: ProductGalle
                       transformOrigin: zoomStyle.transformOrigin,
                       transform: zoomStyle.transform
                     } : {}}
-                    sizes="(max-width: 1023px) 80vw, 500px"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 500px"
                     priority={idx === 0}
                   />
                 </div>

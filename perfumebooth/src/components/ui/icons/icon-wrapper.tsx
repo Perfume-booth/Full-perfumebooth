@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { motion, useAnimation, Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,6 @@ export const IconWrapper = ({
   ...props 
 }: IconWrapperProps) => {
   const controls = useAnimation();
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     if (animateOn === "view") {
@@ -58,14 +57,7 @@ export const IconWrapper = ({
 
   const handleMouseEnter = () => {
     if (animateOn === "hover") {
-      setIsHovered(true);
       controls.start("animate");
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (animateOn === "hover") {
-      setIsHovered(false);
     }
   };
 
@@ -73,7 +65,6 @@ export const IconWrapper = ({
     <motion.div
       className={cn("inline-flex items-center justify-center transition-colors", className)}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       style={{ width: size, height: size }}
     >
       <svg

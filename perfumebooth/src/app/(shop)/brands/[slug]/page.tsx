@@ -13,7 +13,7 @@ interface BrandPageProps {
 
 export async function generateMetadata({ params, searchParams }: BrandPageProps) {
   const { slug } = await params;
-  const sParams = await searchParams;
+  void searchParams;
   
   // Note: generateMetadata doesn't strictly need all filters, but it helps keep it robust
   const collection = await getCollectionProducts(slug, 1);

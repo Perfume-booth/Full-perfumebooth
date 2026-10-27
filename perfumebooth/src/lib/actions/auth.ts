@@ -92,7 +92,7 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     await setAuthCookies(data.access, data.refresh);
     return { success: true, redirectUrl: returnUrl };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again later." };
   }
 }
@@ -133,7 +133,7 @@ export async function registerAction(prevState: any, formData: FormData) {
     await setAuthCookies(data.access, data.refresh);
     const finalRedirect = returnUrl !== "/" ? returnUrl : "/account";
     return { success: true, redirectUrl: finalRedirect };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again later." };
   }
 }
@@ -183,7 +183,7 @@ export async function sendOtpAction(phone: string) {
     }
 
     return { success: true };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again." };
   }
 }
@@ -208,7 +208,7 @@ export async function verifyOtpAction(phone: string, code: string, returnUrl: st
 
     await setAuthCookies(data.access, data.refresh);
     return { success: true, redirectUrl: returnUrl };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again." };
   }
 }
@@ -233,7 +233,7 @@ export async function socialAuthAction(provider: string, token: string, returnUr
 
     await setAuthCookies(data.access, data.refresh);
     return { success: true, redirectUrl: returnUrl };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again." };
   }
 }
@@ -312,7 +312,7 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
     }
 
     return { success: data.detail || "If an account exists with that email, a recovery link has been sent." };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again later." };
   }
 }
@@ -342,7 +342,7 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
       success: data.detail || "Your password has been successfully reset.",
       redirectUrl: "/auth?mode=signin"
     };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again later." };
   }
 }
@@ -371,7 +371,7 @@ export async function changePasswordAction(oldPassword: string, newPassword: str
     }
 
     return { success: data.detail || "Password updated successfully." };
-  } catch (e) {
+  } catch {
     return { error: "Network error. Please try again later." };
   }
 }

@@ -27,30 +27,30 @@ const FaqSection = React.forwardRef<HTMLElement, FaqSectionProps>(
       <section
         ref={ref}
         className={cn(
-          "py-16 w-full bg-gradient-to-b from-transparent via-muted/50 to-transparent",
+          "py-6 sm:py-10 w-full bg-gradient-to-b from-transparent via-muted/50 to-transparent overflow-hidden",
           className
         )}
         {...props}
       >
-        <div className="container mx-auto px-4">
+        <div className="w-full max-w-4xl mx-auto px-2 sm:px-4">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="max-w-2xl mx-auto text-center mb-12"
+            className="max-w-2xl mx-auto text-center mb-4 sm:mb-6 px-2"
           >
-            <h2 className="text-3xl font-semibold mb-3 text-[var(--color-text-primary)]" style={{ fontFamily: "var(--font-serif)" }}>
+            <h2 className="text-2xl sm:text-3xl font-semibold mb-2 sm:mb-3 text-[var(--color-text-primary)] leading-tight tracking-wide" style={{ fontFamily: "var(--font-serif)" }}>
               {title}
             </h2>
             {description && (
-              <p className="text-sm text-[var(--color-text-muted)]">{description}</p>
+              <p className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-relaxed">{description}</p>
             )}
           </motion.div>
 
           {/* FAQ Items */}
-          <div className="max-w-2xl mx-auto space-y-3">
+          <div className="w-full max-w-3xl mx-auto space-y-2.5 sm:space-y-3">
             {items.map((item, index) => (
               <FaqItem
                 key={index}
@@ -68,18 +68,18 @@ const FaqSection = React.forwardRef<HTMLElement, FaqSectionProps>(
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="max-w-md mx-auto mt-12 p-6 rounded-lg text-center border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
+              className="w-full max-w-md mx-auto mt-8 sm:mt-12 p-5 sm:p-6 rounded-xl text-center border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
             >
-              <div className="inline-flex items-center justify-center p-2.5 rounded-full mb-4 bg-[var(--color-gold)]/10 text-[var(--color-gold)]">
+              <div className="inline-flex items-center justify-center p-2.5 rounded-full mb-3 bg-[var(--color-gold)]/10 text-[var(--color-gold)]">
                 <Mail className="h-5 w-5" />
               </div>
               <p className="text-sm font-medium text-[var(--color-text-primary)] mb-1">
                 {contactInfo.title}
               </p>
-              <p className="text-xs text-[var(--color-text-muted)] mb-4">
+              <p className="text-xs text-[var(--color-text-muted)] mb-4 leading-relaxed">
                 {contactInfo.description}
               </p>
-              <Button size="sm" onClick={contactInfo.onContact} className="bg-[var(--color-gold)] hover:bg-[var(--color-gold-dark)] text-black font-semibold">
+              <Button size="sm" onClick={contactInfo.onContact} className="bg-[var(--color-gold)] hover:bg-[var(--color-gold-dark)] text-black font-semibold w-full sm:w-auto">
                 {contactInfo.buttonText}
               </Button>
             </motion.div>
@@ -111,22 +111,22 @@ const FaqItem = React.forwardRef<
       viewport={{ once: true }}
       transition={{ duration: 0.2, delay: index * 0.05 }}
       className={cn(
-        "group rounded-lg",
+        "group rounded-xl w-full overflow-hidden",
         "transition-all duration-200 ease-in-out",
         "border border-[var(--color-border)]",
         isOpen
-          ? "bg-gradient-to-br from-[var(--color-bg)] via-[var(--color-bg-subtle)] to-[var(--color-bg)]"
+          ? "bg-gradient-to-br from-[var(--color-bg)] via-[var(--color-bg-subtle)] to-[var(--color-bg)] shadow-sm"
           : "hover:bg-[var(--color-bg-subtle)]"
       )}
     >
-      <Button
-        variant="ghost"
+      <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-6 py-4 h-auto justify-between hover:bg-transparent text-left flex items-center gap-4"
+        className="w-full px-3.5 sm:px-6 py-3.5 sm:py-4 justify-between text-left flex items-start sm:items-center gap-2.5 sm:gap-4 whitespace-normal rounded-none bg-transparent hover:bg-black/[0.02] cursor-pointer transition-colors"
       >
         <h3
           className={cn(
-            "text-base font-medium transition-colors duration-200 text-left flex-1",
+            "text-sm sm:text-base font-medium transition-colors duration-200 text-left flex-1 break-words leading-snug whitespace-normal min-w-0",
             "text-[var(--color-text-muted)]",
             isOpen && "text-[var(--color-text-primary)]"
           )}
@@ -140,14 +140,14 @@ const FaqItem = React.forwardRef<
           }}
           transition={{ duration: 0.2 }}
           className={cn(
-            "p-0.5 rounded-full flex-shrink-0",
+            "p-1 rounded-full flex-shrink-0 shrink-0 mt-0.5 sm:mt-0",
             "transition-colors duration-200",
             isOpen ? "text-[var(--color-gold)]" : "text-[var(--color-text-muted)]"
           )}
         >
           <ChevronDown className="h-4 w-4" />
         </motion.div>
-      </Button>
+      </button>
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div
@@ -163,12 +163,12 @@ const FaqItem = React.forwardRef<
               transition: { duration: 0.2, ease: "easeIn" },
             }}
           >
-            <div className="px-6 pb-4 pt-2">
+            <div className="px-3.5 sm:px-6 pb-4 pt-1 sm:pt-2">
               <motion.div
-                initial={{ y: -10, opacity: 0 }}
+                initial={{ y: -6, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -10, opacity: 0 }}
-                className="text-sm text-[var(--color-text-muted)] leading-relaxed"
+                exit={{ y: -6, opacity: 0 }}
+                className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-relaxed break-words overflow-hidden"
               >
                 {answer}
               </motion.div>

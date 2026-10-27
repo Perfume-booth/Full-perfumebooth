@@ -60,7 +60,11 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
         if (productHandle) queryParams.append("handle", productHandle);
 
         const res = await fetch(`/api/reviews?${queryParams.toString()}`);
-        if (!res.ok) throw new Error("Failed to fetch reviews");
+        if (!res.ok) {
+          console.warn("Reviews fetch returned status:", res.status);
+          setReviews([]);
+          return;
+        }
         
         const data = await res.json();
         setReviews(data.reviews || []);
@@ -155,19 +159,19 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
   const hasMore = reviews.length > displayCount;
 
   return (
-    <section id="product-reviews" className="bg-white py-12 md:py-16 text-[var(--color-text-primary)] border-t border-[var(--color-border)]">
+    <section id="product-reviews" className="bg-white py-8 md:py-10 text-[var(--color-text-primary)] border-t border-[var(--color-border)]">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         
-        <div className="flex flex-col lg:flex-row gap-10 lg:gap-16">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
            
            {/* ── Left Column: Summary (Scorecard) ── */}
-           <div className="lg:w-1/3 min-w-full lg:min-w-[320px]">
+           <div className="w-full lg:w-1/3 lg:min-w-[300px] shrink-0">
               <div className="bg-[var(--color-bg-subtle)]/50 p-6 md:p-0 md:bg-transparent rounded-2xl border border-[var(--color-border)] md:border-0">
                 <h2 className="text-xl md:text-2xl font-serif font-bold text-[var(--color-text-primary)] mb-3 md:mb-4">
                   Customer Reviews
                 </h2>
                 
-                <div className="flex items-center gap-3 mb-6">
+                <div className="flex items-center gap-3 mb-3">
                    <div className="flex text-[#b8924a] scale-110 origin-left">
                       {[...Array(5)].map((_, i) => (
                          <AnimatedStar key={i} size={18} fill={i < Math.round(parseFloat(avgRating)) ? "currentColor" : "none"} stroke="currentColor" />
@@ -177,7 +181,7 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
                 </div>
 
                 {/* Distribution Bars - Tightened for mobile */}
-                <div className="space-y-3 md:space-y-4 mb-8 md:mb-10">
+                <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
                   {distribution.map((item) => (
                     <div key={item.stars} className="flex items-center gap-3 md:gap-4 text-[10px] md:text-sm">
                         <span className="flex items-center gap-1 w-6 shrink-0 opacity-70 font-bold">
@@ -231,7 +235,7 @@ export default function ProductReviews({ productHandle }: { productHandle?: stri
                         whileInView={{ opacity: 1, scale: 1 }}
                         viewport={{ once: true }}
                         transition={{ delay: idx * 0.05 }}
-                        className="py-6 md:py-8"
+                        className="py-3.5 md:py-4.5"
                       >
                         <div className="flex items-start gap-3 md:gap-4 mb-3">
                            <div className="size-8 md:size-10 rounded-full bg-gray-50 shrink-0 overflow-hidden flex items-center justify-center border border-gray-100">

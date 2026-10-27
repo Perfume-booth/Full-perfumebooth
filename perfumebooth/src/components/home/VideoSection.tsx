@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import SectionHeader from "@/components/ui/SectionHeader";
 import Carousel from "@/components/ui/Carousel";
-import React, { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Play } from "lucide-react";
 
 export interface VideoItem {
@@ -16,67 +16,58 @@ export interface VideoItem {
   href: string;
 }
 
-const DEFAULT_POSTERS = [
-  "/videos/posters/clip-1.jpg",
-  "/videos/posters/clip-2.jpg",
-  "/videos/posters/clip-3.jpg",
-  "/videos/posters/clip-4.jpg",
-  "/videos/posters/clip-5.jpg",
-  "/videos/posters/clip-6.jpg",
-  "/videos/posters/clip-7.jpg",
-  "/videos/posters/clip-8.jpg",
-];
-
 const VIDEO_CAROUSEL_DATA: VideoItem[] = [
   {
     label: "Al Haramain",
-    video: "https://cdn.shopify.com/videos/c/o/v/801c3f868981473ebdda06f0124b3e24.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-1-al-haramain.mp4",
     poster: "/videos/posters/clip-1.jpg",
     href: "/al-haramain",
   },
   {
     label: "Arabiyat Prestige",
-    video: "https://cdn.shopify.com/videos/c/o/v/bf6cee54d3a54c02bacfae2f78062c59.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-2-arabiyat-prestige.mp4",
     poster: "/videos/posters/clip-2.jpg",
     href: "/arabiyat-prestige",
   },
   {
     label: "Al Haramain",
-    video: "https://cdn.shopify.com/videos/c/o/v/68e9382119d848c9a6324a3d5c6f45ce.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-3-al-haramain.mp4",
     poster: "/videos/posters/clip-3.jpg",
     href: "/al-haramain",
   },
   {
     label: "Arabiyat Prestige",
-    video: "https://cdn.shopify.com/videos/c/o/v/9c0ff88aa047479588b8972589ab061b.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-4-arabiyat-prestige-bahiya-garnet.mp4",
     poster: "/videos/posters/clip-4.jpg",
     href: "/products/arabiyat-prestige-bahiya-garnet-edp-100ml-unisex",
   },
   {
     label: "Lomani",
-    video: "https://cdn.shopify.com/videos/c/o/v/f3503e6be44e427cb6966f4e31fa2b2e.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-5-lomani.mp4",
     poster: "/videos/posters/clip-5.jpg",
     href: "/lomani",
   },
   {
     label: "Arabiyat Prestige",
-    video: "https://cdn.shopify.com/videos/c/o/v/3e8d7db2fa484d6c9c659c78cdabb230.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-6-arabiyat-prestige-hypnotic-amber.mp4",
     poster: "/videos/posters/clip-6.jpg",
     href: "/arabiyat-prestige",
   },
   {
     label: "Al-Haramain",
-    video: "https://cdn.shopify.com/videos/c/o/v/490d9ea75336470f8bddb06d558076d6.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-7-al-haramain-l-aventure.mp4",
     poster: "/videos/posters/clip-7.jpg",
     href: "/al-haramain",
   },
   {
     label: "MPF",
-    video: "https://cdn.shopify.com/videos/c/o/v/28aee50ee417466ea254e2683ba9123a.mp4",
+    video: "https://pub-3f642c2b9ee242a79d619d782e435c8d.r2.dev/videos/video-8-mpf.mp4",
     poster: "/videos/posters/clip-8.jpg",
     href: "/mpf",
   },
 ];
+
+const VIDEO_CAROUSEL_OPTIONS = { align: "center", loop: true } as const;
 
 export default function VideoSection({
   items,
@@ -107,7 +98,7 @@ export default function VideoSection({
           <Carousel 
             containerClassName="gap-5.5 md:gap-6"
             slideClassName="basis-[75vw] md:basis-[350px]"
-            options={{ align: "center", loop: true }}
+            options={VIDEO_CAROUSEL_OPTIONS}
             autoplay={true}
             autoplayDelay={5000}
             showDots={true}
@@ -145,7 +136,7 @@ function VideoCard({
   const [isBuffering, setIsBuffering] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  const posterSrc = item.poster || DEFAULT_POSTERS[index % DEFAULT_POSTERS.length];
+  const posterSrc = item.poster || VIDEO_CAROUSEL_DATA[index % VIDEO_CAROUSEL_DATA.length]?.poster || "";
 
   // Desktop hover playback
   const handleMouseEnter = () => {

@@ -22,7 +22,7 @@ interface DeliveryLocation {
 }
 
 // ── Pincode → City lookup (common Indian pincodes) ─────────────
-const PINCODE_MAP: Record<string, string> = {
+/* const PINCODE_MAP: Record<string, string> = {
   "110001": "New Delhi",
   "400001": "Mumbai",
   "400050": "Mumbai",
@@ -39,14 +39,14 @@ const PINCODE_MAP: Record<string, string> = {
 
 function cityFromPincode(pin: string): string {
   return PINCODE_MAP[pin] || "Your Area";
-}
+} */
 
 // ── Main Component ─────────────────────────────────────────────
 export default function DeliverTo() {
   const [location, setLocation] = useState<DeliveryLocation | null>(null);
   const [open, setOpen] = useState(false);
-  const [pincodeInput, setPincodeInput] = useState("");
-  const [pincodeError, setPincodeError] = useState("");
+  // const [pincodeInput, setPincodeInput] = useState("");
+  // const [pincodeError, setPincodeError] = useState("");
   const [locating, setLocating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -98,22 +98,22 @@ export default function DeliverTo() {
     setLocation(loc);
     safeStorage.setItem(LS_KEY, JSON.stringify(loc));
     setOpen(false);
-    setPincodeInput("");
-    setPincodeError("");
+    // setPincodeInput("");
+    // setPincodeError("");
   }, []);
 
-  const applyPincode = () => {
+  /* const applyPincode = () => {
     const pin = pincodeInput.trim();
     if (!/^\d{6}$/.test(pin)) {
       setPincodeError("Please enter a valid 6-digit pincode");
       return;
     }
     saveLocation({ pincode: pin, label: cityFromPincode(pin) });
-  };
+  }; */
 
   const useGeolocation = () => {
     if (!navigator.geolocation) {
-      setPincodeError("Geolocation not supported by your browser");
+      // Geolocation not supported
       return;
     }
     setLocating(true);
@@ -135,7 +135,7 @@ export default function DeliverTo() {
       },
       () => {
         setLocating(false);
-        setPincodeError("Could not get your location. Please enter pincode.");
+        // Could not get location
       },
       { timeout: 8000 }
     );
