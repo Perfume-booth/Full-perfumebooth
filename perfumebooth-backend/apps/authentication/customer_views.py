@@ -317,28 +317,6 @@ class CustomerSocialAuthView(APIView):
                     first_name = parts[0]
                     last_name = parts[1] if len(parts) > 1 else ''
 
-        elif provider == 'apple':
-            if allow_mock and token == 'mock-apple-identity-token-12345':
-                email = 'apple.user@example.com'
-                uid = 'apple-mock-12345'
-                first_name = 'Apple'
-                last_name = 'User'
-            else:
-                try:
-                    from jwt import PyJWKClient
-                    jwks_client = PyJWKClient("https://appleid.apple.com/auth/keys")
-                    signing_key = jwks_client.get_signing_key_from_jwt(token)
-                    decoded = jwt.decode(
-                        token,
-                        signing_key.key,
-                        algorithms=["RS256"],
-                        options={"verify_exp": True, "verify_signature": True}
-                    )
-                    email = decoded.get('email')
-                    uid = decoded.get('sub')
-                except Exception:
-                    return Response({'detail': 'Invalid Apple token.'}, status=status.HTTP_400_BAD_REQUEST)
-
         else:
             return Response({'detail': f'Provider {provider} not supported.'}, status=status.HTTP_400_BAD_REQUEST)
 

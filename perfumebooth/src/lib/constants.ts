@@ -94,10 +94,6 @@ export const TOP_BRANDS = [
   "Swiss Arabian",
   "Royal Mirage",
   "Anfar",
-  "Test",
-  "Customer Brand",
-  "Hacker Brand",
-  "Malicious",
   "Al Haramain"
 ];
 

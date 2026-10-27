@@ -263,12 +263,23 @@ This file keeps track of completed features, active architecture, test verificat
     *   **Scratch Tests & Boilerplate Specs Purged**: Removed temporary scratch test scripts in [`perfumebooth-MPS/scratch/`](file:///d:/Full-Perfumebooth/perfumebooth-MPS/scratch/) (`test_storefront_ssr.py`, `debug_console.js`), the Playwright example boilerplate spec [`perfumebooth/tests/example.spec.ts`](file:///d:/Full-Perfumebooth/perfumebooth/tests/example.spec.ts), and root load test plans (`load-test-plan.md`, `load-test-results.md`). Critical Django backend domain test suites and active Playwright checkout/availability specs were safely preserved.
     *   **Load Test Artifacts Purged**: Cleaned up root `load-test-runner.mjs` and `load-test-results.json`.
     *   **Zero-Regression Verification**: Ran `npx tsc --noEmit` across both Storefront and Merchant Portal (`perfumebooth` and `perfumebooth-mps`), confirming 0 errors and zero broken imports.
+43. **Brand Catalog Sanitization & Removal of Penetration Test Artifacts**:
+    *   **Root Cause Identified**: During past automated penetration testing in [`test_penetration_and_security.py`](file:///d:/Full-Perfumebooth/perfumebooth-backend/apps/authentication/tests/test_penetration_and_security.py), dummy attacker payloads (`"Hacker Brand"`, `"Customer Brand"`, `"Test"`, `"Malicious"`) were submitted against the brand management API and persisted into [`constants.ts`](file:///d:/Full-Perfumebooth/perfumebooth/src/lib/constants.ts) and [`brands.json`](file:///d:/Full-Perfumebooth/perfumebooth-backend/brands.json) via `BrandService.save_brand()`. No actual database products were ever associated with these names.
+    *   **Catalog Sanitization**: Purged all 4 test entries from both [`perfumebooth/src/lib/constants.ts`](file:///d:/Full-Perfumebooth/perfumebooth/src/lib/constants.ts) (`TOP_BRANDS`) and [`perfumebooth-backend/brands.json`](file:///d:/Full-Perfumebooth/perfumebooth-backend/brands.json), restoring the clean list of 12 authentic luxury brands.
+    *   **Cache Invalidation & Verification**: Flushed the `catalog:brands` Redis cache key. Verified `BrandService.load_brands()` returns only authentic brands. Verified full 8/8 penetration tests pass with 0 errors and `npx tsc --noEmit` exits with code 0.
+44. **Complete Removal of Apple Sign-In & Sign-Up Across Frontend & Backend**:
+    *   **Storefront Authentication Modal**: Completely removed `AppleIcon`, mock Apple token handling, and the Apple OAuth button from [`perfumebooth/src/components/ui/cloud-watch-form.tsx`](file:///d:/Full-Perfumebooth/perfumebooth/src/components/ui/cloud-watch-form.tsx). Social login now cleanly and exclusively presents Google and Facebook alongside email/password and phone OTP.
+    *   **Backend Customer Social Auth Endpoint**: Removed Apple ID token decode, JWKS verification, and mock provider handling from `CustomerSocialAuthView` in [`perfumebooth-backend/apps/authentication/customer_views.py`](file:///d:/Full-Perfumebooth/perfumebooth-backend/apps/authentication/customer_views.py). Updated supported provider documentation in [`perfumebooth-backend/apps/authentication/models.py`](file:///d:/Full-Perfumebooth/perfumebooth-backend/apps/authentication/models.py) (`SocialAccount`).
+    *   **Automated Penetration & Security Verification**: Updated [`apps/authentication/tests/test_penetration_and_security.py`](file:///d:/Full-Perfumebooth/perfumebooth-backend/apps/authentication/tests/test_penetration_and_security.py) to assert that requests with unsupported providers (such as `apple`) are strictly rejected with HTTP 400. Ran the test suite via Docker (`docker exec perfumebooth_django python manage.py test apps.authentication.tests.test_penetration_and_security`) — all 8/8 security penetration tests passed with 100% success.
+
+45. **Environment Configuration Audit & Social Auth Sync (Google & Facebook)**:
+    *   **Frontend Verification**: Confirmed `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_FACEBOOK_APP_ID`, and `FACEBOOK_APP_SECRET` are correctly placed in [`perfumebooth/.env.local`](file:///d:/Full-Perfumebooth/perfumebooth/.env.local) and [`perfumebooth/.env.docker`](file:///d:/Full-Perfumebooth/perfumebooth/.env.docker). Next.js browser-facing OAuth components (`GoogleOAuthProvider`, `FB.init`) require the `NEXT_PUBLIC_` prefix, while server-side route handlers (`/api/auth/callback/facebook`) securely access secret keys.
+    *   **Backend Harmonization**: Appended matching `GOOGLE_CLIENT_ID`, `FACEBOOK_APP_ID`, and `FACEBOOK_APP_SECRET` to [`perfumebooth-backend/.env`](file:///d:/Full-Perfumebooth/perfumebooth-backend/.env) to guarantee complete environment parity between Next.js and Django services.
 
 ---
 
 ### 🚧 Current Focus
-*   Merchant Portal System (MPS) catalog consistency and production readiness.
-*   Production configuration and environment variable verification.
+*   Production build verification, merchant portal consistency, and live deployment readiness.
 
 ---
 

@@ -79,11 +79,11 @@ class SecurityPenetrationTests(TestCase):
                 f"Malicious brand name '{name}' should have been rejected."
             )
 
-    def test_apple_social_auth_unverified_token_rejected(self):
-        """Forged unsigned Apple JWT must be rejected by social auth endpoint."""
+    def test_unsupported_or_unverified_social_auth_rejected(self):
+        """Unsupported provider or forged token must be rejected with 400."""
         import jwt
         forged_token = jwt.encode(
-            {'email': 'victim@example.com', 'sub': 'apple-victim-uid'},
+            {'email': 'victim@example.com', 'sub': 'victim-uid'},
             'fake-secret',
             algorithm='HS256'
         )

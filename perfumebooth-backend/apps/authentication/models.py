@@ -171,7 +171,7 @@ class SocialAccount(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='social_accounts')
-    provider = models.CharField(max_length=50)  # 'google', 'facebook', 'apple'
+    provider = models.CharField(max_length=50)  # 'google', 'facebook'
     uid = models.CharField(max_length=255, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
