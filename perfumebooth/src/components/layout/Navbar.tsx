@@ -119,7 +119,7 @@ export default function Navbar({ initialBrands = [] }: { initialBrands?: string[
     { id: "orders", icon: Package, label: "My Orders", href: "/orders" },
     { id: "addresses", icon: MapPin, label: "Addresses", href: "/account?tab=addresses" },
     { id: "wishlist", icon: AnimatedHeart, label: "Wishlist", href: "/wishlist" },
-    { id: "help", icon: HelpCircle, label: "Help & Support", href: "/help" },
+    { id: "help", icon: HelpCircle, label: "Help & Support", href: "/info/contact-us" },
   ];
 
   return (

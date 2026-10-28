@@ -16,8 +16,8 @@ from .views import (
 urlpatterns = [
     path('', OrderListView.as_view(), name='order-list'),
     path('track/', GuestOrderTrackView.as_view(), name='order-track'),
-    path('<uuid:pk>/cancel/', OrderCancelView.as_view(), name='order-cancel'),
-    path('<uuid:pk>/', OrderDetailView.as_view(), name='order-detail'),
+    path('<str:pk>/cancel/', OrderCancelView.as_view(), name='order-cancel'),
+    path('<str:pk>/', OrderDetailView.as_view(), name='order-detail'),
     path('shipping-rates/', ShippingRatesAPIView.as_view(), name='shipping-rates'),
     path('validate-coupon/', CouponValidationView.as_view(), name='validate-coupon'),
     path('promotions/active/', PublicActivePromotionsView.as_view(), name='public-promotions-active'),

@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import { cleanImageUrl } from "@/lib/media-url";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompareStore } from "@/store/useCompareStore";
 import { AnimatedX } from "@/components/ui/icons/AnimatedX";
@@ -24,7 +25,7 @@ export default function CompareBar() {
         <div className="bg-white/90 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-3xl p-4 flex items-center justify-between gap-6">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
             {items.map((item) => {
-              const image = item.image || (item as any).featuredImage?.url || "/placeholder-perfume.jpg";
+              const image = cleanImageUrl(item.image || (item as any).featuredImage?.url) || "/images/fallback-luxury.svg";
               return (
                 <motion.div
                   key={item.id}

@@ -9,37 +9,42 @@ const BACKEND_URL = process.env.BACKEND_API_URL || (isDocker ? "http://django:80
 
 // Helper to set token cookies
 async function setAuthCookies(accessToken: string, refreshToken: string) {
-  const cookieStore = await cookies();
-  
-  // Access Token Cookie (15 mins duration - can be shorter but we sync with backend simplejwt)
-  cookieStore.set("customerAccessToken", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
-  });
+  try {
+    const cookieStore = await cookies();
+    
+    // Access Token Cookie (15 mins duration - can be shorter but we sync with backend simplejwt)
+    cookieStore.set("customerAccessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
+    });
 
-  // Refresh Token Cookie (30 days duration)
-  cookieStore.set("customerRefreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-  });
+    // Refresh Token Cookie (30 days duration)
+    cookieStore.set("customerRefreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    });
 
-  cookieStore.set("isLoggedIn", "true", {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-  });
+    cookieStore.set("isLoggedIn", "true", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+  } catch {
+    // Next.js throws when modifying cookies during Server Component rendering (RSC).
+    // In Server Actions or Route Handlers, this succeeds.
+  }
 }
 
 // Helper to refresh token silently if access token is expired
-async function refreshAccessToken() {
+export async function refreshAccessToken() {
   const cookieStore = await cookies();
   const refreshToken = cookieStore.get("customerRefreshToken")?.value;
 
@@ -53,18 +58,27 @@ async function refreshAccessToken() {
     });
 
     if (res.ok) {
-      const data = await res.json();
-      await setAuthCookies(data.access, data.refresh || refreshToken);
-      return data.access;
+      const raw = await res.json();
+      const data = raw.data || raw;
+      const newAccess = data.access;
+      const newRefresh = data.refresh || refreshToken;
+      if (newAccess) {
+        await setAuthCookies(newAccess, newRefresh);
+        return newAccess;
+      }
     }
   } catch (e) {
     console.error("Failed to silently refresh access token:", e);
   }
 
   // Clear cookies if refresh fails
-  cookieStore.delete("customerAccessToken");
-  cookieStore.delete("customerRefreshToken");
-  cookieStore.delete("isLoggedIn");
+  try {
+    cookieStore.delete("customerAccessToken");
+    cookieStore.delete("customerRefreshToken");
+    cookieStore.delete("isLoggedIn");
+  } catch {
+    // Ignore in RSC
+  }
   return null;
 }
 
@@ -84,14 +98,22 @@ export async function loginAction(prevState: any, formData: FormData) {
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw.data || raw;
 
     if (!res.ok) {
-      return { error: data.detail || "Invalid credentials." };
+      return { error: data.detail || (raw.error && raw.error.message) || "Invalid credentials." };
     }
 
-    await setAuthCookies(data.access, data.refresh);
-    return { success: true, redirectUrl: returnUrl };
+    const access = data.access;
+    const refresh = data.refresh;
+    if (!access || !refresh) {
+      return { error: "Authentication response malformed. Please try again." };
+    }
+
+    await setAuthCookies(access, refresh);
+    const finalRedirect = returnUrl && returnUrl !== "/" ? returnUrl : "/account";
+    return { success: true, redirectUrl: finalRedirect };
   } catch {
     return { error: "Network error. Please try again later." };
   }
@@ -124,14 +146,19 @@ export async function registerAction(prevState: any, formData: FormData) {
       }),
     });
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw.data || raw;
 
     if (!res.ok) {
-      return { error: data.detail || "Registration failed." };
+      return { error: data.detail || (raw.error && raw.error.message) || "Registration failed." };
     }
 
-    await setAuthCookies(data.access, data.refresh);
-    const finalRedirect = returnUrl !== "/" ? returnUrl : "/account";
+    const access = data.access;
+    const refresh = data.refresh;
+    if (access && refresh) {
+      await setAuthCookies(access, refresh);
+    }
+    const finalRedirect = returnUrl && returnUrl !== "/" ? returnUrl : "/account";
     return { success: true, redirectUrl: finalRedirect };
   } catch {
     return { error: "Network error. Please try again later." };
@@ -200,14 +227,20 @@ export async function verifyOtpAction(phone: string, code: string, returnUrl: st
       body: JSON.stringify({ phone, code }),
     });
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw.data || raw;
 
     if (!res.ok) {
-      return { error: data.detail || "Invalid or expired OTP." };
+      return { error: data.detail || (raw.error && raw.error.message) || "Invalid or expired OTP." };
     }
 
-    await setAuthCookies(data.access, data.refresh);
-    return { success: true, redirectUrl: returnUrl };
+    const access = data.access;
+    const refresh = data.refresh;
+    if (access && refresh) {
+      await setAuthCookies(access, refresh);
+    }
+    const finalRedirect = returnUrl && returnUrl !== "/" ? returnUrl : "/account";
+    return { success: true, redirectUrl: finalRedirect };
   } catch {
     return { error: "Network error. Please try again." };
   }
@@ -225,14 +258,20 @@ export async function socialAuthAction(provider: string, token: string, returnUr
       body: JSON.stringify({ provider, token }),
     });
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw.data || raw;
 
     if (!res.ok) {
-      return { error: data.detail || `Social authentication failed with ${provider}.` };
+      return { error: data.detail || (raw.error && raw.error.message) || `Social authentication failed with ${provider}.` };
     }
 
-    await setAuthCookies(data.access, data.refresh);
-    return { success: true, redirectUrl: returnUrl };
+    const access = data.access;
+    const refresh = data.refresh;
+    if (access && refresh) {
+      await setAuthCookies(access, refresh);
+    }
+    const finalRedirect = returnUrl && returnUrl !== "/" ? returnUrl : "/account";
+    return { success: true, redirectUrl: finalRedirect };
   } catch {
     return { error: "Network error. Please try again." };
   }
@@ -243,7 +282,7 @@ export async function getSession() {
   let token = cookieStore.get("customerAccessToken")?.value;
 
   if (!token) {
-    token = await refreshAccessToken();
+    token = (await refreshAccessToken()) || undefined;
   }
 
   return !!token;
@@ -254,7 +293,7 @@ export const requireCustomer = cache(async () => {
   let token = cookieStore.get("customerAccessToken")?.value;
 
   if (!token) {
-    token = await refreshAccessToken();
+    token = (await refreshAccessToken()) || undefined;
   }
 
   if (!token) {
@@ -262,23 +301,55 @@ export const requireCustomer = cache(async () => {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/api/auth/customer/me/`, {
+    let res = await fetch(`${BACKEND_URL}/api/auth/customer/me/`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
+    // If access token expired on backend (401), try refresh once
+    if (res.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        token = refreshedToken;
+        res = await fetch(`${BACKEND_URL}/api/auth/customer/me/`, {
+          headers: { Authorization: `Bearer ${refreshedToken}` },
+        });
+      }
+    }
+
     if (res.ok) {
-      const user = await res.json();
+      const raw = await res.json();
+      const user = raw.data || raw;
       return {
         id: user.id,
         firstName: user.first_name || "Customer",
         lastName: user.last_name || "",
-        email: user.email,
-        phone: user.phone,
-        createdAt: new Date().toISOString(),
+        email: user.email || "",
+        phone: user.phone || "",
+        createdAt: user.created_at || new Date().toISOString(),
         tags: user.tags || [],
         gender: { value: user.gender || "" },
-        addresses: { edges: [] },
-        orders: { edges: [] },
+        addresses: {
+          edges: (user.addresses || []).map((addr: any) => ({
+            node: {
+              id: addr.id,
+              firstName: addr.first_name || user.first_name || "",
+              lastName: addr.last_name || user.last_name || "",
+              address1: addr.address1 || "",
+              address2: addr.address2 || "",
+              city: addr.city || "",
+              province: addr.province || addr.state || "",
+              country: addr.country || "India",
+              zip: addr.zip || addr.postal_code || "",
+              phone: addr.phone || user.phone || "",
+              isDefault: addr.is_default || false,
+            },
+          })),
+        },
+        orders: {
+          edges: (user.orders || []).map((ord: any) => ({
+            node: ord,
+          })),
+        },
       };
     }
   } catch (e) {
@@ -315,7 +386,9 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
     return { 
       success: data.detail || "Verification code sent to your email.",
       email,
-      otpSent: true 
+      otpSent: true,
+      devOtp: data.dev_otp || null,
+      smtpWarning: data.smtp_warning || null
     };
   } catch {
     return { error: "Network error. Please try again later." };

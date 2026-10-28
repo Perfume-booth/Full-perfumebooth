@@ -113,6 +113,7 @@ function md5(string: string): string {
   }
 
   var r: number[] = [];
+  if (!string || typeof string !== "string") return "";
   var s = unescape(encodeURIComponent(string.trim().toLowerCase()));
   for (var i = 0; i < s.length; i++) {
     r[i >> 2] |= s.charCodeAt(i) << ((i % 4) * 8);

@@ -13,6 +13,7 @@ import { AnimatedCheckCircle } from "@/components/ui/icons/AnimatedCheckCircle";
 import Link from "next/link";
 import Image from "next/image";
 import { formatPrice } from "@/lib/utils";
+import { cleanImageUrl } from "@/lib/media-url";
 
 interface OrderSuccessProps {
   orderId: string;
@@ -85,7 +86,7 @@ export default function OrderSuccess({ orderId, email, total, items = [] }: Orde
                     <div key={`${item.id}-${item.selectedVariantId}`} className="flex items-center gap-4 p-4 first:pt-4">
                       <div className="relative w-14 h-14 bg-[var(--color-bg-subtle)] border border-[var(--color-border)]/60 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
                         {item.image ? (
-                          <Image src={item.image} alt={item.title} fill className="object-contain p-1.5" sizes="56px" />
+                          <Image src={cleanImageUrl(typeof item.image === "string" ? item.image : ((item.image as any)?.url || (item as any).featuredImage?.url)) || "/images/fallback-luxury.svg"} alt={item.title} fill className="object-contain p-1.5" sizes="56px" />
                         ) : (
                           <AnimatedShoppingBag size={16} className="text-[var(--color-text-muted)]" />
                         )}

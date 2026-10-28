@@ -13,6 +13,7 @@ import { useCartStore } from "@/store/useCartStore";
 
 import { Product } from "@/types/product";
 import { getBrandFromTags } from "@/lib/transformers";
+import { cleanImageUrl } from "@/lib/media-url";
 
 export default function CompareModal() {
   const { items, isOpen, closeCompare, removeItem } = useCompareStore();
@@ -152,7 +153,7 @@ export default function CompareModal() {
                   <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-neutral-300">Product</h4>
                 </div>
                 {items.map((item) => {
-                  const image = item.image || (item as any).featuredImage?.url || "/placeholder-perfume.jpg";
+                  const image = cleanImageUrl(item.image || (item as any).featuredImage?.url) || "/images/fallback-luxury.svg";
                   const brandName = getBrandFromTags(item.tags) || item.brand || "";
                   const brandSlug = brandName.toLowerCase().replace(/\s+/g, '-');
                   return (

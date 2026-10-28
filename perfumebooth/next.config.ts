@@ -40,6 +40,18 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'media.perfumebooth.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'perfumebooth.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.perfumebooth.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'randomuser.me',
       },
       {

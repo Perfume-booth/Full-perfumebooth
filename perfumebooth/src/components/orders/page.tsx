@@ -207,7 +207,7 @@ export default function OrderHistoryComponent({ orders, email }: OrderHistoryPro
                   <div className="flex flex-col md:flex-row gap-6">
                     {/* Image Link to Product - needs pointer events and higher z-index */}
                     <Link 
-                      href={`/products/${firstItem?.variant?.product?.handle || ""}`}
+                      href={firstItem?.variant?.product?.handle ? `/products/${firstItem.variant.product.handle}` : `/orders/${orderSlug}`}
                       className="relative w-24 h-24 flex-shrink-0 mx-auto md:mx-0 bg-neutral-50 rounded-xl border border-neutral-100 p-2 block hover:opacity-80 transition-opacity z-20"
                     >
                       {firstItem?.variant?.image?.url ? (
@@ -238,7 +238,7 @@ export default function OrderHistoryComponent({ orders, email }: OrderHistoryPro
                         </div>
                         <div className="flex items-center gap-2">
                           <Link 
-                            href={`/products/${firstItem?.variant?.product?.handle || ""}`}
+                            href={firstItem?.variant?.product?.handle ? `/products/${firstItem.variant.product.handle}` : `/orders/${orderSlug}`}
                             className="text-sm font-bold text-[#1a1410] line-clamp-2 leading-tight hover:underline block z-20"
                           >
                             {firstItem?.title || "Product"}

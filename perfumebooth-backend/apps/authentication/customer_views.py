@@ -598,6 +598,8 @@ class CustomerPasswordResetRequestView(APIView):
         if not email:
             return Response({'detail': 'Email address is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        smtp_error_msg = None
+        code_to_return = None
         user = CustomUser.objects.filter(email=email, is_active=True).first()
         if user:
             # Generate 6-digit OTP code stored in cache for 15 minutes
@@ -656,13 +658,23 @@ class CustomerPasswordResetRequestView(APIView):
                     fail_silently=False
                 )
             except Exception as e:
+                smtp_error_msg = str(e)
                 logger.warning(f"Could not send password reset email via SMTP ({e}). Dev Reset Link: {reset_url} Code: {code}")
 
-        return Response({
+            if getattr(settings, 'DEBUG', False):
+                code_to_return = code
+
+        resp_payload = {
             'detail': 'A 6-digit verification code has been sent to your email.',
             'email': email,
-            'otp_sent': True
-        })
+            'otp_sent': True,
+        }
+        if code_to_return:
+            resp_payload['dev_otp'] = code_to_return
+        if smtp_error_msg and getattr(settings, 'DEBUG', False):
+            resp_payload['smtp_warning'] = smtp_error_msg
+
+        return Response(resp_payload)
 
 
 class CustomerPasswordResetConfirmView(APIView):

@@ -17,7 +17,7 @@ export const NAV_LINKS = [
   { label: "All ", href: "/all" },
   { label: "MEN", href: "/men" },
   { label: "WOMEN", href: "/women" },
-  { label: "BRANDS", href: "#" },
+  { label: "BRANDS", href: "/brands" },
   { label: "SCENT SHOT", href: "/scent-shot" },
   // { label: "SALE", href: "/sale" },
   { label: "NEW", href: "/new" },

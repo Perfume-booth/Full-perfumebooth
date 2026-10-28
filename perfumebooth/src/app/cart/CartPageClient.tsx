@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
 import { formatPrice } from "@/lib/utils";
+import { cleanImageUrl } from "@/lib/media-url";
 import { AnimatedMinus } from "@/components/ui/icons/AnimatedMinus";
 import { AnimatedPlus } from "@/components/ui/icons/AnimatedPlus";
 import { AnimatedX } from "@/components/ui/icons/AnimatedX";
@@ -164,7 +165,7 @@ export default function CartPageClient() {
                         <Link href={`/products/${item.handle}`} className="relative w-24 h-32 sm:w-32 sm:h-40 flex-shrink-0 bg-[#f7f7f7] rounded-md overflow-hidden hover:opacity-90 transition-opacity">
                           {item.image ? (
                             <Image
-                              src={item.image}
+                              src={cleanImageUrl(typeof item.image === "string" ? item.image : ((item.image as any)?.url || (item as any).featuredImage?.url)) || "/images/fallback-luxury.svg"}
                               alt={item.title}
                               fill
                               className="object-cover"

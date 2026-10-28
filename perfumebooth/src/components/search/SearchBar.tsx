@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { TOP_BRANDS } from "@/lib/constants";
 import { cleanCategoryName } from "@/lib/transformers";
+import { cleanImageUrl } from "@/lib/media-url";
 import { trackFirstParty } from '@/lib/first-party-analytics';
 
 interface SuggestionProduct {
@@ -420,7 +421,7 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
                           {product.featuredImage?.url || product.image ? (
                             <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 shrink-0 flex items-center justify-center">
                               <Image
-                                src={product.featuredImage?.url || product.image || ""}
+                                src={cleanImageUrl(product.featuredImage?.url || product.image) || "/images/fallback-luxury.svg"}
                                 alt={product.title}
                                 width={44}
                                 height={44}
@@ -634,7 +635,7 @@ export default function SearchBar({ variant = "desktop", className }: SearchBarP
                           {product.featuredImage?.url || product.image ? (
                             <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 shrink-0 flex items-center justify-center">
                               <Image
-                                src={product.featuredImage?.url || product.image || ""}
+                                src={cleanImageUrl(product.featuredImage?.url || product.image) || "/images/fallback-luxury.svg"}
                                 alt={product.title}
                                 width={40}
                                 height={40}

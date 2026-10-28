@@ -32,7 +32,7 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: Package,     label: "My Orders",     href: "/orders" },
   { icon: MapPin,      label: "My Addresses",  href: "/account?tab=addresses" },
   // { icon: Gift,        label: "Gift Cards",    href: "/account" },
-  { icon: HelpCircle,  label: "Help & Support",href: "/help" },
+  { icon: HelpCircle,  label: "Help & Support",href: "/info/contact-us" },
 ];
 
 // ─── Animation Variants ───────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ interface CloudWatchFormProps {
   onModeChange?: (mode: "signin" | "signup" | "forgot") => void;
 }
 
-function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }: CloudWatchFormProps) {
+function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeChange }: CloudWatchFormProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [eyePos, setEyePos] = useState({ x: 0, y: 0 });
   const [blink, setBlink] = useState(false);
@@ -55,6 +55,8 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">(type);
   const [forgotStep, setForgotStep] = useState<"request" | "verify">("request");
   const [resetEmail, setResetEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setOtp("");
     const fd = new FormData();
     fd.append("email", resetEmail);
     const result = await forgotPasswordAction(null, fd);
@@ -78,6 +81,10 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
       setError(result.error);
     } else {
       setSuccess("A new 6-digit verification code has been sent to your email.");
+      if (result.devOtp) {
+        setDevOtp(result.devOtp);
+        setOtp(result.devOtp);
+      }
       setResendCooldown(60);
     }
   };
@@ -107,6 +114,8 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
   const handleModeChange = (newMode: "signin" | "signup" | "forgot") => {
     setMode(newMode);
     setForgotStep("request");
+    setOtp("");
+    setDevOtp(null);
     setError(null);
     setSuccess(null);
     onModeChange?.(newMode);
@@ -115,6 +124,8 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
   useEffect(() => {
     setMode(type);
     setForgotStep("request");
+    setOtp("");
+    setDevOtp(null);
     setError(null);
     setSuccess(null);
   }, [type]);
@@ -208,7 +219,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
       if (result.error) {
         setError(result.error);
       } else {
-        window.location.href = result.redirectUrl || "/";
+        window.location.href = result.redirectUrl || returnUrl || "/account";
       }
     } else if (mode === "signin") {
       const result = await loginAction(null, formData);
@@ -216,7 +227,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
       if (result.error) {
         setError(result.error);
       } else {
-        window.location.href = result.redirectUrl || "/";
+        window.location.href = result.redirectUrl || returnUrl || "/account";
       }
     } else if (mode === "forgot") {
       if (forgotStep === "request") {
@@ -227,6 +238,8 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
         } else {
           const emailInput = ((formData.get("email") as string) || "").trim().toLowerCase();
           setResetEmail(emailInput);
+          setOtp(result.devOtp || "");
+          setDevOtp(result.devOtp || null);
           setForgotStep("verify");
           setSuccess(typeof result.success === "string" ? result.success : "A 6-digit verification code has been sent to your email.");
           setResendCooldown(60);
@@ -348,22 +361,42 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
         )}
 
         {mode === "forgot" && forgotStep === "verify" && (
-          <div className="w-full mb-4 p-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-left text-xs leading-relaxed text-neutral-700 flex items-center justify-between shadow-sm">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider block">Verification code sent to</span>
-              <span className="font-semibold text-neutral-900 text-xs">{resetEmail}</span>
+          <div className="w-full mb-4 p-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-left text-xs leading-relaxed text-neutral-700 flex flex-col gap-2 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider block">Verification code sent to</span>
+                <span className="font-semibold text-neutral-900 text-xs">{resetEmail}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotStep("request");
+                  setOtp("");
+                  setDevOtp(null);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className="text-[11px] font-bold text-[var(--color-maroon)] hover:underline ml-2"
+              >
+                Change Email
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setForgotStep("request");
-                setError(null);
-                setSuccess(null);
-              }}
-              className="text-[11px] font-bold text-[var(--color-maroon)] hover:underline ml-2"
-            >
-              Change Email
-            </button>
+
+            {devOtp && (
+              <div className="pt-2 border-t border-neutral-200 flex items-center justify-between bg-amber-50/90 -mx-3 -mb-3 p-2.5 rounded-b-2xl border-amber-200">
+                <div className="text-[11px] text-amber-900 flex items-center gap-1.5">
+                  <span className="font-bold uppercase tracking-wider text-[9px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-mono">Dev Mode</span>
+                  <span>Code: <strong className="font-mono text-sm tracking-widest text-[var(--color-maroon)]">{devOtp}</strong></span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOtp(devOtp)}
+                  className="text-[10px] font-bold text-[var(--color-maroon)] hover:text-black underline uppercase tracking-wider"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -382,11 +415,22 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
         )}
 
         {/* Forms */}
-        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
+        <form key={`${mode}-${forgotStep}`} onSubmit={handleSubmit} className="w-full flex flex-col gap-4" autoComplete="off">
           <input type="hidden" name="returnUrl" value={returnUrl} />
 
           {mode === "forgot" && forgotStep === "verify" ? (
             <>
+              {/* Accessible hidden username to bind account credential context so browsers never mistake the OTP field for a username */}
+              <input
+                type="text"
+                name="username"
+                value={resetEmail}
+                autoComplete="username"
+                readOnly
+                tabIndex={-1}
+                aria-hidden="true"
+                className="sr-only absolute pointer-events-none opacity-0 h-0 w-0"
+              />
               <input type="hidden" name="email" value={resetEmail} />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="otp" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">
@@ -397,9 +441,15 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
                   id="otp" 
                   type="text" 
                   inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   pattern="[0-9]{6}"
                   maxLength={6}
                   required 
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   placeholder="123456" 
                   autoFocus
                   className="rounded-full px-5 h-11 text-center font-mono tracking-[0.4em] text-lg font-bold border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" 
@@ -414,6 +464,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
                   name="password"
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   minLength={8}
                   placeholder="•••••••• (min 8 characters)"
@@ -459,13 +510,13 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
               {mode === "signup" && (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="name" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Full Name</Label>
-                  <Input name="name" id="name" placeholder="John Doe" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
+                  <Input name="name" id="name" autoComplete="name" placeholder="John Doe" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
                 </div>
               )}
               
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="email" className="text-xs text-[var(--color-gold)] font-bold uppercase tracking-wider">Email Address</Label>
-                <Input name="email" id="email" type="email" placeholder="john@example.com" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
+                <Input name="email" id="email" type="email" autoComplete="email" placeholder="john@example.com" required className="rounded-full px-5 h-11 border-white/50 bg-white/50 focus:bg-[var(--color-surface)] transition-all" />
               </div>
 
               {mode !== "forgot" && (
@@ -486,6 +537,7 @@ function CloudWatchFormInner({ type = "signup", returnUrl = "/", onModeChange }:
                     name="password"
                     id="password"
                     type="password"
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
                     required
                     placeholder="••••••••"
                     onFocus={() => setIsTyping(true)}

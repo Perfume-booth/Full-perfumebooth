@@ -15,6 +15,7 @@ from .services import verify_razorpay_signature, process_payment_webhook, calcul
 from .tasks import send_order_email_receipt
 from .models import Order, OrderItem, Shipment, AbandonedCart, Coupon, CouponRedemption, Promotion
 from apps.shop.models import Product, ProductVariant, Inventory
+from apps.shop.views import format_media_url
 from apps.authentication.views import HasRolePermission
 from apps.authentication.helpers import log_action
 from core.throttling import CheckoutRateThrottle
@@ -68,13 +69,14 @@ class OrderListView(APIView):
     def get(self, request):
         is_merchant = check_is_merchant(request.user)
 
-        orders_query = Order.objects.prefetch_related('items', 'shipments').all()
+        orders_query = Order.objects.prefetch_related('items__product__images', 'items__variant', 'shipments').all()
         if not is_merchant:
             orders_query = orders_query.filter(user=request.user)
 
         data = []
         for order in orders_query:
-            item_qty = sum(item.quantity for item in order.items.all())
+            order_items = list(order.items.all())
+            item_qty = sum(item.quantity for item in order_items)
             
             shipping = order.shipping_address or {}
             delivery_method = shipping.get('shipping_carrier', 'Standard Shipping')
@@ -113,6 +115,7 @@ class OrderListView(APIView):
                 'delivery_method': latest_shipment.courier_name if latest_shipment and latest_shipment.courier_name else delivery_method,
                 'payment_method': order.payment_method,
                 'currency': order.currency,
+                'items': [serialize_order_item(item, request=request) for item in order_items],
             })
             
         return Response(data)
@@ -129,38 +132,74 @@ class OrderListView(APIView):
 
 
 
-def serialize_order_detail(order):
-    """Formats full order details for customer/admin/guest tracking."""
-    items_data = []
-    for item in order.items.all():
-        prod_img = None
-        if item.product:
-            if item.product.image:
-                try:
-                    prod_img = item.product.image.url
-                except Exception:
-                    prod_img = str(item.product.image)
-            elif hasattr(item.product, 'images'):
-                first_img_obj = item.product.images.first()
-                if first_img_obj and first_img_obj.image:
+def serialize_order_item(item, request=None):
+    """Serializes a single order item with resilient image and product resolution."""
+    product = item.product
+    variant = item.variant
+
+    if not product and item.sku:
+        try:
+            variant_obj = ProductVariant.objects.select_related('product').filter(sku=item.sku).first()
+            if variant_obj:
+                variant = variant or variant_obj
+                product = variant_obj.product
+            else:
+                product = Product.objects.filter(sku=item.sku).first()
+        except Exception:
+            pass
+
+    prod_img = None
+    if variant and getattr(variant, 'image', None):
+        try:
+            prod_img = variant.image.url
+        except Exception:
+            prod_img = str(variant.image)
+
+    if not prod_img and product and getattr(product, 'image', None):
+        try:
+            prod_img = product.image.url
+        except Exception:
+            prod_img = str(product.image)
+
+    if not prod_img and product and hasattr(product, 'images'):
+        try:
+            first_img_obj = product.images.first()
+            if first_img_obj:
+                if getattr(first_img_obj, 'image', None):
                     try:
                         prod_img = first_img_obj.image.url
                     except Exception:
                         prod_img = str(first_img_obj.image)
+                elif getattr(first_img_obj, 'source_url', None):
+                    prod_img = first_img_obj.source_url
+        except Exception:
+            pass
 
-        items_data.append({
-            'id': str(item.id),
-            'product_id': str(item.product.id) if item.product else None,
-            'product_slug': item.product.slug if item.product else None,
-            'product_image': prod_img,
-            'product_title': item.product_title or (item.product.title if item.product else 'Deleted Product'),
-            'variant_id': str(item.variant_id) if item.variant_id else None,
-            'variant_title': item.variant_title,
-            'sku': item.sku or (item.product.sku if item.product else 'N/A'),
-            'quantity': item.quantity,
-            'unit_price': str(item.unit_price),
-            'line_total': str(item.line_total),
-        })
+    formatted_img = format_media_url(prod_img, request=request) if prod_img else None
+
+    try:
+        line_total_val = str(item.line_total)
+    except Exception:
+        line_total_val = str(float(item.unit_price) * item.quantity)
+
+    return {
+        'id': str(item.id),
+        'product_id': str(product.id) if product else (str(item.product_id) if hasattr(item, 'product_id') and item.product_id else None),
+        'product_slug': product.slug if product else None,
+        'product_image': formatted_img,
+        'product_title': item.product_title or (product.title if product else 'Deleted Product'),
+        'variant_id': str(variant.id) if variant else (str(item.variant_id) if item.variant_id else None),
+        'variant_title': item.variant_title or (variant.title if variant else ''),
+        'sku': item.sku or (product.sku if product else 'N/A'),
+        'quantity': item.quantity,
+        'unit_price': str(item.unit_price),
+        'line_total': line_total_val,
+    }
+
+
+def serialize_order_detail(order, request=None):
+    """Formats full order details for customer/admin/guest tracking."""
+    items_data = [serialize_order_item(item, request=request) for item in order.items.all()]
 
     shipments = [{
         'id': str(shipment.id),
@@ -234,13 +273,13 @@ class GuestOrderTrackView(APIView):
 
         try:
             parsed_uuid = uuid.UUID(clean_id)
-            order = Order.objects.prefetch_related('items__product', 'items__variant', 'shipments').filter(id=parsed_uuid).first()
+            order = Order.objects.prefetch_related('items__product__images', 'items__variant', 'shipments').filter(id=parsed_uuid).first()
         except (ValueError, AttributeError):
             pass
 
         if not order:
             from django.db.models import Q
-            order = Order.objects.prefetch_related('items__product', 'items__variant', 'shipments').filter(
+            order = Order.objects.prefetch_related('items__product__images', 'items__variant', 'shipments').filter(
                 Q(order_number__iexact=order_query) |
                 Q(order_number__iexact=clean_id) |
                 Q(order_number__iexact=f"PB-{clean_id}") |
@@ -269,7 +308,26 @@ class GuestOrderTrackView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        return Response(serialize_order_detail(order))
+        return Response(serialize_order_detail(order, request=request))
+
+
+def resolve_order(pk_or_order_number):
+    """Finds an order QuerySet by UUID or human-readable order number."""
+    clean = str(pk_or_order_number).strip().lstrip('#')
+    try:
+        parsed_uuid = uuid.UUID(clean)
+        res = Order.objects.filter(id=parsed_uuid)
+        if res.exists():
+            return res
+    except (ValueError, AttributeError):
+        pass
+    from django.db.models import Q
+    return Order.objects.filter(
+        Q(order_number__iexact=pk_or_order_number) |
+        Q(order_number__iexact=clean) |
+        Q(order_number__iexact=f"PB-{clean}") |
+        Q(order_number__iexact=f"#{clean}")
+    )
 
 
 class OrderDetailView(APIView):
@@ -277,16 +335,15 @@ class OrderDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk: str):
-        try:
-            order = Order.objects.prefetch_related('items__product', 'items__variant', 'shipments').get(id=pk)
-        except Order.DoesNotExist:
+        order = resolve_order(pk).prefetch_related('items__product__images', 'items__variant', 'shipments').first()
+        if not order:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         is_merchant = check_is_merchant(request.user)
         if not is_merchant and order.user != request.user:
             return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
-        return Response(serialize_order_detail(order))
+        return Response(serialize_order_detail(order, request=request))
 
     def put(self, request, pk: str):
         is_merchant = check_is_merchant(request.user)
@@ -295,7 +352,9 @@ class OrderDetailView(APIView):
 
         try:
             with transaction.atomic():
-                order = Order.objects.select_for_update().get(id=pk)
+                order = resolve_order(pk).select_for_update().first()
+                if not order:
+                    return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
                 status_val = request.data.get('status')
                 if status_val:
@@ -362,7 +421,9 @@ class OrderCancelView(APIView):
         is_merchant = check_is_merchant(request.user)
         try:
             with transaction.atomic():
-                order = Order.objects.select_for_update().get(id=pk)
+                order = resolve_order(pk).select_for_update().first()
+                if not order:
+                    return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
                 if not is_merchant and order.user != request.user:
                     return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 

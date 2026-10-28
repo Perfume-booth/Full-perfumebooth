@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 import { formatPrice } from "@/lib/utils";
+import { cleanImageUrl } from "@/lib/media-url";
 import { useRouter } from "next/navigation";
 import { AnimatedLoader2 } from "@/components/ui/icons/AnimatedLoader2";
 import { AnimatedShoppingBag } from "@/components/ui/icons/AnimatedShoppingBag";
@@ -779,7 +780,7 @@ export default function CheckoutClient({ customer }: Props) {
                                 <div key={`${item.id}-${item.selectedVariantId}`} className="flex items-center gap-4 bg-[#fcfbfc] p-4 rounded-xl border border-gray-150 shadow-sm transition-all duration-300 hover:border-gray-200">
                                   <Link href={`/products/${item.handle}`} className="relative w-20 h-24 bg-white border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center hover:opacity-90 transition-opacity">
                                     {item.image ? (
-                                      <Image src={item.image} alt={item.title} fill className="object-contain p-1" sizes="80px" />
+                                      <Image src={cleanImageUrl(typeof item.image === "string" ? item.image : ((item.image as any)?.url || (item as any).featuredImage?.url)) || "/images/fallback-luxury.svg"} alt={item.title} fill className="object-contain p-1" sizes="80px" />
                                     ) : (
                                       <AnimatedShoppingBag size={24} className="text-gray-300" />
                                     )}
@@ -1030,7 +1031,7 @@ export default function CheckoutClient({ customer }: Props) {
                     <div key={`${item.id}-${item.selectedVariantId}`} className="flex items-center gap-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm transition-all duration-300 hover:border-gray-200">
                       <Link href={`/products/${item.handle}`} className="relative w-16 h-20 bg-gray-50 border border-gray-200 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center hover:opacity-90 transition-opacity">
                         {item.image ? (
-                          <Image src={item.image} alt={item.title} fill className="object-contain p-1" sizes="64px" />
+                          <Image src={cleanImageUrl(typeof item.image === "string" ? item.image : ((item.image as any)?.url || (item as any).featuredImage?.url)) || "/images/fallback-luxury.svg"} alt={item.title} fill className="object-contain p-1" sizes="64px" />
                         ) : (
                           <AnimatedShoppingBag size={20} className="text-gray-300" />
                         )}

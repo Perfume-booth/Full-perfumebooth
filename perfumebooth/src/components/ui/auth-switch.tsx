@@ -7,8 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function AuthSwitch() {
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signup");
-  const [returnUrl, setReturnUrl] = useState("/");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const [returnUrl, setReturnUrl] = useState("/account");
  
   // Sync state with URL if it changes (safely on the client post-hydration)
   useEffect(() => {
@@ -16,7 +16,7 @@ export default function AuthSwitch() {
     if (urlMode === "signin" || urlMode === "signup" || urlMode === "forgot") {
       setMode(urlMode);
     } else {
-      setMode("signup");
+      setMode("signin");
     }
 
     const urlReturn = searchParams.get("returnUrl");
@@ -28,10 +28,8 @@ export default function AuthSwitch() {
   return (
     <div className="flex flex-col items-center w-full max-w-lg mx-auto py-2">
       
-      {/* Premium Segmented Switcher - Removed as requested */}
-
       {/* Auth Container with Morphing height */}
-      <div className="relative w-full  p-6">
+      <div className="relative w-full p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={mode}

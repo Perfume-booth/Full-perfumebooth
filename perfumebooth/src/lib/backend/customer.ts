@@ -1,4 +1,5 @@
 import { unwrapApiData, ensureArray } from './types';
+import { cleanImageUrl } from '../media-url';
 
 const isServer = typeof window === 'undefined';
 const isDocker = process.env.WATCHPACK_POLLING === "true";
@@ -83,19 +84,25 @@ function mapOrder(order: any) {
     awb: order.awb_code,
     courierName: order.courier_name,
     lineItems: {
-      edges: items.map((item: any) => ({
-        node: {
-          id: String(item.id),
-          title: item.product_title,
-          quantity: item.quantity,
-          variant: {
+      edges: items.map((item: any) => {
+        const itemImage = cleanImageUrl(item.product_image) || "/images/fallback-luxury.svg";
+        return {
+          node: {
+            id: String(item.id),
             title: item.product_title,
-            image: item.product_image ? { url: item.product_image, altText: item.product_title } : null,
-            price: { amount: String(item.unit_price || 0), currencyCode: "INR" },
+            quantity: item.quantity,
+            variant: {
+              title: item.variant_title || item.product_title,
+              image: { url: itemImage, altText: item.product_title },
+              price: { amount: String(item.unit_price || 0), currencyCode: "INR" },
+              product: {
+                handle: item.product_slug || "",
+              },
+            },
+            originalTotalPrice: { amount: String(item.line_total || 0), currencyCode: "INR" },
           },
-          originalTotalPrice: { amount: String(item.line_total || 0), currencyCode: "INR" },
-        },
-      })),
+        };
+      }),
     },
     metafields: [],
   };

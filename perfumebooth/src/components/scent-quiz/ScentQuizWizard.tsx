@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useCartStore } from "@/store/useCartStore";
 import { formatPrice } from "@/lib/utils";
+import { cleanImageUrl } from "@/lib/media-url";
 import { toast } from "react-hot-toast";
 
 interface Product {
@@ -298,7 +299,7 @@ export default function ScentQuizWizard({ initialProducts }: ScentQuizWizardProp
                     </span>
                     {product.featuredImage?.url ? (
                       <Image
-                        src={product.featuredImage.url}
+                        src={cleanImageUrl(product.featuredImage.url) || "/images/fallback-luxury.svg"}
                         alt={product.title}
                         width={250}
                         height={250}

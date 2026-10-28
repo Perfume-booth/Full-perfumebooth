@@ -525,23 +525,36 @@ export default function OrderDetailsComponent({ order, trackingInfo, isGuest }: 
                   const totalPrice = parseFloat(item.originalTotalPrice?.amount || "0");
                   const unitPrice = item.quantity > 0 ? totalPrice / item.quantity : 0;
                   return (
-                    <div key={idx} className="flex justify-between items-start gap-4 text-sm">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          {/* Mini fragrance dot/bullet */}
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#c5a059] flex-shrink-0" />
+                    <div key={idx} className="flex justify-between items-center gap-4 text-sm">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {item.variant?.image?.url ? (
+                          <div className="relative w-12 h-12 rounded-lg bg-neutral-50 border border-neutral-100 overflow-hidden flex-shrink-0">
+                            <Image
+                              src={item.variant.image.url}
+                              alt={item.title || "Product"}
+                              fill
+                              className="object-contain p-1"
+                              sizes="48px"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0 text-neutral-300">
+                            <PackageIcon size={20} />
+                          </div>
+                        )}
+                        <div className="min-w-0">
                           <span className="font-semibold text-neutral-800 line-clamp-1">
                             {item.title}
                           </span>
-                        </div>
-                        {item.variant?.title && item.variant.title !== "Default Title" && (
-                          <p className="text-[11px] text-neutral-400 font-medium pl-3 mt-0.5">
-                            {item.variant.title}
+                          {item.variant?.title && item.variant.title !== "Default Title" && (
+                            <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
+                              {item.variant.title}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-neutral-500 font-medium mt-0.5">
+                            Qty: {item.quantity} × {formatPrice(unitPrice)}
                           </p>
-                        )}
-                        <p className="text-[11px] text-neutral-500 font-medium pl-3 mt-0.5">
-                          Qty: {item.quantity} × {formatPrice(unitPrice)}
-                        </p>
+                        </div>
                       </div>
                       <span className="font-bold text-neutral-800 whitespace-nowrap">
                         {formatPrice(totalPrice)}

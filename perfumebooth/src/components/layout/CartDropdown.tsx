@@ -8,6 +8,7 @@ import { AnimatedShoppingBag as ShoppingBag } from "@/components/ui/icons/Animat
 import { AnimatedX as X } from "@/components/ui/icons/AnimatedX";
 import { useCartStore } from "@/store/useCartStore";
 import { formatPrice } from "@/lib/utils";
+import { cleanImageUrl } from "@/lib/media-url";
 
 // ─── Animation Variants ───────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ export default function CartDropdown({
                         className="relative w-16 h-20 flex-shrink-0 bg-white rounded-md border border-[var(--color-border)] overflow-hidden hover:opacity-90 transition-opacity block"
                       >
                         <Image
-                          src={item.image || "https://placehold.co/400x500/F6F3EE/B8924A?text=Perfume"}
+                          src={cleanImageUrl(typeof item.image === "string" ? item.image : ((item.image as any)?.url || (item as any).featuredImage?.url)) || "/images/fallback-luxury.svg"}
                           alt={item.title}
                           fill
                           className="object-cover"
