@@ -113,6 +113,17 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Legacy gender collection URLs use the existing root-level collection pages.
+      {
+        source: '/collections/gender/:gender(men|women|unisex)',
+        destination: '/:gender',
+        permanent: true,
+      },
+      {
+        source: '/collections/gender/:gender(men|women|unisex)/',
+        destination: '/:gender',
+        permanent: true,
+      },
       {
         source: '/collections/:collection/products/:product',
         destination: '/products/:product',

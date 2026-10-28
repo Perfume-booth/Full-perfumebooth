@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { collectionPublicPath } from '@/lib/collection-url';
 import {
   Plus,
   Search,
@@ -549,7 +550,7 @@ export default function CollectionsPage() {
               
               <div className="flex flex-col gap-3 p-4 neu-inset-sm rounded-2xl">
                 <span className="text-xs font-bold text-primary hover:underline truncate block">
-                  https://perfumebooth.com/collections/{slug}
+                  https://perfumebooth.com{collectionPublicPath(slug)}
                 </span>
                 <span className="text-sm font-extrabold text-foreground block">
                   {title || "Unreleased Collection Title"}
@@ -563,11 +564,12 @@ export default function CollectionsPage() {
               <div className="flex flex-col gap-2 mt-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">URL Handle Slug</label>
                 <div className="flex rounded-2xl overflow-hidden neu-input text-sm">
-                  <span className="bg-muted/40 px-3.5 py-2.5 text-muted-foreground select-none font-bold border-r border-border/30">/collections/</span>
+                  <span className="bg-muted/40 px-3.5 py-2.5 text-muted-foreground select-none font-bold border-r border-border/30">/</span>
                   <input
                     type="text"
                     required
-                    value={slug}
+                    aria-label="Public collection URL handle"
+                    value={collectionPublicPath(slug).slice(1)}
                     onChange={(e) => setSlug(e.target.value)}
                     placeholder="e.g. summer-best-sellers"
                     className="flex-1 bg-transparent px-3.5 py-2.5 focus:outline-none text-foreground font-medium"

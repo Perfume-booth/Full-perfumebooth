@@ -1,13 +1,10 @@
 import { useAuthStore } from '@/store/useAuthStore';
 
 export function getApiBaseUrl(): string {
-  let url = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!url && typeof window !== 'undefined') {
-    url = `${window.location.protocol}//${window.location.hostname}:8000/api`;
+  if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
   }
-  if (!url) {
-    url = 'http://localhost:8000/api';
-  }
+  let url = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
   url = url.replace(/\/$/, '');
   if (!url.endsWith('/api')) {
     url = `${url}/api`;
@@ -18,13 +15,16 @@ export function getApiBaseUrl(): string {
 export function formatProductImageUrl(url?: string | null): string {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/media/')) return `http://localhost:8000${url}`;
-  if (url.startsWith('media/')) return `http://localhost:8000/${url}`;
+  const host = typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : 'http://localhost:8000';
+  if (url.startsWith('/media/')) return `${host}${url}`;
+  if (url.startsWith('media/')) return `${host}/${url}`;
   if (url.startsWith('products/') || url.startsWith('variants/')) {
-    return `http://localhost:8000/media/${url}`;
+    return `${host}/media/${url}`;
   }
   if (url.startsWith('/products/') || url.startsWith('/variants/')) {
-    return `http://localhost:8000/media${url}`;
+    return `${host}/media${url}`;
   }
   return url;
 }

@@ -94,7 +94,8 @@ export const TOP_BRANDS = [
   "Swiss Arabian",
   "Royal Mirage",
   "Anfar",
-  "Al Haramain"
+  "Al Haramain",
+  "Caneza"
 ];
 
 export const INDIAN_STATES = [
