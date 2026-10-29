@@ -1,7 +1,9 @@
 import { Article, BlogData, unwrapApiData, ensureArray } from "./types";
 
 
-const DJANGO_URL = process.env.NEXT_PUBLIC_DJANGO_URL || 'http://localhost:8000';
+const DJANGO_URL = (process.env.NEXT_PUBLIC_DJANGO_URL ||
+  (process.env.WATCHPACK_POLLING === 'true' ? 'http://django:8000' : 'http://127.0.0.1:8000'))
+  .replace('://localhost:', '://127.0.0.1:').replace(/\/$/, '');
 
 export async function getBlog(_handle: string = 'news', first: number = 20): Promise<BlogData> {
   try {

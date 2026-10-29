@@ -5,6 +5,7 @@ This file keeps track of completed features, active architecture, test verificat
 ---
 
 ## 🎯 Current Context & Focus
+*   **2026-10-29 — Legacy blogs imported**: Imported all 28 published articles returned by paginated legacy Storefront API into CMS BlogPost, preserving title/slug/author/date/tags/content. Copied 28 processed image URLs to R2 and CMS Blog Images folder with content checksum verification. 0 failures/0 overwritten posts. Storefront blog fetch now targets current IPv4 backend and listing no longer truncates at 20 posts.
 *   **2026-10-29 — Removed exposed password-reset OTP**: Removed visible development-code panel, autofill button and automatic OTP population from storefront auth form. Backend no longer returns dev_otp even in DEBUG, and SMTP failure logging no longer prints reset links/codes. Email verification remains required.
 *   **2026-10-29 — MPS collection images assigned**: Filled 23 empty AutoCollection.image fields from exact matching existing PageBanner file keys, including Men/Women/Unisex/Arabiyat Prestige. No reuploads, product changes, or existing-image overwrites. Remaining unmatched collections still have no image; no suitable source banner was inferred for them.
 *   **2026-10-29 — MPS collection image diagnosis**: Read-only DB check confirms 48 imported CMS MediaAssets, but all 622 AutoCollection.image fields are empty. Men/Women/Unisex each have a PageBanner image, which is a separate model. MPS collection table/editor renders col.image only, explaining blank thumbnails despite successfully saved R2 media and storefront page banners. No data changes made in this diagnostic turn.
@@ -42,6 +43,7 @@ This file keeps track of completed features, active architecture, test verificat
 ## 📋 Task Log
 
 ### ✅ Completed Milestones
+*   **2026-10-29 — Blog migration**: Added repeatable import_legacy_blogs command (dry-run default, --apply, existing-slug preservation, R2 requirement, host/size/image validation, hash deduplication). Successful import: 28 new posts, 0 skipped, 0 failed. Cover/embedded Shopify CDN references handled. TypeScript passed for backend URL change; no visual browser verification claimed. Only published Storefront-accessible articles are included; unpublished legacy drafts are outside this source.
 *   **2026-10-29 — OTP disclosure cleanup**: Removed devOtp state and server-action forwarding along with UI exposure; sanitized sensitive reset failure log. React guidance kept the form simpler without redundant debug state. Storefront TypeScript and Django system checks passed; targeted source search confirms exposed devOtp/dev_otp/reset-link log/autofill references gone. No real password reset or outbound email test performed.
 *   **2026-10-29 — Saved collection thumbnails verified**: Added transactional, repeatable link_collection_banner_images management command with dry-run default. Applied 23 exact last-slug-segment matches; subsequent dry run found 0. Verified via actual MPS proxy localhost:3001/api/shop/collections/: Men, Women, Unisex and Arabiyat Prestige have image URLs, all four returned HTTP 200. Visual browser verification not claimed.
 *   **2026-10-29 — Image persistence distinction verified**: Confirmed MPS table and editor use AutoCollection.image, while earlier imports registered MediaAssets and PageBannerImages only. Missing collection thumbnails are unassigned collection image fields, not failed R2 uploads.
@@ -402,6 +404,7 @@ This file keeps track of completed features, active architecture, test verificat
 ---
 
 ### 📅 Next Steps
+*   Review imported articles in MPS Blog and storefront /blog; allow 60-second frontend data cache refresh. Validate article formatting visually and review legacy internal links/SEO redirects separately. Existing posts are not overwritten by migration reruns.
 *   Refresh the auth page and request a new verification code through email. Verify configured email delivery separately; development OTPs are no longer exposed in the browser or API. Rendered browser QA remains pending.
 *   Refresh MPS Collections and reopen the editor to reload assigned images. Collections without matching imported banners (e.g. taxonomy/category collections shown in screenshot) still require their own image selection; do not apply unrelated brand banners to them.
 *   If authorized, assign existing R2 banner keys to matching empty AutoCollection.image fields (exact/explicit alias mapping only), preserving custom images and leaving unmatched collections untouched. No reupload or duplicate media is needed.

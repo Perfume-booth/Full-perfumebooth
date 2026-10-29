@@ -8,7 +8,7 @@ export const metadata = {
 import BlogCard from "@/components/blog/BlogCard";
 
 export default async function BlogArchivePage() {
-  const blogData = await getBlog("news", 20);
+  const blogData = await getBlog("news", Number.MAX_SAFE_INTEGER);
   const articles = blogData?.articles || [];
 
   return (
