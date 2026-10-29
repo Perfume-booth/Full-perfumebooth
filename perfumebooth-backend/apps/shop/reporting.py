@@ -8,6 +8,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.orders.models import Order, OrderItem
+from .category_utils import clean_fragrance_category
 
 TZ = ZoneInfo('Asia/Kolkata')
 ZERO = Decimal('0')
@@ -71,10 +72,13 @@ def build_report(timeframe='7d', now=None):
                 for i, row in enumerate(ranking)]
     categories = lines.values('product__attributes__category').annotate(
         revenue=Sum(line_total)).order_by('-revenue')
-    colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6']
-    category_data = [{'name': row['product__attributes__category'] or 'Uncategorised',
-                      'value': float(row['revenue']), 'color': colors[i % len(colors)]}
-                     for i, row in enumerate(categories)]
+    colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#06b6d4', '#e11d48', '#d97706']
+    grouped_rev = {}
+    for row in categories:
+        c_name = clean_fragrance_category(row['product__attributes__category'] or '')
+        grouped_rev[c_name] = grouped_rev.get(c_name, 0.0) + float(row['revenue'] or 0.0)
+    category_data = [{'name': cat, 'value': val, 'color': colors[i % len(colors)]}
+                     for i, (cat, val) in enumerate(sorted(grouped_rev.items(), key=lambda x: x[1], reverse=True))]
     methods = orders.values('payment_method').annotate(count=Count('id')).order_by('payment_method')
     refunded = orders.filter(payment_status=Order.PaymentStatus.REFUNDED).aggregate(
         total=Sum('total'))['total'] or ZERO

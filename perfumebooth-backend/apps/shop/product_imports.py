@@ -571,6 +571,9 @@ def _parse(field, value):
         if normalized:
             raise ValueError('Use Men, Women, Unisex, or Kids.')
         return ''
+    if field == 'category' and ('>' in value or 'health & beauty' in value.lower()):
+        from .category_utils import clean_fragrance_category
+        return clean_fragrance_category(raw_category=value)
     if field == 'title' and not value:
         raise ValueError('Title cannot be empty.')
     if len(value) > (500 if field in {'title', 'brand', 'category', 'product_type'} else 10000):

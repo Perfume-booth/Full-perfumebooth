@@ -3,10 +3,9 @@
 import ProductCard from "@/components/product/ProductCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 import Carousel from "@/components/ui/Carousel";
-import type { Product } from "@/types/product";
 
 interface ProductCarouselProps {
-    products: Product[];
+    products: any[];
     title: string;
     italicPart?: string;
     viewAllLink?: string;

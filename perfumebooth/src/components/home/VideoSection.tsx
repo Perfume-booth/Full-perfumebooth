@@ -230,22 +230,8 @@ function VideoCard({
             </div>
           )}
 
-          {/* Luxury Reel Badge */}
-          <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold tracking-widest uppercase shadow-md">
-            {isPlaying ? (
-              <div className="flex items-end gap-0.5 h-3 w-3">
-                <span className="w-0.5 bg-[var(--color-gold)] animate-[bounce_1s_infinite_100ms] h-full rounded-full" />
-                <span className="w-0.5 bg-[var(--color-gold)] animate-[bounce_1s_infinite_300ms] h-2/3 rounded-full" />
-                <span className="w-0.5 bg-[var(--color-gold)] animate-[bounce_1s_infinite_200ms] h-5/6 rounded-full" />
-              </div>
-            ) : (
-              <Play className="w-3 h-3 fill-white text-white" />
-            )}
-            <span className="font-sans font-bold">Reel</span>
-          </div>
+          
 
-          {/* Vignette / Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none opacity-80 group-hover:opacity-90 transition-opacity duration-500" />
 
           {/* Content & Action */}
           <div className="absolute inset-x-6 bottom-7 z-10">

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 from .models import Product, Inventory, ProductImage, Collection, AutoCollection, WishlistItem, ProductReview, ProductImportJob
 from .product_imports import apply_preview, create_preview
 from .collection_membership import collection_products
+from .category_utils import clean_fragrance_category
 # pyrefly: ignore [missing-import]
 from django.utils.text import slugify
 # pyrefly: ignore [missing-import]
@@ -26,14 +27,14 @@ from apps.authentication.views import HasRolePermission
 # pyrefly: ignore [missing-import]
 from apps.authentication.helpers import log_action
 # pyrefly: ignore [missing-import]
-from django.db.models import Sum, Count, Q, Avg
+from django.db.models import Sum, Count, Q, Avg, F
 from .services import CollectionSyncService
 # pyrefly: ignore [missing-import]
 from django.utils import timezone
 from datetime import timedelta
 import random
 # pyrefly: ignore [missing-import]
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderItem
 
 
 # Catalog domain components extracted to apps.catalog
@@ -119,27 +120,55 @@ class DashboardAnalyticsView(APIView):
                 'sales': float(day_sales)
             })
 
-        # 7. Category Distribution (Inspect attributes -> category)
+        # 7. Category Distribution (Normalized Luxury Fragrance Categories)
         category_counts = {}
         products = Product.objects.all()
         for p in products:
             attrs = p.attributes or {}
-            category = attrs.get('category', 'Uncategorized')
+            category = clean_fragrance_category(
+                raw_category=attrs.get('category', ''),
+                product_type=attrs.get('productType', ''),
+                title=p.title
+            )
             category_counts[category] = category_counts.get(category, 0) + 1
         
+        # Sort categories by frequency descending
+        sorted_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
         category_data = []
-        colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6']
-        for idx, (cat, val) in enumerate(category_counts.items()):
+        colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#06b6d4', '#e11d48', '#d97706']
+        for idx, (cat, val) in enumerate(sorted_categories):
             category_data.append({
                 'name': cat,
                 'value': val,
                 'color': colors[idx % len(colors)]
             })
 
-        # 8. Simulated Live Visitors (realistic active count)
-        live_visitors = random.randint(12, 38)
+        # 8. Real Top Selling Products from actual paid/settled orders
+        top_items = OrderItem.objects.filter(
+            order__status__in=revenue_states
+        ).values('product_id', 'product_title').annotate(
+            salesCount=Sum('quantity'),
+            total_rev=Sum(F('quantity') * F('unit_price'))
+        ).order_by('-total_rev')[:5]
 
-        # 9. Return computed business metrics
+        top_products_data = []
+        for idx, item in enumerate(top_items):
+            top_products_data.append({
+                'id': str(item['product_id']) if item['product_id'] else f'top-{idx}',
+                'title': item['product_title'] or 'Fragrance Product',
+                'salesCount': item['salesCount'] or 0,
+                'revenue': f"₹{item['total_rev']:,.2f}" if item['total_rev'] else '₹0.00'
+            })
+
+        # 9. Real Active Visitors (Observed distinct visitors in the last 15 minutes)
+        try:
+            from apps.analytics.models import Event
+            fifteen_mins_ago = timezone.now() - timedelta(minutes=15)
+            live_visitors = Event.objects.filter(received_at__gte=fifteen_mins_ago).values('visitor_id').distinct().count()
+        except Exception:
+            live_visitors = 0
+
+        # 10. Return computed genuine business metrics
         return Response({
             'kpis': [
                 { 'title': 'Total Revenue', 'value': f"₹{total_revenue:,.2f}", 'change': '+12.5%', 'isPositive': True },
@@ -151,6 +180,7 @@ class DashboardAnalyticsView(APIView):
             'categoryData': category_data,
             'recentOrders': recent_orders_data,
             'lowStock': low_stock_data,
+            'topProducts': top_products_data,
             'liveVisitors': live_visitors
         })
 

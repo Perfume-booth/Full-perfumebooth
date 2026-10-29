@@ -64,96 +64,56 @@ interface LowStockItem {
   stock: number;
 }
 
-// Default Fallback Mock Data Arrays
-const defaultKPIs: KPI[] = [
-  { title: 'Total Revenue', value: '₹348,250.00', change: '+12.5%', isPositive: true },
-  { title: 'Total Orders', value: '1,482', change: '+8.2%', isPositive: true },
-  { title: 'Active Customers', value: '984', change: '+5.4%', isPositive: true },
-  { title: 'Average Order Value', value: '₹2,350.00', change: '+2.1%', isPositive: true },
-];
+interface TopProduct {
+  id: string;
+  title: string;
+  salesCount: number;
+  revenue: string;
+}
 
-const defaultSalesTrend: SalesTrend[] = [
-  { name: 'Mon', sales: 4000 },
-  { name: 'Tue', sales: 3000 },
-  { name: 'Wed', sales: 9800 },
-  { name: 'Thu', sales: 2780 },
-  { name: 'Fri', sales: 8890 },
-  { name: 'Sat', sales: 11390 },
-  { name: 'Sun', sales: 14490 },
-];
-
-const defaultCategoryData: CategoryData[] = [
-  { name: 'Floral', value: 400, color: '#8b5cf6' },
-  { name: 'Citrus', value: 300, color: '#ec4899' },
-  { name: 'Woody', value: 300, color: '#10b981' },
-  { name: 'Spicy', value: 200, color: '#f59e0b' },
-];
-
-const defaultRecentOrders: RecentOrder[] = [
-  { id: '1', orderNo: 'ORD-9482', customer: 'Rahul Sharma', total: '₹4,999.00', status: 'Paid', date: new Date().toISOString() },
-  { id: '2', orderNo: 'ORD-9481', customer: 'Priya Patel', total: '₹2,499.00', status: 'Processing', date: new Date().toISOString() },
-  { id: '3', orderNo: 'ORD-9480', customer: 'Vikram Singh', total: '₹8,120.00', status: 'Shipped', date: new Date(Date.now() - 86400000).toISOString() },
-  { id: '4', orderNo: 'ORD-9479', customer: 'Neha Reddy', total: '₹3,750.00', status: 'Pending', date: new Date(Date.now() - 86400000).toISOString() },
-  { id: '5', orderNo: 'ORD-9478', customer: 'Rohan Mehta', total: '₹1,850.00', status: 'Delivered', date: new Date(Date.now() - 172800000).toISOString() },
-];
-
-const defaultLowStock: LowStockItem[] = [
-  { id: 'l1', title: 'Woody Intense EDP (100ml)', sku: 'WDY-INT-100', stock: 4 },
-  { id: 'l2', title: 'Citrus Breeze Cologne (50ml)', sku: 'CTR-BRZ-50', stock: 7 },
-  { id: 'l3', title: 'Royal Oud Parfum (100ml)', sku: 'OUD-RYL-100', stock: 9 },
+// Initial Clean Zero-State Arrays (No Mock / Dummy Data)
+const initialKPIs: KPI[] = [
+  { title: 'Total Revenue', value: '₹0.00', change: '0%', isPositive: true },
+  { title: 'Total Orders', value: '0', change: '0%', isPositive: true },
+  { title: 'Active Customers', value: '0', change: '0%', isPositive: true },
+  { title: 'Average Order Value', value: '₹0.00', change: '0%', isPositive: true },
 ];
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [kpis, setKpis] = useState<KPI[]>(defaultKPIs);
-  const [salesTrend, setSalesTrend] = useState<SalesTrend[]>(defaultSalesTrend);
-  const [categoryData, setCategoryData] = useState<CategoryData[]>(defaultCategoryData);
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>(defaultRecentOrders);
-  const [lowStock, setLowStock] = useState<LowStockItem[]>(defaultLowStock);
-  const [liveVisitors, setLiveVisitors] = useState(24);
+  const [kpis, setKpis] = useState<KPI[]>(initialKPIs);
+  const [salesTrend, setSalesTrend] = useState<SalesTrend[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [liveVisitors, setLiveVisitors] = useState(0);
   const [timeRange, setTimeRange] = useState('7d');
-  
-  const defaultTopProducts = [
-    { id: '1', title: 'Ahmed Al Maghribi Exotic EDP', salesCount: 142, revenue: '₹2,84,000.00' },
-    { id: '2', title: 'MPF L\'amour EDP', salesCount: 98, revenue: '₹1,96,000.00' },
-    { id: '3', title: 'Ahmed Al Maghribi Ignite Oud', salesCount: 84, revenue: '₹2,88,960.00' },
-  ];
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       const data = await apiFetch('/shop/dashboard/');
-      
-      // Check if backend database has no orders or products
-      const isDatabaseEmpty = !data.recentOrders || data.recentOrders.length === 0;
+      if (!data) return;
 
-      if (isDatabaseEmpty) {
-        console.info('Database is empty. Using mock arrays to showcase dashboard visuals.');
-        setKpis(defaultKPIs);
-        setSalesTrend(defaultSalesTrend);
-        setCategoryData(defaultCategoryData);
-        setRecentOrders(defaultRecentOrders);
-        setLowStock(defaultLowStock);
-        setLiveVisitors(data.liveVisitors || 24);
-      } else {
+      if (data.kpis && data.kpis.length > 0) {
         setKpis(data.kpis);
-        setSalesTrend(data.salesTrend);
-        const colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
-        const mappedCategories = data.categoryData.map((c: any, index: number) => ({
-          ...c,
-          color: c.color || colors[index % colors.length]
-        }));
-        setCategoryData(mappedCategories);
-        setRecentOrders(data.recentOrders);
-        // Only use real low stock if we have actual items, else show fallback
-        setLowStock(data.lowStock && data.lowStock.length > 0 ? data.lowStock : defaultLowStock);
-        setLiveVisitors(data.liveVisitors);
       }
+      setSalesTrend(data.salesTrend || []);
+      const colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#06b6d4', '#e11d48', '#d97706'];
+      const mappedCategories = (data.categoryData || []).map((c: any, index: number) => ({
+        ...c,
+        color: c.color || colors[index % colors.length]
+      }));
+      setCategoryData(mappedCategories);
+      setRecentOrders(data.recentOrders || []);
+      setLowStock(data.lowStock || []);
+      setTopProducts(data.topProducts || []);
+      setLiveVisitors(data.liveVisitors || 0);
     } catch (err) {
-      console.warn('Dashboard API offline. Falling back to local mock data arrays.');
-      // Keep using default pre-initialized state arrays
+      console.warn('Dashboard API error:', err);
     } finally {
       setLoading(false);
     }
@@ -444,26 +404,32 @@ export default function DashboardPage() {
             <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">This Month</span>
           </div>
           <div className="flex flex-col gap-3">
-            {defaultTopProducts.map((p, idx) => (
-              <div key={p.id} className="p-4 neu-inset rounded-2xl border border-border/20 flex items-center justify-between hover:border-primary/40 transition duration-200">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl neu-extruded-sm flex items-center justify-center font-extrabold text-xs shrink-0 ${
-                    idx === 0 ? 'text-amber-500' :
-                    idx === 1 ? 'text-zinc-400' :
-                    'text-amber-700'
-                  }`}>
-                    #{idx + 1}
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-bold text-foreground truncate">{p.title}</span>
-                    <span className="text-xs text-muted-foreground">{p.salesCount} bottles sold</span>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-sm font-extrabold text-emerald-800 dark:text-emerald-300">{p.revenue}</span>
-                </div>
+            {topProducts.length === 0 ? (
+              <div className="h-40 flex items-center justify-center text-center text-xs text-muted-foreground font-medium">
+                No product sales recorded yet.
               </div>
-            ))}
+            ) : (
+              topProducts.map((p, idx) => (
+                <div key={p.id} className="p-4 neu-inset rounded-2xl border border-border/20 flex items-center justify-between hover:border-primary/40 transition duration-200">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl neu-extruded-sm flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                      idx === 0 ? 'text-amber-500' :
+                      idx === 1 ? 'text-zinc-400' :
+                      'text-amber-700'
+                    }`}>
+                      #{idx + 1}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-foreground truncate">{p.title}</span>
+                      <span className="text-xs text-muted-foreground">{p.salesCount} bottles sold</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-sm font-extrabold text-emerald-800 dark:text-emerald-300">{p.revenue}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

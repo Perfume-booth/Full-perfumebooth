@@ -120,7 +120,7 @@ export async function getCollection(
   
   const NEW_HANDLES = ["new", "new-launches", "new-arrivals"];
   const TRENDING_HANDLES = ["trending", "trending-perfumes"];
-  const BESTSELLER_HANDLES = ["best-sellers", "best-selling-perfumes", "bestsellers"];
+  const BESTSELLER_HANDLES = ["best-sellers", "best-selling-perfumes", "bestsellers", "our-best-sellers"];
   const PASSTHROUGH_HANDLES = ["all", "home-hero", ...NEW_HANDLES, ...TRENDING_HANDLES, ...BESTSELLER_HANDLES];
   
   let products = allProducts;

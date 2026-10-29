@@ -1,16 +1,15 @@
 import ProductCarousel from "@/components/home/ProductCarousel";
-import { getCollection } from "@/lib/catalog";
-import type { Product } from "@/types/product";
+import { getCollection, getProducts } from "@/lib/catalog";
+import type { Product } from "@/lib/backend/types";
 
 interface ProductEdge {
   node: Product;
 }
 
 const extractProducts = (collection: any, limit: number = 15): Product[] => {
-  return collection?.products?.edges
-    ?.map((e: ProductEdge) => e.node)
-    ?.filter((p: Product) => p.availableForSale)
-    ?.slice(0, limit) || [];
+  const all = collection?.products?.edges?.map((e: ProductEdge) => e.node) || [];
+  const available = all.filter((p: Product) => p.availableForSale);
+  return (available.length > 0 ? available : all).slice(0, limit);
 };
 
 export default async function BestSellerSection({
@@ -26,8 +25,22 @@ export default async function BestSellerSection({
   collectionHandle?: string;
   limit?: number;
 } = {}) {
-    const bestSellersCol = await getCollection(collectionHandle, limit);
-    const bestSellers = extractProducts(bestSellersCol, limit);
+    let bestSellers: Product[] = [];
+    try {
+      const bestSellersCol = await getCollection(collectionHandle, limit);
+      bestSellers = extractProducts(bestSellersCol, limit);
+    } catch (err) {
+      console.error("Error fetching best sellers collection:", err);
+    }
+
+    if (bestSellers.length === 0) {
+      try {
+        const fallback = await getProducts(limit);
+        bestSellers = fallback.slice(0, limit);
+      } catch (err) {
+        console.error("Error fetching fallback products for BestSellerSection:", err);
+      }
+    }
     
     return (
       <ProductCarousel
