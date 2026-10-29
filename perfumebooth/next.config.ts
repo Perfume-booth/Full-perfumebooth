@@ -95,7 +95,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     const isDocker = process.env.WATCHPACK_POLLING === "true";
-    const API_URL = isDocker ? 'http://django:8000' : 'http://localhost:8000';
+    const API_URL = isDocker ? 'http://django:8000' : 'http://127.0.0.1:8000';
     return {
       beforeFiles: [
         {

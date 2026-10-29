@@ -4,7 +4,7 @@ import { availableUnits, catalogAvailable } from '../catalog-availability';
 
 const isServer = typeof window === 'undefined';
 const isDocker = process.env.WATCHPACK_POLLING === "true";
-const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
+const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000';
 
 
 export function mapDjangoProductToProduct(p: any): Product {

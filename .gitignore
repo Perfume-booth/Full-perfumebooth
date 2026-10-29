@@ -22,6 +22,8 @@ lib/
 !perfumebooth/src/lib/
 perfumebooth/src/lib/*
 !perfumebooth/src/lib/catalog-availability.ts
+!perfumebooth/src/lib/catalog-filters.ts
+!perfumebooth/src/lib/backend/
 lib64/
 parts/
 sdist/

@@ -1,4 +1,4 @@
-import { getCollectionProducts, getBrands, getProductTypes, getBanner } from "@/lib/catalog";
+import { getCollectionProducts, getBanner } from "@/lib/catalog";
 import SideFilter from "@/components/product/SideFilter";
 import CollectionProductGrid from "@/components/product/CollectionProductGrid";
 import CollectionBanner from "@/components/ui/CollectionBanner";
@@ -41,9 +41,11 @@ export default async function CollectionTemplate({
   const { sortKey, reverse } = getSortConfig(sort);
 
   // Build filter options using shared utility
-  const priceRange: [number, number] = price 
+  const priceRange: [number, number] | undefined = price
     ? (price.split("-").map(Number) as [number, number]) 
-    : [0, 10000];
+    : getParam("min") || getParam("max")
+      ? [Number(getParam("min") || 0), Number(getParam("max") || 10000)]
+      : undefined;
 
   const filterOptions = buildCatalogFilters({
     brands: brand?.split(","),
@@ -56,9 +58,10 @@ export default async function CollectionTemplate({
 
   // Fetch full collection data with filters applied for SSR
   // Fetch banner data concurrently
-  const [collection, totalVendors, cmsBanner] = await Promise.all([
+  if (getParam("rating")) filterOptions.push({ rating: Number(getParam("rating")) });
+  if (getParam("q")) filterOptions.push({ q: getParam("q") });
+  const [collection, cmsBanner] = await Promise.all([
     getCollectionProducts(handle, defaultLimit, null, filterOptions, sortKey, reverse),
-    getBrands(),
     getBanner(bannerSlug || handle)
   ]);
   
@@ -68,23 +71,7 @@ export default async function CollectionTemplate({
 
   const { title, products, totalCount, pageInfo, filters: initialFilters } = collection;
   
-  // Ensure we always have a Brand filter in the sidebar
-  let filters = [...(initialFilters || [])];
-  const brandFilter = filters.find(f => f.id.toLowerCase().includes('vendor') || f.label.toLowerCase().includes('brand'));
-  
-  if (!brandFilter && totalVendors && totalVendors.length > 0) {
-    filters.push({
-      id: 'filter.p.vendor',
-      label: 'Brand',
-      type: 'LIST',
-      values: totalVendors.map((v: any) => ({
-        id: v,
-        label: v,
-        count: 0,
-        input: JSON.stringify({ productVendor: v })
-      }))
-    });
-  }
+  const filters = initialFilters || [];
   
   const displayTitle = customTitle || title || "Collection";
   
@@ -100,7 +87,7 @@ export default async function CollectionTemplate({
         initialTotalCount={totalCount}
         collectionHandle={handle}
         title={displayTitle}
-        globalBrands={totalVendors}
+        globalBrands={[]}
       >
         <Breadcrumb title={displayTitle} totalProducts={totalCount} />
         <CollectionBanner

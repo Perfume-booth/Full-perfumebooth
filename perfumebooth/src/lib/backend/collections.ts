@@ -1,6 +1,7 @@
 import { Collection, unwrapApiData, ensureArray } from './types';
 import { getProducts, getFacets, mapDjangoProductToProduct } from './products';
 import { cleanImageUrl } from '../transformers';
+import { collectionFacets, filterCollection } from './collection-query';
 
 export interface CollectionProductsResult {
   title: string;
@@ -18,7 +19,7 @@ export interface CollectionProductsResult {
 export async function getAllCollections(_first: number = 250): Promise<Collection[]> {
   const isServer = typeof window === 'undefined';
   const isDocker = process.env.WATCHPACK_POLLING === "true";
-  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000';
 
   try {
     const res = await fetch(`${API_URL}/api/shop/collections/`, {
@@ -81,7 +82,7 @@ export async function getCollection(
 
   const isServer = typeof window === 'undefined';
   const isDocker = process.env.WATCHPACK_POLLING === "true";
-  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000';
 
   // 1. Try to fetch from backend collections API first
   try {
@@ -115,7 +116,7 @@ export async function getCollection(
   }
 
   // 2. Fallback to virtual collections
-  const allProducts = await getProducts(200);
+  const allProducts = await getProducts(Number.MAX_SAFE_INTEGER);
   
   const NEW_HANDLES = ["new", "new-launches", "new-arrivals"];
   const TRENDING_HANDLES = ["trending", "trending-perfumes"];
@@ -147,15 +148,16 @@ export async function getCollection(
     products = allProducts.filter(p => {
       // 1. Gender field matching (for /men, /women, /unisex, /perfumes-for-men, /perfumes-for-women)
       const gender = p.metafields?.find((m: any) => m.key === 'gender')?.value?.toLowerCase() || '';
+      const titleUnisex = p.title.toLowerCase().includes('unisex');
       if (term === 'men' || term === 'perfumes-for-men') {
-        return gender === 'men' || gender === 'male' || 
+        return titleUnisex || gender === 'men' || gender === 'male' ||
           (gender.includes('men') && !gender.includes('women'));
       }
       if (term === 'women' || term === 'perfumes-for-women') {
-        return gender === 'women' || gender === 'female' || gender.includes('women');
+        return titleUnisex || gender === 'women' || gender === 'female' || gender.includes('women');
       }
       if (term === 'unisex' || term === 'unisex-perfumes') {
-        return gender === 'unisex' || gender.includes('unisex');
+        return titleUnisex || gender === 'unisex' || gender.includes('unisex');
       }
       
       // 2. Match by productType field (e.g., /perfume, /attar, /eau-de-parfum)
@@ -217,39 +219,13 @@ export async function getCollectionProducts(
   sortKey?: string,
   reverse?: boolean
 ): Promise<CollectionProductsResult | null> {
-  const collection = await getCollection(handle, 200);
+  // Count and filter the complete collection before applying display pagination.
+  const collection = await getCollection(handle, Number.MAX_SAFE_INTEGER);
   if (!collection) return null;
 
   let products = collection.products.edges.map(e => e.node);
 
-  if (filterOptions && filterOptions.length > 0) {
-    filterOptions.forEach(filter => {
-      if (filter.tag) {
-        const tagTerm = filter.tag.toLowerCase();
-        products = products.filter(p => p.tags?.some((t: string) => t.toLowerCase() === tagTerm));
-      }
-      if (filter.price) {
-        const { min, max } = filter.price;
-        products = products.filter(p => {
-          const amt = parseFloat(p.priceRange.minVariantPrice.amount);
-          return (!min || amt >= min) && (!max || amt <= max);
-        });
-      }
-      if (filter.available !== undefined) {
-        products = products.filter(p => p.availableForSale === filter.available);
-      }
-      // Brand/vendor filter
-      if (filter.productVendor) {
-        const vendorTerm = filter.productVendor.toLowerCase();
-        products = products.filter(p => p.vendor?.toLowerCase() === vendorTerm);
-      }
-      // Product type filter  
-      if (filter.productType) {
-        const typeTerm = filter.productType.toLowerCase();
-        products = products.filter(p => p.productType?.toLowerCase() === typeTerm);
-      }
-    });
-  }
+  products = filterCollection(products, filterOptions);
 
   if (sortKey === "PRICE") {
     products.sort((a, b) => parseFloat(a.priceRange.minVariantPrice.amount) - parseFloat(b.priceRange.minVariantPrice.amount));
@@ -261,8 +237,8 @@ export async function getCollectionProducts(
     products.reverse();
   }
 
-  // Build real filter facets from the facets API
-  const facets = await getFacets();
+  // Facet counts describe this filtered collection, not the entire catalog.
+  const facets = collectionFacets(products);
   const filters: any[] = [];
   
   if (facets) {
@@ -276,7 +252,7 @@ export async function getCollectionProducts(
           id: g.value,
           label: g.value,
           count: g.count,
-          input: JSON.stringify({ tag: g.value })
+          input: JSON.stringify({ gender: g.value })
         }))
       });
     }
@@ -321,7 +297,7 @@ export async function getCollectionProducts(
           id: c.value,
           label: c.value,
           count: c.count,
-          input: JSON.stringify({ tag: c.value.toLowerCase() })
+          input: JSON.stringify({ category: c.value })
         }))
       });
     }
@@ -336,7 +312,7 @@ export async function getCollectionProducts(
           id: o.value,
           label: o.value,
           count: o.count,
-          input: JSON.stringify({ tag: o.value.toLowerCase() })
+          input: JSON.stringify({ occasion: o.value })
         }))
       });
     }
@@ -351,7 +327,7 @@ export async function getCollectionProducts(
           id: s.value,
           label: s.value,
           count: s.count,
-          input: JSON.stringify({ tag: s.value.toLowerCase() })
+          input: JSON.stringify({ season: s.value })
         }))
       });
     }
@@ -378,7 +354,7 @@ export async function getCollectionProducts(
 export async function getBanner(slug: string): Promise<any | null> {
   const isServer = typeof window === 'undefined';
   const isDocker = process.env.WATCHPACK_POLLING === "true";
-  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000';
   
   console.log(`[getBanner] Fetching banner for slug: ${slug}`);
 
@@ -408,7 +384,7 @@ export async function getBanner(slug: string): Promise<any | null> {
 export async function getCmsPage(slug: string): Promise<any | null> {
   const isServer = typeof window === 'undefined';
   const isDocker = process.env.WATCHPACK_POLLING === "true";
-  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://localhost:8000') : 'http://localhost:8000';
+  const API_URL = isServer ? (isDocker ? 'http://django:8000' : 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000';
 
   try {
     const res = await fetch(`${API_URL}/api/cms/pages/${slug}/`, {

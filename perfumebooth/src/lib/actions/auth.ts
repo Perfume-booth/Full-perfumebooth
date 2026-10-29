@@ -387,7 +387,6 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
       success: data.detail || "Verification code sent to your email.",
       email,
       otpSent: true,
-      devOtp: data.dev_otp || null,
       smtpWarning: data.smtp_warning || null
     };
   } catch {

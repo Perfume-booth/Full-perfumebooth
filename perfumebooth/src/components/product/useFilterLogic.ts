@@ -42,11 +42,6 @@ export const useFilterLogic = ({
   const [totalCount, setTotalCount] = useState(initialTotalCount || initialProducts.length);
   const [isFiltering, setIsFiltering] = useState(false);
 
-  const getProductRating = (product: Product) => {
-    const prodIdString = product.id?.toString() || "";
-    const seed = prodIdString.charCodeAt(prodIdString.length - 1) || 0;
-    return product.rating || (3.5 + (seed % 3) * 0.5);
-  };
 
   const sortProductsByAvailability = (productList: Product[], currentSortKey?: string) => {
     if (currentSortKey && 
@@ -69,7 +64,6 @@ export const useFilterLogic = ({
   const [filters, setFilters] = useState(initialFilters);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const isFirstMount = useRef(true);
   const priceDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup timers on unmount
@@ -92,19 +86,14 @@ export const useFilterLogic = ({
     const maxPrice = parseInt(searchParams.get("max") || "10000");
     const sortVal = searchParams.get("sort") || SORT_OPTIONS[0].value;
 
-    const initialGender = [...gender];
-    if (gender.length === 0 && isFirstMount.current && collectionHandle) {
-      const handleLower = collectionHandle.toLowerCase();
-      if (handleLower.includes("men") || handleLower.includes("him")) initialGender.push("Men");
-      else if (handleLower.includes("women") || handleLower.includes("her")) initialGender.push("Women");
-    }
 
     const q = searchParams.get("q") || "";
     
     setSelectedTypes(types);
     setSelectedBrands(brands);
     setSelectedAvailability(availability);
-    setSelectedGender(initialGender);
+    // Collection membership is already resolved by the backend; only apply explicit filters.
+    setSelectedGender(gender);
     setSelectedRating(rating);
     setPriceRange([minPrice, maxPrice]);
     setSort(sortVal);
@@ -116,7 +105,6 @@ export const useFilterLogic = ({
     setFilters(initialFilters);
     setTotalCount(initialTotalCount || initialProducts.length);
 
-    isFirstMount.current = false;
   }, [searchParams, collectionHandle, initialProducts, initialPageInfo, initialFilters, initialTotalCount]);
 
   const applyFilters = async (
@@ -183,16 +171,14 @@ export const useFilterLogic = ({
     });
 
     if (searchQuery) (filterOptions as any).push({ q: searchQuery });
+    if (rating !== null) filterOptions.push({ rating });
 
     const { sortKey, reverse } = getSortConfig(currentSort);
 
     try {
       const data = await getCollectionProducts(collectionHandle || 'all', 80, null as any, filterOptions, sortKey, reverse);
       if (data) {
-        let finalProducts = data.products as Product[];
-        if (rating !== null) {
-          finalProducts = finalProducts.filter(p => getProductRating(p) >= rating);
-        }
+        const finalProducts = data.products as Product[];
         setProducts(sortProductsByAvailability(finalProducts, currentSort));
         setPageInfo(data.pageInfo);
         setTotalCount(data.totalCount !== undefined ? data.totalCount : finalProducts.length);
@@ -220,15 +206,14 @@ export const useFilterLogic = ({
       initialFilters: filters
     });
 
+    if (selectedRating !== null) filterOptions.push({ rating: selectedRating });
+    if (searchQuery) filterOptions.push({ q: searchQuery });
     const { sortKey, reverse } = getSortConfig(sort);
     try {
       const data = await loadMoreCollectionProducts(collectionHandle || 'all', pageInfo.endCursor, filterOptions, sortKey, reverse);
 
       if (data) {
-        let nextProducts = (data as any).products as Product[];
-        if (selectedRating !== null) {
-          nextProducts = nextProducts.filter(p => getProductRating(p) >= selectedRating);
-        }
+        const nextProducts = (data as any).products as Product[];
         setProducts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
           const uniqueNext = nextProducts.filter(p => !existingIds.has(p.id));
@@ -251,7 +236,7 @@ export const useFilterLogic = ({
     } finally {
       setIsLoadingMore(false);
     }
-  }, [pageInfo, isLoadingMore, selectedTypes, selectedBrands, priceRange, selectedAvailability, selectedGender, collectionHandle, sort, selectedRating, filters]);
+  }, [pageInfo, isLoadingMore, selectedTypes, selectedBrands, priceRange, selectedAvailability, selectedGender, collectionHandle, sort, selectedRating, filters, searchQuery]);
 
   const toggleType = (type: string) => {
     const isSelected = selectedTypes.some(t => t.toLowerCase() === type.toLowerCase());

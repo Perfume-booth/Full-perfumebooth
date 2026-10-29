@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  skipTrailingSlashRedirect: true,
   allowedDevOrigins: [
     '192.168.31.168',
     '192.168.31.168:3001',
@@ -39,10 +40,16 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
+    const backend = (process.env.DJANGO_API_ORIGIN ||
+      (process.env.WATCHPACK_POLLING === 'true' ? 'http://django:8000' : 'http://127.0.0.1:8000')).replace(/\/$/, '');
     return [
       {
+        source: '/api/:path*',
+        destination: `${backend}/api/:path*/`
+      },
+      {
         source: '/media/:path*',
-        destination: 'http://localhost:8000/media/:path*'
+        destination: `${backend}/media/:path*`
       }
     ];
   }

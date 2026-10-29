@@ -56,7 +56,6 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
   const [forgotStep, setForgotStep] = useState<"request" | "verify">("request");
   const [resetEmail, setResetEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -81,10 +80,6 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
       setError(result.error);
     } else {
       setSuccess("A new 6-digit verification code has been sent to your email.");
-      if (result.devOtp) {
-        setDevOtp(result.devOtp);
-        setOtp(result.devOtp);
-      }
       setResendCooldown(60);
     }
   };
@@ -115,7 +110,6 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
     setMode(newMode);
     setForgotStep("request");
     setOtp("");
-    setDevOtp(null);
     setError(null);
     setSuccess(null);
     onModeChange?.(newMode);
@@ -125,7 +119,6 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
     setMode(type);
     setForgotStep("request");
     setOtp("");
-    setDevOtp(null);
     setError(null);
     setSuccess(null);
   }, [type]);
@@ -238,8 +231,7 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
         } else {
           const emailInput = ((formData.get("email") as string) || "").trim().toLowerCase();
           setResetEmail(emailInput);
-          setOtp(result.devOtp || "");
-          setDevOtp(result.devOtp || null);
+          setOtp("");
           setForgotStep("verify");
           setSuccess(typeof result.success === "string" ? result.success : "A 6-digit verification code has been sent to your email.");
           setResendCooldown(60);
@@ -372,7 +364,6 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
                 onClick={() => {
                   setForgotStep("request");
                   setOtp("");
-                  setDevOtp(null);
                   setError(null);
                   setSuccess(null);
                 }}
@@ -382,21 +373,6 @@ function CloudWatchFormInner({ type = "signin", returnUrl = "/account", onModeCh
               </button>
             </div>
 
-            {devOtp && (
-              <div className="pt-2 border-t border-neutral-200 flex items-center justify-between bg-amber-50/90 -mx-3 -mb-3 p-2.5 rounded-b-2xl border-amber-200">
-                <div className="text-[11px] text-amber-900 flex items-center gap-1.5">
-                  <span className="font-bold uppercase tracking-wider text-[9px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-mono">Dev Mode</span>
-                  <span>Code: <strong className="font-mono text-sm tracking-widest text-[var(--color-maroon)]">{devOtp}</strong></span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOtp(devOtp)}
-                  className="text-[10px] font-bold text-[var(--color-maroon)] hover:text-black underline uppercase tracking-wider"
-                >
-                  Auto-fill
-                </button>
-              </div>
-            )}
           </div>
         )}
 

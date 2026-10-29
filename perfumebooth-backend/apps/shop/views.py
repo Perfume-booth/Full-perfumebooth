@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 from .models import Product, Inventory, ProductImage, Collection, AutoCollection, WishlistItem, ProductReview, ProductImportJob
 from .product_imports import apply_preview, create_preview
+from .collection_membership import collection_products
 # pyrefly: ignore [missing-import]
 from django.utils.text import slugify
 # pyrefly: ignore [missing-import]
@@ -181,10 +182,10 @@ class CollectionListCreateView(APIView):
                 'description': col.description or '',
                 'image': image_url,
                 'match_type': col.collection_type,
-                'match_value': '',
+                'match_value': col.name if col.collection_type != 'manual' else '',
                 'is_active': col.status == 'active',
                 'sort_order': 0,
-                'product_count': col.products.count(),
+                'product_count': collection_products(col).count(),
                 'products': [str(p.id) for p in col.products.all()],
                 'excluded_products': col.excluded_products or []
             })
@@ -345,33 +346,9 @@ class CollectionDetailView(APIView):
         if not is_merchant and col.status != 'active':
             return Response({'detail': 'Collection not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        cache_key = f'catalog:collection:{slug}:merchant:{is_merchant}'
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
         image_url = request.build_absolute_uri(col.image.url) if col.image else None
         
-        if col.collection_type == 'manual':
-            products_qs = col.products.filter(is_online=True)
-        else:
-            base = Product.objects.filter(is_online=True)
-            val = col.name
-            if col.collection_type == 'gender':
-                products_qs = base.filter(attributes__gender__iexact=val)
-            elif col.collection_type == 'brand':
-                products_qs = base.filter(attributes__brand__iexact=val)
-            elif col.collection_type == 'category':
-                products_qs = base.filter(attributes__category__iexact=val)
-            elif col.collection_type == 'type':
-                products_qs = base.filter(attributes__productType__iexact=val)
-            elif col.collection_type == 'note':
-                products_qs = base.filter(attributes__tags__contains=[val])
-            else:
-                products_qs = base.none()
-
-        if col.excluded_products:
-            products_qs = products_qs.exclude(id__in=col.excluded_products)
+        products_qs = collection_products(col).prefetch_related('images', 'variants')
 
         products_data = [flatten_product(p, request) for p in products_qs]
 
@@ -386,10 +363,11 @@ class CollectionDetailView(APIView):
             'is_active': col.status == 'active',
             'sort_order': 0,
             'products': products_data,
+            'product_count': len(products_data),
             'manual_product_ids': [str(p.id) for p in col.products.all()] if col.collection_type == 'manual' else [],
             'excluded_products': col.excluded_products or []
         }
-        cache.set(cache_key, data, timeout=7200)  # Cache 2 hours
+        # Membership changes must be reflected immediately, including slug aliases.
         return Response(data)
 
     def put(self, request, slug):

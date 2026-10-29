@@ -1,15 +1,14 @@
 import { useAuthStore } from '@/store/useAuthStore';
 
 export function getApiBaseUrl(): string {
-  if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
-  }
+  // Keep browser cookies and CSRF on the MPS origin; Next proxies to Django.
+  if (typeof window !== 'undefined') return '/api';
   let url = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
   url = url.replace(/\/$/, '');
   if (!url.endsWith('/api')) {
     url = `${url}/api`;
   }
-  return url;
+  return url.replace('://localhost:', '://127.0.0.1:');
 }
 
 export function formatProductImageUrl(url?: string | null): string {

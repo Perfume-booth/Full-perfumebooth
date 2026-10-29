@@ -389,6 +389,8 @@ export default function SideFilter({
     const id = f.id.toLowerCase();
     const label = f.label.toLowerCase();
     return !id.includes("vendor") && label !== "brand" &&
+           !id.includes("season") && !label.includes("season") &&
+           !id.includes("occasion") && !label.includes("occasion") &&
            !id.includes("product_type") && !label.includes("type") && !label.includes("category") &&
            !id.includes("available") && !label.includes("availability") &&
            !id.includes("price") && !label.includes("price") &&
