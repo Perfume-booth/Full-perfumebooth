@@ -42,10 +42,6 @@ export default async function FaqPage() {
             © {new Date().getFullYear()} PerfumeBooth Pvt. Ltd. All rights
             reserved.
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-gold)] inline-block" />
-            Protected by industry-standard encryption
-          </span>
         </div>
       </div>
     </main>
