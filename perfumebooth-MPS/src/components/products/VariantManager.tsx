@@ -11,7 +11,7 @@ import {
   EyeOff,
   Package,
   Barcode,
-  DollarSign,
+  IndianRupee,
   Boxes,
   Maximize2,
   Minimize2,

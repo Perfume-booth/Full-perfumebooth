@@ -12,6 +12,7 @@ import {
   UserX, 
   MoreVertical, 
   ChevronRight,
+  ChevronLeft,
   Loader2,
   Tag,
   Calendar
@@ -41,6 +42,17 @@ interface Metrics {
   average_order_value: string;
 }
 
+const normalizeTags = (tags: unknown): string[] => {
+  if (!tags) return [];
+  if (Array.isArray(tags)) {
+    return tags.flatMap(t => (typeof t === 'string' && t.includes(',') ? t.split(',').map(s => s.trim()).filter(Boolean) : [String(t).trim()])).filter(Boolean);
+  }
+  if (typeof tags === 'string') {
+    return tags.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({
@@ -50,6 +62,13 @@ export default function CustomersPage() {
     average_order_value: '0.00',
   });
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    total_count: 0,
+    total_pages: 1,
+    has_next: false,
+    has_prev: false,
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,11 +80,18 @@ export default function CustomersPage() {
       const params = new URLSearchParams();
       if (searchQuery) params.append('q', searchQuery);
       if (statusFilter !== 'all') params.append('status', statusFilter);
+      params.append('page', String(page));
+      params.append('page_size', '50');
 
       const data = await apiFetch(`/auth/merchant/customers/?${params.toString()}`);
       if (data) {
-        setCustomers(data.customers || []);
+        const rawCustomers: Customer[] = data.customers || [];
+        setCustomers(rawCustomers.map(c => ({
+          ...c,
+          tags: normalizeTags(c.tags),
+        })));
         if (data.metrics) setMetrics(data.metrics);
+        if (data.pagination) setPagination(data.pagination);
       }
     } catch (err) {
       console.error('Error fetching customer directory:', err);
@@ -74,9 +100,14 @@ export default function CustomersPage() {
     }
   };
 
+  // Reset to page 1 on query/filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter]);
+
   useEffect(() => {
     fetchCustomers();
-  }, [searchQuery, statusFilter]);
+  }, [page, searchQuery, statusFilter]);
 
   const toggleCustomerStatus = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -93,7 +124,7 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 md:p-8 space-y-6 mx-auto">
       
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -123,7 +154,7 @@ export default function CustomersPage() {
           </div>
           <div>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Customers</p>
-            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">{metrics.total_customers}</h3>
+            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">{metrics.total_customers.toLocaleString()}</h3>
           </div>
         </div>
 
@@ -133,7 +164,7 @@ export default function CustomersPage() {
           </div>
           <div>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active Customers</p>
-            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">{metrics.active_customers}</h3>
+            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">{metrics.active_customers.toLocaleString()}</h3>
           </div>
         </div>
 
@@ -143,7 +174,7 @@ export default function CustomersPage() {
           </div>
           <div>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Revenue (LTV)</p>
-            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">₹{metrics.total_ltv}</h3>
+            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">₹{parseFloat(metrics.total_ltv || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
           </div>
         </div>
 
@@ -153,7 +184,7 @@ export default function CustomersPage() {
           </div>
           <div>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Avg Order Value</p>
-            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">₹{metrics.average_order_value}</h3>
+            <h3 className="text-2xl font-extrabold text-foreground mt-0.5">₹{parseFloat(metrics.average_order_value || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
           </div>
         </div>
       </div>
@@ -234,16 +265,20 @@ export default function CustomersPage() {
                           <p className="font-bold text-foreground group-hover:text-primary transition-colors">
                             {c.full_name}
                           </p>
-                          {c.tags && c.tags.length > 0 && (
-                            <div className="flex items-center gap-1 mt-1">
-                              {c.tags.slice(0, 2).map((tag, idx) => (
-                                <span key={idx} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold neu-inset-sm text-muted-foreground">
-                                  <Tag className="w-2.5 h-2.5" />
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const tagsList = normalizeTags(c.tags);
+                            if (!tagsList.length) return null;
+                            return (
+                              <div className="flex items-center gap-1 mt-1">
+                                {tagsList.slice(0, 2).map((tag, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold neu-inset-sm text-muted-foreground">
+                                    <Tag className="w-2.5 h-2.5" />
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </Link>
                     </td>
@@ -260,7 +295,7 @@ export default function CustomersPage() {
                     </td>
 
                     <td className="py-4 px-4 text-right font-extrabold text-foreground">
-                      ₹{c.lifetime_value}
+                      ₹{parseFloat(c.lifetime_value || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
 
                     <td className="py-4 px-4">
@@ -327,6 +362,45 @@ export default function CustomersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Footer */}
+        {!loading && customers.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 border-t border-border/10 bg-card/50">
+            <p className="text-xs font-bold text-muted-foreground">
+              Showing <span className="font-extrabold text-foreground">{((page - 1) * 50) + 1}</span> to{' '}
+              <span className="font-extrabold text-foreground">
+                {Math.min(page * 50, pagination.total_count || customers.length)}
+              </span>{' '}
+              of <span className="font-extrabold text-foreground">{(pagination.total_count || customers.length).toLocaleString()}</span> customers
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Previous</span>
+              </button>
+
+              <span className="text-xs font-black px-3.5 py-2 rounded-xl neu-inset-sm text-foreground">
+                Page {page} of {pagination.total_pages || 1}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPage(p => p + 1)}
+                disabled={page >= (pagination.total_pages || 1)}
+                className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>

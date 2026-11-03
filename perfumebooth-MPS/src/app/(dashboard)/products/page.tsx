@@ -26,7 +26,9 @@ import {
   FileSpreadsheet,
   Wand2,
   Package,
-  FolderPlus
+  FolderPlus,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Product {
@@ -931,6 +933,19 @@ export default function ProductsPage() {
     );
     return matchesSearch && matchesBrand && matchesStatus && matchesStock && matchesForm && matchesCollection;
   });
+
+  const [productPage, setProductPage] = useState(1);
+  const PRODUCT_PAGE_SIZE = 50;
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [search, filterBrand, filterStatus, filterStock, filterForm, filterCollection]);
+
+  const totalProductPages = Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE) || 1;
+  const paginatedProducts = filteredProducts.slice(
+    (productPage - 1) * PRODUCT_PAGE_SIZE,
+    productPage * PRODUCT_PAGE_SIZE
+  );
 
   if (modalOpen) {
     return (
@@ -2004,12 +2019,14 @@ export default function ProductsPage() {
                   <th className="p-5 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredProducts.length > 0 && selectedSlugs.length === filteredProducts.length}
+                      checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedSlugs.includes(p.slug))}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedSlugs(filteredProducts.map(p => p.slug));
+                          const newSlugs = Array.from(new Set([...selectedSlugs, ...paginatedProducts.map(p => p.slug)]));
+                          setSelectedSlugs(newSlugs);
                         } else {
-                          setSelectedSlugs([]);
+                          const pageSlugs = new Set(paginatedProducts.map(p => p.slug));
+                          setSelectedSlugs(selectedSlugs.filter(s => !pageSlugs.has(s)));
                         }
                       }}
                       className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
@@ -2033,7 +2050,7 @@ export default function ProductsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product) => {
+                  paginatedProducts.map((product) => {
                     const isHighlighted = highlightSlug === product.slug;
                     return (
                       <tr
@@ -2081,6 +2098,8 @@ export default function ProductsPage() {
                             <img
                               src={displayUrl}
                               alt={product.title}
+                              loading="lazy"
+                              decoding="async"
                               className="w-12 h-12 object-cover rounded-xl neu-extruded-sm border border-border/20 bg-black"
                             />
                           );
@@ -2281,6 +2300,45 @@ export default function ProductsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Footer */}
+          {!loading && filteredProducts.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 border-t border-border/10 bg-card/50">
+              <p className="text-xs font-bold text-muted-foreground">
+                Showing <span className="font-extrabold text-foreground">{((productPage - 1) * PRODUCT_PAGE_SIZE) + 1}</span> to{' '}
+                <span className="font-extrabold text-foreground">
+                  {Math.min(productPage * PRODUCT_PAGE_SIZE, filteredProducts.length)}
+                </span>{' '}
+                of <span className="font-extrabold text-foreground">{filteredProducts.length.toLocaleString()}</span> products
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProductPage(p => Math.max(1, p - 1))}
+                  disabled={productPage === 1}
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
+                </button>
+
+                <span className="text-xs font-black px-3.5 py-2 rounded-xl neu-inset-sm text-foreground">
+                  Page {productPage} of {totalProductPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setProductPage(p => Math.min(p + 1, totalProductPages))}
+                  disabled={productPage >= totalProductPages}
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {bulkEditOpen && (

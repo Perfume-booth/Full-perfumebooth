@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,19 @@ export default function CartPageClient() {
 
   const [couponInput, setCouponInput] = useState(couponCode || "");
   const [couponMsg, setCouponMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/coupons/active')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.coupons && Array.isArray(data.coupons)) {
+          setAvailableCoupons(data.coupons);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const subtotal = subtotalAmount > 0 ? subtotalAmount : cartTotal();
   const discountAmt = subtotalAmount > 0 ? storeDiscountAmount : (subtotal * couponDiscount) / 100;
@@ -55,14 +67,16 @@ export default function CartPageClient() {
   }, 0);
   const productDiscount = Math.max(0, totalMRP - subtotal);
 
-  const handleApplyCoupon = async () => {
-    const upper = couponInput.trim().toUpperCase();
+  const handleApplyCoupon = async (codeToApply?: string) => {
+    const upper = (codeToApply ?? couponInput).trim().toUpperCase();
     if (!upper) {
       await applyCoupon("");
-      setCouponMsg({ type: "success", text: "Coupon cleared." });
+      setCouponInput("");
+      setCouponMsg({ type: "success", text: "Coupon removed." });
       setTimeout(() => setCouponMsg(null), 4000);
       return;
     }
+    setCouponInput(upper);
     const success = await applyCoupon(upper);
     if (success) {
       const state = useCartStore.getState();
@@ -108,7 +122,7 @@ export default function CartPageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] pt-28">
+    <main className="min-h-screen bg-[var(--color-bg)] pt-24 md:pt-36 lg:pt-40">
       <div className="max-w-[1280px] mx-auto px-4 lg:px-8 py-6">
 
         {/* Page Title */}
@@ -296,6 +310,97 @@ export default function CartPageClient() {
           {/* ──── RIGHT: Price Summary ──── */}
           <aside className="space-y-4">
 
+            {/* Coupons & Promo Codes Card */}
+            <div className="bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <AnimatedBadgePercent size={18} className="text-[var(--color-gold)]" />
+                <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wider">
+                  Coupons & Offers
+                </h3>
+              </div>
+
+              {couponCode ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono font-bold text-xs bg-emerald-800 text-white px-2 py-0.5 rounded tracking-wider">
+                      {couponCode}
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">Coupon Applied!</p>
+                      <p className="text-[11px] text-emerald-700">You saved {formatPrice(discountAmt)}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCoupon("")}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="ENTER COUPON CODE"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                      className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs font-semibold uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-[var(--color-gold)]"
+                    />
+                    <button
+                      type="button"
+                      disabled={isApplyingDiscount || !couponInput.trim()}
+                      onClick={() => handleApplyCoupon()}
+                      className="px-4 py-2 bg-[#1a1410] hover:bg-[var(--color-gold)] text-white text-xs font-bold uppercase tracking-wider rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {isApplyingDiscount ? "Applying..." : "Apply"}
+                    </button>
+                  </div>
+
+                  {couponMsg && (
+                    <p className={`text-xs font-medium ${couponMsg.type === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {couponMsg.text}
+                    </p>
+                  )}
+
+                  {/* Available Public Offers List */}
+                  {availableCoupons.length > 0 && (
+                    <div className="pt-2 border-t border-dashed border-gray-200 space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Available Offers</p>
+                      {availableCoupons.map((c) => (
+                        <div
+                          key={c.code}
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-[#faf8f5] border border-[#ede8e0] hover:border-[#b8924a]/50 transition-all"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-[11px] text-[#1a1410] bg-white px-1.5 py-0.5 rounded border border-[#ede8e0] tracking-wider">
+                                {c.code}
+                              </span>
+                              {c.first_order_only && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-[#b8924a] bg-[#b8924a]/10 px-1 rounded">
+                                  First Order
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-gray-600 font-medium">{c.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyCoupon(c.code)}
+                            className="text-xs font-bold text-[#b8924a] hover:text-[#1a1410] hover:underline uppercase tracking-wider cursor-pointer pl-2 shrink-0"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Price Breakdown */}
             <div className="bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06)] p-5">

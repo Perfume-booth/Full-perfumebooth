@@ -7,6 +7,7 @@ import logging
 import random
 import uuid
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -69,18 +70,30 @@ class OrderListView(APIView):
     def get(self, request):
         is_merchant = check_is_merchant(request.user)
 
-        orders_query = Order.objects.prefetch_related('items__product__images', 'items__variant', 'shipments').all()
+        orders_query = Order.objects.select_related('user').prefetch_related('items__product__images', 'items__variant', 'shipments').order_by('-created_at')
         if not is_merchant:
             orders_query = orders_query.filter(user=request.user)
 
+        orders_list = list(orders_query)
+
+        # Pre-resolve unlinked order item SKUs in 2 batch queries to eliminate N+1 query storms
+        missing_skus = {item.sku for o in orders_list for item in o.items.all() if not item.product and item.sku}
+        sku_cache = {}
+        if missing_skus:
+            variants = {v.sku: (v, v.product) for v in ProductVariant.objects.filter(sku__in=missing_skus).select_related('product')}
+            remaining_skus = missing_skus - set(variants.keys())
+            products = {p.sku: (None, p) for p in Product.objects.filter(sku__in=remaining_skus)}
+            sku_cache = {**variants, **products}
+
         data = []
-        for order in orders_query:
+        for order in orders_list:
             order_items = list(order.items.all())
             item_qty = sum(item.quantity for item in order_items)
             
             shipping = order.shipping_address or {}
             delivery_method = shipping.get('shipping_carrier', 'Standard Shipping')
-            latest_shipment = order.shipments.first()
+            shipments = list(order.shipments.all())
+            latest_shipment = shipments[0] if shipments else None
                 
             fulfillment_status = "Unfulfilled"
             if order.status == 'Shipped':
@@ -115,7 +128,7 @@ class OrderListView(APIView):
                 'delivery_method': latest_shipment.courier_name if latest_shipment and latest_shipment.courier_name else delivery_method,
                 'payment_method': order.payment_method,
                 'currency': order.currency,
-                'items': [serialize_order_item(item, request=request) for item in order_items],
+                'items': [serialize_order_item(item, request=request, sku_cache=sku_cache) for item in order_items],
             })
             
         return Response(data)
@@ -132,21 +145,28 @@ class OrderListView(APIView):
 
 
 
-def serialize_order_item(item, request=None):
+def serialize_order_item(item, request=None, sku_cache=None):
     """Serializes a single order item with resilient image and product resolution."""
     product = item.product
     variant = item.variant
 
     if not product and item.sku:
-        try:
-            variant_obj = ProductVariant.objects.select_related('product').filter(sku=item.sku).first()
-            if variant_obj:
-                variant = variant or variant_obj
-                product = variant_obj.product
-            else:
-                product = Product.objects.filter(sku=item.sku).first()
-        except Exception:
-            pass
+        if sku_cache is not None and item.sku in sku_cache:
+            v_cached, p_cached = sku_cache[item.sku]
+            variant = variant or v_cached
+            product = product or p_cached
+        else:
+            try:
+                variant_obj = ProductVariant.objects.select_related('product').filter(sku=item.sku).first()
+                if variant_obj:
+                    variant = variant or variant_obj
+                    product = variant_obj.product
+                else:
+                    product = Product.objects.filter(sku=item.sku).first()
+                if sku_cache is not None:
+                    sku_cache[item.sku] = (variant, product)
+            except Exception:
+                pass
 
     prod_img = None
     if variant and getattr(variant, 'image', None):
@@ -163,7 +183,8 @@ def serialize_order_item(item, request=None):
 
     if not prod_img and product and hasattr(product, 'images'):
         try:
-            first_img_obj = product.images.first()
+            images_list = list(product.images.all())
+            first_img_obj = images_list[0] if images_list else None
             if first_img_obj:
                 if getattr(first_img_obj, 'image', None):
                     try:
@@ -1277,4 +1298,40 @@ class PublicActivePromotionsView(APIView):
             for p in active_promos
         ]
         return Response({'promotions': data})
+
+
+class PublicActiveCouponsView(APIView):
+    """
+    GET /api/orders/coupons/active/
+    Public endpoint providing active promo codes and available coupons for storefront display.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .models import Coupon
+        from django.utils import timezone
+        now = timezone.now()
+        coupons = Coupon.objects.filter(is_active=True).filter(
+            Q(start_date__isnull=True) | Q(start_date__lte=now)
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=now)
+        ).order_by('-discount_value')
+
+        data = []
+        for c in coupons:
+            # Skip if restricted to specific secret emails or usage limit reached
+            if c.customer_restrictions and len(c.customer_restrictions) > 0:
+                continue
+            if c.usage_limit is not None and c.times_used >= c.usage_limit:
+                continue
+            data.append({
+                'code': c.code,
+                'description': c.description or (f"{c.discount_value}% OFF on your order" if c.discount_type == 'percentage' else f"Flat ₹{c.discount_value} OFF"),
+                'discount_type': c.discount_type,
+                'discount_value': float(c.discount_value),
+                'min_order_value': float(c.min_order_value) if c.min_order_value else 0.0,
+                'max_discount': float(c.max_discount) if c.max_discount else None,
+                'first_order_only': c.first_order_only,
+            })
+        return Response({'coupons': data})
 

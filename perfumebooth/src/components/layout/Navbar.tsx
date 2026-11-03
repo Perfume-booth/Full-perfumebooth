@@ -52,6 +52,25 @@ export default function Navbar({ initialBrands = [] }: { initialBrands?: string[
   const [logoutError, setLogoutError] = useState("");
   const pathname = usePathname();
   const [brands, setBrands] = useState<string[]>(initialBrands);
+  const [activePromo, setActivePromo] = useState<{
+    code: string;
+    discount_value: string;
+    discount_type: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/coupons/active")
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data?.coupons || []);
+        if (Array.isArray(list) && list.length > 0) {
+          setActivePromo(list[0]);
+        } else {
+          setActivePromo(null);
+        }
+      })
+      .catch(() => setActivePromo(null));
+  }, []);
 
   useEffect(() => {
     fetch("/api/brands")
@@ -126,12 +145,9 @@ export default function Navbar({ initialBrands = [] }: { initialBrands?: string[
     <header
       className={cn(
         "fixed top-0 left-0 right-0 z-[100] transition-shadow duration-300",
-        isScrolled && "shadow-[0_2px_24px_rgba(26,20,16,0.09)]"
+        isScrolled && "shadow-[0_2px_24px_rgba(26,20,16,0.09)]" 
       )}
     >
-      {/* ── Gold top rule ── */}
-      <div className="w-full" style={{ background: `linear-gradient(90deg,transparent,${GOLD} 30%,${GOLD_LIGHT} 70%,transparent)` }} />
-
       {/* ══════════════════════════════════════════════════════════
           DESKTOP — ROW 1: Logo · Nav · [spacer] · Deliver To
       ══════════════════════════════════════════════════════════ */}

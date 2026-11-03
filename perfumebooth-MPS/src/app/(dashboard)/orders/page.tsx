@@ -11,6 +11,9 @@ import {
   CheckCircle2,
   XCircle,
   Layers,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface OrderSummary {
@@ -62,9 +65,10 @@ export default function OrdersPage() {
 
   const counts = {
     all: orderList.length,
-    processing: orderList.filter(o => (o.fulfillment_status || o.status)?.toLowerCase() === 'processing').length,
+    processing: orderList.filter(o => ['processing', 'paid'].includes((o.fulfillment_status || o.status)?.toLowerCase())).length,
     shipped: orderList.filter(o => (o.fulfillment_status || o.status)?.toLowerCase() === 'shipped').length,
     delivered: orderList.filter(o => (o.fulfillment_status || o.status)?.toLowerCase() === 'delivered').length,
+    pending: orderList.filter(o => (o.fulfillment_status || o.status)?.toLowerCase() === 'pending').length,
     cancelled: orderList.filter(o => (o.fulfillment_status || o.status)?.toLowerCase() === 'cancelled').length,
   };
 
@@ -76,8 +80,21 @@ export default function OrdersPage() {
     if (!matchesSearch) return false;
     if (deliveryStatus === 'all') return true;
     const currentStatus = (o.fulfillment_status || o.status)?.toLowerCase();
+    if (deliveryStatus === 'processing') {
+      return currentStatus === 'processing' || currentStatus === 'paid';
+    }
     return currentStatus === deliveryStatus.toLowerCase();
   });
+
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, deliveryStatus]);
+
+  const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE) || 1;
+  const paginatedOrders = filteredOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-8">
@@ -104,9 +121,10 @@ export default function OrdersPage() {
         <div className="flex items-center gap-1.5 p-1.5 neu-inset-sm rounded-2xl overflow-x-auto shrink-0">
           {[
             { id: 'all', label: 'All Orders', icon: Layers, count: counts.all },
-            { id: 'processing', label: 'Processing', icon: Clock, count: counts.processing },
+            { id: 'processing', label: 'Processing & Paid', icon: Clock, count: counts.processing },
             { id: 'shipped', label: 'Shipped', icon: Truck, count: counts.shipped },
             { id: 'delivered', label: 'Delivered', icon: CheckCircle2, count: counts.delivered },
+            { id: 'pending', label: 'Pending Payment', icon: AlertCircle, count: counts.pending },
             { id: 'cancelled', label: 'Cancelled', icon: XCircle, count: counts.cancelled },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -168,7 +186,7 @@ export default function OrdersPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => (
+                  paginatedOrders.map((order) => (
                     <tr key={order.id} className="hover:bg-primary/[0.03] transition duration-150">
                       <td className="p-5">
                         <Link
@@ -243,6 +261,45 @@ export default function OrdersPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Footer */}
+          {!loading && filteredOrders.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 border-t border-border/10 bg-card/50">
+              <p className="text-xs font-bold text-muted-foreground">
+                Showing <span className="font-extrabold text-foreground">{((page - 1) * PAGE_SIZE) + 1}</span> to{' '}
+                <span className="font-extrabold text-foreground">
+                  {Math.min(page * PAGE_SIZE, filteredOrders.length)}
+                </span>{' '}
+                of <span className="font-extrabold text-foreground">{filteredOrders.length.toLocaleString()}</span> orders
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
+                </button>
+
+                <span className="text-xs font-black px-3.5 py-2 rounded-xl neu-inset-sm text-foreground">
+                  Page {page} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                  disabled={page >= totalPages}
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

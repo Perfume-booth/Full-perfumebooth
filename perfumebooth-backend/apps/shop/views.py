@@ -31,7 +31,8 @@ from django.db.models import Sum, Count, Q, Avg, F
 from .services import CollectionSyncService
 # pyrefly: ignore [missing-import]
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+import zoneinfo
 import random
 # pyrefly: ignore [missing-import]
 from apps.orders.models import Order, OrderItem
@@ -68,21 +69,141 @@ class DashboardAnalyticsView(APIView):
     allowed_roles = ['Super Admin', 'Admin', 'E-commerce Executive']
 
     def get(self, request):
-        # 1. Total Revenue (Paid, Processing, Shipped, Delivered status orders)
+        TZ_IST = zoneinfo.ZoneInfo('Asia/Kolkata')
+        now_ist = timezone.now().astimezone(TZ_IST)
+        today_ist = now_ist.date()
+        yesterday_ist = today_ist - timedelta(days=1)
+
+        start_of_today = datetime.combine(today_ist, time.min, tzinfo=TZ_IST)
+        end_of_today = datetime.combine(today_ist, time.max, tzinfo=TZ_IST)
+
+        start_of_yesterday = datetime.combine(yesterday_ist, time.min, tzinfo=TZ_IST)
+        end_of_yesterday = datetime.combine(yesterday_ist, time.max, tzinfo=TZ_IST)
+
         revenue_states = [Order.Status.PAID, Order.Status.PROCESSING, Order.Status.SHIPPED, Order.Status.DELIVERED]
-        orders_query = Order.objects.filter(status__in=revenue_states)
-        
-        total_revenue = orders_query.aggregate(total=Sum('total'))['total'] or 0.00
-        total_orders_count = orders_query.count()
+        valid_orders_q = Q(status__in=[Order.Status.PAID, Order.Status.PROCESSING, Order.Status.SHIPPED, Order.Status.DELIVERED, Order.Status.PENDING]) & ~Q(status=Order.Status.CANCELLED)
 
-        # 2. Average Order Value (AOV)
-        aov = float(total_revenue) / total_orders_count if total_orders_count > 0 else 0.00
+        # 1. Today's live sales and orders in Asia/Kolkata IST
+        today_orders = Order.objects.filter(valid_orders_q, created_at__range=(start_of_today, end_of_today))
+        today_sales = today_orders.filter(status__in=revenue_states).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        today_orders_count = today_orders.count()
+        today_aov = float(today_sales) / today_orders_count if today_orders_count > 0 else 0.00
 
-        # 3. Active Customers (unique user IDs)
-        active_customers = orders_query.values('user').distinct().count()
+        # Yesterday's metrics for real comparison
+        yesterday_orders = Order.objects.filter(valid_orders_q, created_at__range=(start_of_yesterday, end_of_yesterday))
+        yesterday_sales = yesterday_orders.filter(status__in=revenue_states).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        yesterday_orders_count = yesterday_orders.count()
 
-        # 4. Low Stock Products (Inventory <= 10)
-        low_stock_items = Inventory.objects.filter(stock_level__lte=10).select_related('product')
+        if yesterday_sales > 0:
+            sales_pct = ((today_sales - yesterday_sales) / yesterday_sales) * 100
+            today_sales_change = f"{sales_pct:+.1f}%"
+            today_sales_pos = sales_pct >= 0
+        else:
+            today_sales_change = "+100%" if today_sales > 0 else "0.0%"
+            today_sales_pos = today_sales >= 0
+
+        if yesterday_orders_count > 0:
+            orders_pct = ((today_orders_count - yesterday_orders_count) / yesterday_orders_count) * 100
+            today_orders_change = f"{orders_pct:+.1f}%"
+            today_orders_pos = orders_pct >= 0
+        else:
+            today_orders_change = "+100%" if today_orders_count > 0 else "0.0%"
+            today_orders_pos = today_orders_count >= 0
+
+        # 2. Lifetime & Range-Aware Overview
+        range_param = request.query_params.get('range', '7d').lower()
+
+        lifetime_orders = Order.objects.filter(valid_orders_q)
+        lifetime_rev_orders = lifetime_orders.filter(status__in=revenue_states)
+        lifetime_revenue = lifetime_rev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        lifetime_orders_count = lifetime_rev_orders.count()
+        lifetime_aov = float(lifetime_revenue) / lifetime_orders_count if lifetime_orders_count > 0 else 0.00
+        lifetime_customers = lifetime_orders.values('user').exclude(user__isnull=True).distinct().count() or lifetime_orders.values('customer_email').distinct().count()
+
+        if range_param == 'today':
+            range_orders = Order.objects.filter(valid_orders_q, created_at__range=(start_of_today, end_of_today))
+            range_rev_orders = range_orders.filter(status__in=revenue_states)
+            total_revenue = range_rev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+            total_orders_count = range_rev_orders.count()
+            aov = float(total_revenue) / total_orders_count if total_orders_count > 0 else 0.00
+            active_customers = range_rev_orders.values('customer_email').distinct().count()
+            rev_change = today_sales_change
+            rev_pos = today_sales_pos
+            ord_change = today_orders_change
+            ord_pos = today_orders_pos
+            subtitle_suffix = 'Today vs yesterday'
+
+        elif range_param == '30d':
+            start_30d = datetime.combine(today_ist - timedelta(days=30), time.min, tzinfo=TZ_IST)
+            start_prev_30d = datetime.combine(today_ist - timedelta(days=60), time.min, tzinfo=TZ_IST)
+            range_orders = Order.objects.filter(valid_orders_q, created_at__gte=start_30d, created_at__lte=end_of_today)
+            range_rev_orders = range_orders.filter(status__in=revenue_states)
+            total_revenue = range_rev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+            total_orders_count = range_rev_orders.count()
+            aov = float(total_revenue) / total_orders_count if total_orders_count > 0 else 0.00
+            active_customers = range_rev_orders.values('customer_email').distinct().count()
+
+            prev_rev_orders = Order.objects.filter(status__in=revenue_states, created_at__gte=start_prev_30d, created_at__lt=start_30d)
+            prev_rev = prev_rev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+            prev_cnt = prev_rev_orders.count()
+            if prev_rev > 0:
+                pct = ((total_revenue - prev_rev) / prev_rev) * 100
+                rev_change = f"{pct:+.1f}%"
+                rev_pos = pct >= 0
+            else:
+                rev_change = "+100%" if total_revenue > 0 else "0.0%"
+                rev_pos = total_revenue >= 0
+            if prev_cnt > 0:
+                pct = ((total_orders_count - prev_cnt) / prev_cnt) * 100
+                ord_change = f"{pct:+.1f}%"
+                ord_pos = pct >= 0
+            else:
+                ord_change = "+100%" if total_orders_count > 0 else "0.0%"
+                ord_pos = total_orders_count >= 0
+            subtitle_suffix = 'Last 30 days vs prev 30d'
+
+        elif range_param in ['all', 'all-time', '365d']:
+            total_revenue = lifetime_revenue
+            total_orders_count = lifetime_orders_count
+            aov = lifetime_aov
+            active_customers = lifetime_customers
+            rev_change = 'Confirmed'
+            rev_pos = True
+            ord_change = 'Delivered'
+            ord_pos = True
+            subtitle_suffix = 'All-time lifetime totals'
+
+        else: # Default '7d'
+            start_7d = datetime.combine(today_ist - timedelta(days=7), time.min, tzinfo=TZ_IST)
+            start_prev_7d = datetime.combine(today_ist - timedelta(days=14), time.min, tzinfo=TZ_IST)
+            range_orders = Order.objects.filter(valid_orders_q, created_at__gte=start_7d, created_at__lte=end_of_today)
+            range_rev_orders = range_orders.filter(status__in=revenue_states)
+            total_revenue = range_rev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+            total_orders_count = range_rev_orders.count()
+            aov = float(total_revenue) / total_orders_count if total_orders_count > 0 else 0.00
+            active_customers = range_rev_orders.values('customer_email').distinct().count()
+
+            prev_rev_orders = Order.objects.filter(status__in=revenue_states, created_at__gte=start_prev_7d, created_at__lt=start_7d)
+            prev_rev = prev_rev_orders.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+            prev_cnt = prev_rev_orders.count()
+            if prev_rev > 0:
+                pct = ((total_revenue - prev_rev) / prev_rev) * 100
+                rev_change = f"{pct:+.1f}%"
+                rev_pos = pct >= 0
+            else:
+                rev_change = "+100%" if total_revenue > 0 else "0.0%"
+                rev_pos = total_revenue >= 0
+            if prev_cnt > 0:
+                pct = ((total_orders_count - prev_cnt) / prev_cnt) * 100
+                ord_change = f"{pct:+.1f}%"
+                ord_pos = pct >= 0
+            else:
+                ord_change = "+100%" if total_orders_count > 0 else "0.0%"
+                ord_pos = total_orders_count >= 0
+            subtitle_suffix = 'Last 7 days vs prev 7d'
+
+        # 3. Low Stock Products (Inventory <= 10, limit to top 15 for dashboard widget)
+        low_stock_items = Inventory.objects.filter(stock_level__lte=10).select_related('product')[:15]
         low_stock_data = []
         for item in low_stock_items:
             if item.product:
@@ -93,46 +214,103 @@ class DashboardAnalyticsView(APIView):
                     'stock': item.stock_level
                 })
 
-        # 5. Recent Orders (Latest 5 orders)
-        recent_orders_list = Order.objects.order_by('-created_at')[:5]
+        # 4. Recent Orders (Latest 5 orders with preloaded user to prevent N+1)
+        recent_orders_list = Order.objects.select_related('user').order_by('-created_at')[:5]
         recent_orders_data = []
         for o in recent_orders_list:
+            customer_name = 'Guest'
+            if o.user:
+                customer_name = o.user.full_name or o.user.email or 'Customer'
+            elif isinstance(o.shipping_address, dict):
+                first = o.shipping_address.get('first_name') or ''
+                last = o.shipping_address.get('last_name') or ''
+                customer_name = f"{first} {last}".strip() or o.customer_email or 'Guest'
             recent_orders_data.append({
                 'id': str(o.id),
                 'orderNo': o.order_number,
-                'customer': o.user.full_name if o.user else 'Guest',
+                'customer': customer_name,
                 'total': f"₹{o.total:,.2f}",
                 'status': o.status,
-                'date': o.created_at.isoformat()
+                'date': o.created_at.astimezone(TZ_IST).strftime('%d %b %Y, %I:%M %p')
             })
 
-        # 6. Sales Trend (Daily sales for the last 7 days)
+        # 5. Sales Trend based on range_param
         trend_data = []
-        today = timezone.now().date()
-        for i in range(6, -1, -1):
-            day = today - timedelta(days=i)
-            day_sales = Order.objects.filter(
-                status__in=revenue_states,
-                created_at__date=day
-            ).aggregate(total=Sum('total'))['total'] or 0
-            trend_data.append({
-                'name': day.strftime('%a'),  # Mon, Tue, etc.
-                'sales': float(day_sales)
-            })
+        if range_param == 'today':
+            hours = [0, 3, 6, 9, 12, 15, 18, 21]
+            for h in hours:
+                b_start = datetime.combine(today_ist, time(h, 0), tzinfo=TZ_IST)
+                if h == 21:
+                    b_end = datetime.combine(today_ist, time.max, tzinfo=TZ_IST)
+                else:
+                    b_end = datetime.combine(today_ist, time(h + 3, 0), tzinfo=TZ_IST) - timedelta(microseconds=1)
+                
+                h_sales = Order.objects.filter(
+                    status__in=revenue_states,
+                    created_at__range=(b_start, b_end)
+                ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+                label = b_start.strftime('%I %p').lstrip('0')
+                trend_data.append({'name': label, 'sales': float(h_sales)})
+        elif range_param == '30d':
+            for i in range(29, -1, -1):
+                day = today_ist - timedelta(days=i)
+                d_start = datetime.combine(day, time.min, tzinfo=TZ_IST)
+                d_end = datetime.combine(day, time.max, tzinfo=TZ_IST)
+                d_sales = Order.objects.filter(
+                    status__in=revenue_states,
+                    created_at__range=(d_start, d_end)
+                ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+                trend_data.append({
+                    'name': day.strftime('%d %b'),
+                    'sales': float(d_sales)
+                })
+        elif range_param in ['all', 'all-time', '365d']:
+            for i in range(11, -1, -1):
+                m_year = today_ist.year
+                m_month = today_ist.month - i
+                while m_month <= 0:
+                    m_month += 12
+                    m_year -= 1
+                m_start = datetime(m_year, m_month, 1, 0, 0, 0, tzinfo=TZ_IST)
+                if m_month == 12:
+                    m_end = datetime(m_year + 1, 1, 1, 0, 0, 0, tzinfo=TZ_IST) - timedelta(microseconds=1)
+                else:
+                    m_end = datetime(m_year, m_month + 1, 1, 0, 0, 0, tzinfo=TZ_IST) - timedelta(microseconds=1)
+                m_sales = Order.objects.filter(
+                    status__in=revenue_states,
+                    created_at__range=(m_start, m_end)
+                ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+                trend_data.append({
+                    'name': m_start.strftime('%b %y'),
+                    'sales': float(m_sales)
+                })
+        else: # Default 7d
+            for i in range(6, -1, -1):
+                day = today_ist - timedelta(days=i)
+                d_start = datetime.combine(day, time.min, tzinfo=TZ_IST)
+                d_end = datetime.combine(day, time.max, tzinfo=TZ_IST)
+                d_sales = Order.objects.filter(
+                    status__in=revenue_states,
+                    created_at__range=(d_start, d_end)
+                ).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+                trend_data.append({
+                    'name': day.strftime('%a'),
+                    'date': day.strftime('%d %b'),
+                    'sales': float(d_sales)
+                })
 
-        # 7. Category Distribution (Normalized Luxury Fragrance Categories)
+        # 6. Category Distribution (Normalized Luxury Fragrance Categories)
         category_counts = {}
-        products = Product.objects.all()
+        products = Product.objects.values('title', 'attributes')
         for p in products:
-            attrs = p.attributes or {}
+            attrs = p.get('attributes') or {}
             category = clean_fragrance_category(
                 raw_category=attrs.get('category', ''),
                 product_type=attrs.get('productType', ''),
-                title=p.title
+                title=p.get('title', '')
             )
             category_counts[category] = category_counts.get(category, 0) + 1
         
-        # Sort categories by frequency descending
         sorted_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
         category_data = []
         colors = ['#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#06b6d4', '#e11d48', '#d97706']
@@ -143,7 +321,7 @@ class DashboardAnalyticsView(APIView):
                 'color': colors[idx % len(colors)]
             })
 
-        # 8. Real Top Selling Products from actual paid/settled orders
+        # 7. Real Top Selling Products from actual paid/settled orders
         top_items = OrderItem.objects.filter(
             order__status__in=revenue_states
         ).values('product_id', 'product_title').annotate(
@@ -160,7 +338,7 @@ class DashboardAnalyticsView(APIView):
                 'revenue': f"₹{item['total_rev']:,.2f}" if item['total_rev'] else '₹0.00'
             })
 
-        # 9. Real Active Visitors (Observed distinct visitors in the last 15 minutes)
+        # 8. Real Active Visitors (last 15 minutes)
         try:
             from apps.analytics.models import Event
             fifteen_mins_ago = timezone.now() - timedelta(minutes=15)
@@ -168,14 +346,37 @@ class DashboardAnalyticsView(APIView):
         except Exception:
             live_visitors = 0
 
-        # 10. Return computed genuine business metrics
+        # 9. Return computed genuine business metrics
         return Response({
+            'todaysMetrics': {
+                'todaySales': f"₹{today_sales:,.2f}",
+                'todaySalesRaw': float(today_sales),
+                'todaySalesChange': today_sales_change,
+                'salesIsPositive': today_sales_pos,
+                'todayOrders': today_orders_count,
+                'todayOrdersFormatted': f"{today_orders_count:,}",
+                'todayOrdersChange': today_orders_change,
+                'ordersIsPositive': today_orders_pos,
+                'todayAov': f"₹{today_aov:,.2f}",
+                'yesterdaySales': f"₹{yesterday_sales:,.2f}",
+                'yesterdayOrders': yesterday_orders_count,
+                'currentDateIST': today_ist.strftime('%d %B %Y'),
+            },
             'kpis': [
-                { 'title': 'Total Revenue', 'value': f"₹{total_revenue:,.2f}", 'change': '+12.5%', 'isPositive': True },
-                { 'title': 'Total Orders', 'value': f"{total_orders_count:,}", 'change': '+8.2%', 'isPositive': True },
-                { 'title': 'Active Customers', 'value': f"{active_customers:,}", 'change': '+5.4%', 'isPositive': True },
-                { 'title': 'Average Order Value', 'value': f"₹{aov:,.2f}", 'change': '+2.1%', 'isPositive': True },
+                { 'title': "Today's Sales", 'value': f"₹{today_sales:,.2f}", 'change': today_sales_change, 'isPositive': today_sales_pos, 'subtitle': 'vs yesterday' },
+                { 'title': "Today's Orders", 'value': f"{today_orders_count:,}", 'change': today_orders_change, 'isPositive': today_orders_pos, 'subtitle': 'vs yesterday' },
+                { 'title': 'Total Revenue', 'value': f"₹{total_revenue:,.2f}", 'change': rev_change, 'isPositive': rev_pos, 'subtitle': subtitle_suffix },
+                { 'title': 'Total Orders', 'value': f"{total_orders_count:,}", 'change': ord_change, 'isPositive': ord_pos, 'subtitle': subtitle_suffix },
+                { 'title': 'Average Order Value', 'value': f"₹{aov:,.2f}", 'change': 'Average', 'isPositive': True, 'subtitle': f'AOV ({subtitle_suffix})' },
+                { 'title': 'Active Customers', 'value': f"{active_customers:,}", 'change': 'Purchasers', 'isPositive': True, 'subtitle': f'Buyers ({subtitle_suffix})' },
             ],
+            'lifetimeMetrics': {
+                'lifetimeRevenue': f"₹{lifetime_revenue:,.2f}",
+                'lifetimeOrders': lifetime_orders_count,
+                'lifetimeAov': f"₹{lifetime_aov:,.2f}",
+                'lifetimeCustomers': lifetime_customers,
+            },
+            'timeRange': range_param,
             'salesTrend': trend_data,
             'categoryData': category_data,
             'recentOrders': recent_orders_data,

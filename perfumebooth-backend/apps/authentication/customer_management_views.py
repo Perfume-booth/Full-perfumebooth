@@ -1,3 +1,4 @@
+import math
 from django.db.models import Sum, Count, Q, Max
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -7,6 +8,22 @@ from .models import CustomUser
 from .views import HasRolePermission
 from .helpers import log_action
 from apps.orders.models import Order
+
+
+def normalize_tags(tags):
+    if not tags:
+        return []
+    if isinstance(tags, list):
+        res = []
+        for t in tags:
+            if isinstance(t, str) and ',' in t:
+                res.extend([x.strip() for x in t.split(',') if x.strip()])
+            elif t:
+                res.append(str(t).strip())
+        return res
+    if isinstance(tags, str):
+        return [x.strip() for x in tags.split(',') if x.strip()]
+    return []
 
 
 class MerchantCustomerListView(APIView):
@@ -21,6 +38,14 @@ class MerchantCustomerListView(APIView):
     def get(self, request):
         search_q = request.query_params.get('q', '').strip()
         status_filter = request.query_params.get('status', '').strip()
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (ValueError, TypeError):
+            page = 1
+        try:
+            page_size = min(200, max(10, int(request.query_params.get('page_size', 50))))
+        except (ValueError, TypeError):
+            page_size = 50
 
         # Query customers (users who are not staff or superusers)
         customers_qs = CustomUser.objects.filter(is_staff=False)
@@ -38,17 +63,40 @@ class MerchantCustomerListView(APIView):
         elif status_filter == 'disabled':
             customers_qs = customers_qs.filter(is_active=False)
 
-        # Annotate with order statistics
         paid_statuses = ['Paid', 'Shipped', 'Delivered', 'Processing']
 
-        customers_data = []
-        for user in customers_qs.order_by('-date_joined'):
-            user_orders = Order.objects.filter(user=user)
-            total_orders = user_orders.count()
+        # Database-level aggregate metrics across the filtered set
+        total_customers = customers_qs.count()
+        active_customers = customers_qs.filter(is_active=True).count()
+        total_pages = math.ceil(total_customers / page_size) if total_customers > 0 else 1
 
-            paid_orders = user_orders.filter(status__in=paid_statuses)
-            ltv_val = paid_orders.aggregate(total_sum=Sum('total'))['total_sum'] or 0.0
-            last_order = user_orders.order_by('-created_at').first()
+        orders_agg = Order.objects.filter(status__in=paid_statuses).aggregate(
+            tot_paid_orders=Count('id'),
+            tot_ltv=Sum('total')
+        )
+        grand_ltv = float(orders_agg['tot_ltv'] or 0.0)
+        paid_orders_all = orders_agg['tot_paid_orders'] or 0
+        aov = round(grand_ltv / paid_orders_all, 2) if paid_orders_all > 0 else 0.0
+
+        # Fast paginated slice
+        offset = (page - 1) * page_size
+        users_slice = list(customers_qs.order_by('-date_joined')[offset:offset + page_size])
+        user_ids = [u.id for u in users_slice]
+
+        # Single batch query to aggregate stats for the 50 visible customers
+        order_stats = Order.objects.filter(user_id__in=user_ids).values('user_id').annotate(
+            orders_count=Count('id', filter=Q(status__in=paid_statuses)),
+            paid_ltv=Sum('total', filter=Q(status__in=paid_statuses)),
+            last_order=Max('created_at', filter=Q(status__in=paid_statuses))
+        )
+        stats_map = {s['user_id']: s for s in order_stats}
+
+        customers_data = []
+        for user in users_slice:
+            st = stats_map.get(user.id)
+            total_orders = st['orders_count'] if st else 0
+            ltv_val = float(st['paid_ltv'] or 0.0) if st else 0.0
+            last_order_dt = st['last_order'] if st else None
 
             customers_data.append({
                 'id': str(user.id),
@@ -60,17 +108,10 @@ class MerchantCustomerListView(APIView):
                 'is_active': user.is_active,
                 'date_joined': user.date_joined,
                 'orders_count': total_orders,
-                'lifetime_value': str(round(float(ltv_val), 2)),
-                'last_order_date': last_order.created_at if last_order else None,
-                'tags': user.tags or [],
+                'lifetime_value': str(round(ltv_val, 2)),
+                'last_order_date': last_order_dt,
+                'tags': normalize_tags(user.tags),
             })
-
-        # Calculate overall KPI metrics
-        total_customers = len(customers_data)
-        active_customers = sum(1 for c in customers_data if c['is_active'])
-        grand_ltv = sum(float(c['lifetime_value']) for c in customers_data)
-        total_orders_all = sum(c['orders_count'] for c in customers_data)
-        aov = round(grand_ltv / total_orders_all, 2) if total_orders_all > 0 else 0.0
 
         return Response({
             'metrics': {
@@ -79,7 +120,15 @@ class MerchantCustomerListView(APIView):
                 'total_ltv': str(round(grand_ltv, 2)),
                 'average_order_value': str(aov),
             },
-            'customers': customers_data
+            'customers': customers_data,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_count': total_customers,
+                'total_pages': total_pages,
+                'has_next': page < total_pages,
+                'has_prev': page > 1,
+            }
         })
 
     def post(self, request):
@@ -107,7 +156,7 @@ class MerchantCustomerListView(APIView):
             first_name=first_name,
             last_name=last_name,
             is_staff=False,
-            tags=tags if isinstance(tags, list) else [],
+            tags=normalize_tags(tags),
             notes=notes
         )
 
@@ -173,7 +222,7 @@ class MerchantCustomerDetailView(APIView):
             'full_name': user.full_name or 'Guest Customer',
             'is_active': user.is_active,
             'date_joined': user.date_joined,
-            'tags': user.tags or [],
+            'tags': normalize_tags(user.tags),
             'notes': user.notes or '',
             'metrics': {
                 'lifetime_value': str(round(float(ltv_val), 2)),
@@ -210,8 +259,8 @@ class MerchantCustomerDetailView(APIView):
             if CustomUser.objects.filter(phone=phone).exclude(id=user.id).exists():
                 return Response({'detail': 'Phone number already in use.'}, status=status.HTTP_400_BAD_REQUEST)
             user.phone = phone
-        if tags is not None and isinstance(tags, list):
-            user.tags = tags
+        if tags is not None:
+            user.tags = normalize_tags(tags)
         if notes is not None:
             user.notes = notes
         if is_active is not None:

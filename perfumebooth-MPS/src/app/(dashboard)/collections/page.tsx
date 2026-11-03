@@ -13,7 +13,9 @@ import {
   Check,
   X,
   FileImage,
-  FolderOpen
+  FolderOpen,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import ResizableTextarea from '@/components/ui/ResizableTextarea';
 
@@ -61,10 +63,16 @@ export default function CollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Search & Filter State
+  // Search & Filter & Pagination State
+  const COLLECTION_PAGE_SIZE = 10;
+  const [collectionPage, setCollectionPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState(''); // 'active', 'offline', or ''
   const [filterMatchType, setFilterMatchType] = useState(''); // 'manual', 'brand', etc.
+
+  useEffect(() => {
+    setCollectionPage(1);
+  }, [search, filterStatus, filterMatchType]);
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -737,6 +745,12 @@ export default function CollectionsPage() {
     return matchesSearch && matchesStatus && matchesMatchType;
   });
 
+  const totalCollectionPages = Math.ceil(filteredCollections.length / COLLECTION_PAGE_SIZE) || 1;
+  const paginatedCollections = filteredCollections.slice(
+    (collectionPage - 1) * COLLECTION_PAGE_SIZE,
+    collectionPage * COLLECTION_PAGE_SIZE
+  );
+
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
@@ -859,7 +873,7 @@ export default function CollectionsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredCollections.map((col) => (
+                paginatedCollections.map((col) => (
                   <tr key={col.id} className="border-b border-border/20 hover:bg-muted/10 transition duration-150">
                     <td className="p-5">
                       <div className="w-16 h-10 rounded-xl neu-inset-sm overflow-hidden flex items-center justify-center p-0.5">
@@ -911,6 +925,45 @@ export default function CollectionsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        {!loading && filteredCollections.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 border-t border-border/10 bg-card/50">
+            <p className="text-xs font-bold text-muted-foreground">
+              Showing <span className="font-extrabold text-foreground">{((collectionPage - 1) * COLLECTION_PAGE_SIZE) + 1}</span> to{' '}
+              <span className="font-extrabold text-foreground">
+                {Math.min(collectionPage * COLLECTION_PAGE_SIZE, filteredCollections.length)}
+              </span>{' '}
+              of <span className="font-extrabold text-foreground">{filteredCollections.length}</span> collections
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCollectionPage(p => Math.max(1, p - 1))}
+                disabled={collectionPage === 1}
+                className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Previous</span>
+              </button>
+
+              <span className="text-xs font-black px-3.5 py-2 rounded-xl neu-inset-sm text-foreground">
+                Page {collectionPage} of {totalCollectionPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setCollectionPage(p => Math.min(p + 1, totalCollectionPages))}
+                disabled={collectionPage >= totalCollectionPages}
+                className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

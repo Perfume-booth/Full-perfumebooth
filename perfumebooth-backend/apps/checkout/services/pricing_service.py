@@ -106,6 +106,10 @@ class PricingService:
 
         # 1. Check database-backed Coupon
         coupon = Coupon.objects.filter(code__iexact=normalized).first()
+        if not coupon and normalized.endswith('%'):
+            coupon = Coupon.objects.filter(code__iexact=normalized.rstrip('%')).first()
+        elif not coupon:
+            coupon = Coupon.objects.filter(code__iexact=normalized + '%').first()
         if coupon:
             if not coupon.is_active:
                 raise InvalidCouponException(code=normalized, message="This coupon is disabled.")

@@ -196,7 +196,18 @@ export default function ProductDetailsClient({ product }: Props) {
     clearBuyNow();
   }, [clearBuyNow]);
 
-  // Coupons/Offers section hidden as per request
+  const [activeCoupons, setActiveCoupons] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/coupons/active')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.coupons && Array.isArray(data.coupons)) {
+          setActiveCoupons(data.coupons);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleWishlist = () => {
     if (isWishlisted) {
@@ -379,7 +390,7 @@ export default function ProductDetailsClient({ product }: Props) {
 
         <div className="flex flex-wrap gap-2">
           {isSoldOut && (
-            <span className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 text-white text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full shadow-sm">
+            <span className="px-3 md:px-4 py-1 md:py-1.5 bg-[var(--color-maroon)] text-white text-[8px] md:text-[9px] uppercase tracking-[0.15em] font-bold rounded-full shadow-sm">
               Sold Out
             </span>
           )}
@@ -489,6 +500,61 @@ export default function ProductDetailsClient({ product }: Props) {
 
         </div>
 
+        {/* 4b. Available Offers & Coupons Card (Only shown if active coupons exist in database) */}
+        {activeCoupons.length > 0 && (
+          <div className="p-3.5 bg-gradient-to-r from-[#faf8f5] to-[#fbf7ee] border border-[#b8924a]/30 rounded-xl space-y-2.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-[#b8924a] text-white flex items-center justify-center text-[10px] font-bold">🏷️</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#1a1410]">Best Offers & Coupons</span>
+              </div>
+              <span className="text-[10px] text-[#b8924a] font-semibold">Verified</span>
+            </div>
+
+            <div className="space-y-1.5">
+              {activeCoupons.map((c) => (
+                <div key={c.code} className="flex items-center justify-between text-xs bg-white/90 p-2 rounded-lg border border-[#ede8e0]">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(c.code);
+                        toast.success(`Coupon "${c.code}" copied!`);
+                      }}
+                      className="font-mono font-bold text-xs bg-[#1a1410] text-[#b8924a] px-2 py-0.5 rounded border border-[#b8924a]/40 tracking-wider hover:bg-[#b8924a] hover:text-white transition-colors cursor-pointer"
+                      title="Click to copy coupon code"
+                    >
+                      {c.code}
+                    </button>
+                    <span className="text-[11px] text-gray-700 font-medium">
+                      {c.description || (c.discount_type === 'percentage' ? `${parseFloat(c.discount_value)}% OFF` : `₹${parseFloat(c.discount_value)} OFF`)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(c.code);
+                      toast.success(`Coupon "${c.code}" copied!`);
+                    }}
+                    className="text-[10px] text-[#b8924a] hover:underline font-bold uppercase tracking-wider cursor-pointer ml-2 shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center justify-between text-xs bg-white/90 p-2 rounded-lg border border-[#ede8e0]">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-xs bg-[#f4ece1] text-[#7a5e2a] px-2 py-0.5 rounded border border-[#b8924a]/20 tracking-wider">
+                    FREESHIP
+                  </span>
+                  <span className="text-[11px] text-gray-700 font-medium">Free express delivery on orders over ₹999</span>
+                </div>
+                <span className="text-[10px] text-[#2d7a4f] font-bold uppercase tracking-wider shrink-0 ml-2">Automatic</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Delivery Status and Pincode Checkers */}
         <div className="space-y-2 pt-0.5">
           {pincode && (
@@ -503,7 +569,7 @@ export default function ProductDetailsClient({ product }: Props) {
               </div>
               <div className="space-y-0.5">
                 <p className="text-xs font-bold text-gray-900 leading-normal">
-                  FREE delivery <span className="text-[#b8924a]">{getDeliveryDateStr()}</span>.
+                  Delivery <span className="text-[#b8924a]">{getDeliveryDateStr()}</span>.
                 </p>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[#807667] font-medium uppercase tracking-wider">
                   <span className="flex items-center gap-1">
@@ -606,7 +672,7 @@ export default function ProductDetailsClient({ product }: Props) {
             )}
           </div>
           <span className="text-[10px] text-[var(--color-gold)] font-bold truncate max-w-[130px]">
-            {selectedVariant?.title && selectedVariant.title !== "Default Title" ? selectedVariant.title : (isSoldOut ? "Out of Stock" : "Free Delivery")}
+            {selectedVariant?.title && selectedVariant.title !== "Default Title" ? selectedVariant.title : (isSoldOut ? "Out of Stock" : "Delivery")}
           </span>
         </div>
 

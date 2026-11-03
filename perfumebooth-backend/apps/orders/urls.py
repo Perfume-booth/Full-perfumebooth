@@ -11,6 +11,7 @@ from .views import (
     MerchantPromotionDetailView,
     MerchantPromotionToggleStatusView,
     PublicActivePromotionsView,
+    PublicActiveCouponsView,
 )
 
 urlpatterns = [
@@ -20,6 +21,7 @@ urlpatterns = [
     path('<str:pk>/', OrderDetailView.as_view(), name='order-detail'),
     path('shipping-rates/', ShippingRatesAPIView.as_view(), name='shipping-rates'),
     path('validate-coupon/', CouponValidationView.as_view(), name='validate-coupon'),
+    path('coupons/active/', PublicActiveCouponsView.as_view(), name='public-coupons-active'),
     path('promotions/active/', PublicActivePromotionsView.as_view(), name='public-promotions-active'),
     path('merchant/coupons/', MerchantCouponListView.as_view(), name='merchant-coupon-list'),
     path('merchant/coupons/bulk-generate/', MerchantCouponBulkGenerateView.as_view(), name='merchant-coupon-bulk-generate'),

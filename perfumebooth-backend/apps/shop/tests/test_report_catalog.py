@@ -86,10 +86,12 @@ class ReportCatalogTests(TestCase):
         self.assertEqual(self.report('fulfillment-time')['rows'][0][2], 22)
 
     def test_date_validation_and_missing_report(self):
-        for params in [{'start':'bad'}, {'start':'2027-01-01','end':'2026-01-01'},
-                       {'start':'2020-01-01','end':'2026-10-21'}]:
+        for params in [{'start':'bad'}, {'start':'2027-01-01','end':'2026-01-01'}]:
             with self.assertRaises(ValidationError):
                 report_data('sales-orders', params, self.now)
+        # Multi-year historical ranges are supported and succeed
+        res = report_data('sales-orders', {'start':'2020-01-01','end':'2026-10-21'}, self.now)
+        self.assertIsNotNone(res)
         with self.assertRaises(ValidationError):
             self.report('does-not-exist')
 

@@ -314,32 +314,46 @@ export default function InventoryPage() {
                 </tbody>
               </table>
             </div>
-          </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between bg-card neu-extruded px-6 py-4 rounded-3xl border border-border/10">
-              <span className="text-xs text-muted-foreground font-medium">
-                Showing page <strong className="text-foreground">{page}</strong> of <strong className="text-foreground">{totalPages}</strong> ({totalCount} total items)
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage(p => Math.max(p - 1, 1))}
-                  disabled={page === 1}
-                  className="w-9 h-9 rounded-xl neu-btn flex items-center justify-center text-foreground transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-                  disabled={page === totalPages}
-                  className="w-9 h-9 rounded-xl neu-btn flex items-center justify-center text-foreground transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+            {/* Pagination Footer */}
+            {!loading && totalCount > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 border-t border-border/10 bg-card/50">
+                <p className="text-xs font-bold text-muted-foreground">
+                  Showing <span className="font-extrabold text-foreground">{((page - 1) * pageSize) + 1}</span> to{' '}
+                  <span className="font-extrabold text-foreground">
+                    {Math.min(page * pageSize, totalCount)}
+                  </span>{' '}
+                  of <span className="font-extrabold text-foreground">{totalCount.toLocaleString()}</span> products
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Previous</span>
+                  </button>
+
+                  <span className="text-xs font-black px-3.5 py-2 rounded-xl neu-inset-sm text-foreground">
+                    Page {page} of {totalPages || 1}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                    disabled={page >= (totalPages || 1)}
+                    className="flex items-center gap-1 px-3.5 py-2 rounded-xl neu-btn text-xs font-bold disabled:opacity-40 cursor-pointer text-foreground"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
     </div>

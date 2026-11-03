@@ -66,7 +66,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       if (data) {
         setCustomer(data);
         setNotes(data.notes || '');
-        setTagsInput((data.tags || []).join(', '));
+        const normalizedTags = Array.isArray(data.tags)
+          ? data.tags
+          : (typeof data.tags === 'string' ? data.tags.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+        setTagsInput(normalizedTags.join(', '));
       }
     } catch (err) {
       console.error('Error fetching customer profile:', err);

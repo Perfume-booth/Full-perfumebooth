@@ -221,6 +221,12 @@ services:
       - .env.docker
     depends_on:
       - django
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - perfumebooth_net
 
@@ -240,6 +246,12 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8000
     depends_on:
       - django
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - perfumebooth_net
 

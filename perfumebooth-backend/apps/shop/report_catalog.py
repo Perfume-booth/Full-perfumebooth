@@ -3,6 +3,7 @@ from collections import defaultdict, Counter
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from itertools import combinations
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from apps.orders.models import Order, OrderItem, Shipment
@@ -84,8 +85,8 @@ def bounds(params, now=None):
         first = date.fromisoformat(params.get('start', (last - timedelta(days=29)).isoformat()))
     except (ValueError, TypeError):
         raise ValidationError('Dates must use YYYY-MM-DD.')
-    if first > last or (last - first).days > 365 or last > now.date():
-        raise ValidationError('Choose an ordered date range of at most 366 days, ending no later than today.')
+    if first > last or last > now.date():
+        raise ValidationError('Choose an ordered date range ending no later than today.')
     return datetime.combine(first, time.min, TZ), min(datetime.combine(last + timedelta(days=1), time.min, TZ), now)
 
 
@@ -103,7 +104,7 @@ def identity(order):
 
 
 def paid(order):
-    return order.payment_status == 'Paid' and order.status not in ['Cancelled', 'Refunded']
+    return (order.payment_status == 'Paid' or order.status in ['Paid', 'Delivered', 'Shipped', 'Processing']) and order.status not in ['Cancelled', 'Refunded']
 
 
 def number(value):
@@ -170,7 +171,8 @@ def report_data(key, params, now=None):
                           [[*label, *v] for label, v in sorted(groups.items(), key=lambda pair: -pair[1][1])])
         first_orders = {}
         if key == 'sales-types':
-            history = limited(Order.objects.filter(created_at__lt=end, currency='INR', payment_status='Paid')
+            history = limited(Order.objects.filter(created_at__lt=end, currency='INR')
+                              .filter(Q(payment_status='Paid') | Q(status__in=['Paid', 'Delivered', 'Shipped', 'Processing']))
                               .exclude(status__in=['Cancelled', 'Refunded']).order_by('created_at', 'id'))
             for o in history:
                 first_orders.setdefault(identity(o), o.pk)
@@ -231,7 +233,8 @@ def report_data(key, params, now=None):
                 day=TruncDate('date_joined', tzinfo=TZ)).values('day').annotate(count=Count('id')).order_by('day')
             notes.append('Account registration dates only. Guest purchasers are not registered accounts; staff/role-bearing accounts are excluded.')
             return finish(['Registration date', 'New accounts'], [[r['day'].isoformat(), r['count']] for r in rows])
-        history = limited(Order.objects.filter(created_at__lt=end, currency='INR', payment_status='Paid')
+        history = limited(Order.objects.filter(created_at__lt=end, currency='INR')
+                          .filter(Q(payment_status='Paid') | Q(status__in=['Paid', 'Delivered', 'Shipped', 'Processing']))
                           .exclude(status__in=['Cancelled', 'Refunded']).order_by('created_at', 'id'))
         people = defaultdict(list)
         for o in history:

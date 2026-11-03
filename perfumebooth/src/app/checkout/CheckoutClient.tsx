@@ -218,6 +218,18 @@ export default function CheckoutClient({ customer }: Props) {
   const [isApplying, setIsApplying] = useState(false);
   const [discountError, setDiscountError] = useState<string | null>(null);
   const [discountSuccess, setDiscountSuccess] = useState<string | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/coupons/active')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.coupons && Array.isArray(data.coupons)) {
+          setAvailableCoupons(data.coupons);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     email: customer?.email || "",
@@ -265,29 +277,31 @@ export default function CheckoutClient({ customer }: Props) {
     });
   };
 
-  const handleApplyDiscount = async () => {
-    if (!discountInput.trim()) return;
+  const handleApplyDiscount = async (codeToApply?: string) => {
+    const code = (codeToApply ?? discountInput).trim().toUpperCase();
+    if (!code) return;
+    setDiscountInput(code);
     setIsApplying(true);
     setDiscountError(null);
     setDiscountSuccess(null);
     try {
-      const success = await applyCoupon(discountInput.trim());
+      const success = await applyCoupon(code);
       if (success) {
         const state = useCartStore.getState();
         const updatedDiscountAmount = state.discountAmount;
         const currentSubtotal = state.subtotalAmount || state.cartTotal();
         const discountPercentage = currentSubtotal > 0 ? Math.round((updatedDiscountAmount / currentSubtotal) * 100) : 0;
         
-        let successMessage = `Coupon "${discountInput.trim()}" applied successfully!`;
+        let successMessage = `Coupon "${code}" applied successfully!`;
         if (updatedDiscountAmount > 0) {
           successMessage += ` Saved ${formatPrice(updatedDiscountAmount)} (${discountPercentage}% off).`;
         }
         
         setDiscountSuccess(successMessage);
-        toast.success(`Coupon "${discountInput.trim()}" applied successfully!`);
+        toast.success(successMessage);
       } else {
         const state = useCartStore.getState();
-        const errorMsg = state.discountErrorMessage || `Discount code "${discountInput.trim()}" is invalid or not applicable.`;
+        const errorMsg = state.discountErrorMessage || `Discount code "${code}" is invalid or not applicable.`;
         setDiscountError(errorMsg);
       }
     } catch (e) {
@@ -296,6 +310,15 @@ export default function CheckoutClient({ customer }: Props) {
     } finally {
       setIsApplying(false);
     }
+  };
+
+  const handleRemoveDiscount = async () => {
+    setIsApplying(true);
+    await applyCoupon("");
+    setDiscountInput("");
+    setDiscountSuccess(null);
+    setDiscountError(null);
+    setIsApplying(false);
   };
 
   const checkoutRetryKey = () => {
@@ -530,7 +553,7 @@ export default function CheckoutClient({ customer }: Props) {
           </div>
         </main>
       ) : (
-        <main className="min-h-screen flex flex-col md:flex-row bg-white pt-28 pb-16 animate-fadeIn">
+        <main className="min-h-screen flex flex-col md:flex-row bg-white pt-24 md:pt-36 lg:pt-40 pb-16 animate-fadeIn">
           {/* ─── LEFT COLUMN: CHECKOUT FORM ─── */}
           <div className="flex-1 px-4 md:px-12 lg:px-24 pt-10 pb-16 border-r border-gray-200">
             <div className="max-w-[600px] mx-auto md:ml-auto md:mr-0">
@@ -1123,46 +1146,104 @@ export default function CheckoutClient({ customer }: Props) {
 
               {/* Discount/Coupon Application Form */}
               <div className="py-6 border-t border-gray-200">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="discount code"
-                    value={discountInput}
-                    onChange={(e) => {
-                      setDiscountInput(e.target.value.toUpperCase());
-                      if (discountError) setDiscountError(null);
-                      if (discountSuccess) setDiscountSuccess(null);
-                    }}
-                    className={`flex-1 border rounded-md px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-all bg-white uppercase ${
-                      discountError
-                        ? "border-red-400 focus:border-red-500 focus:ring-red-400"
-                        : discountSuccess
-                        ? "border-green-400 focus:border-green-500 focus:ring-green-400"
-                        : "border-gray-300 focus:border-[#1a1410] focus:ring-[#1a1410]"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyDiscount}
-                    disabled={isApplying || !discountInput.trim()}
-                    className={`font-bold px-6 py-3 rounded-md text-xs uppercase tracking-widest transition-all ${
-                      !discountInput.trim() || isApplying
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
-                        : "bg-[#1a1410] text-white hover:bg-[#b8924a] cursor-pointer shadow-sm"
-                    }`}
-                  >
-                    {isApplying ? "Applying..." : "Apply"}
-                  </button>
-                </div>
-                {discountError && (
-                  <p className="mt-2 text-xs text-red-600 font-semibold pl-1">
-                    {discountError}
-                  </p>
-                )}
-                {discountSuccess && (
-                  <p className="mt-2 text-xs text-green-700 font-semibold pl-1">
-                    {discountSuccess}
-                  </p>
+                {couponCode ? (
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono font-bold text-xs bg-emerald-800 text-white px-2 py-0.5 rounded tracking-wider">
+                        {couponCode}
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-emerald-900">Coupon Applied Successfully</p>
+                        <p className="text-[11px] text-emerald-700 font-medium">You saved {formatPrice(discountAmount)}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveDiscount}
+                      className="text-xs font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="DISCOUNT CODE"
+                        value={discountInput}
+                        onChange={(e) => {
+                          setDiscountInput(e.target.value.toUpperCase());
+                          if (discountError) setDiscountError(null);
+                          if (discountSuccess) setDiscountSuccess(null);
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyDiscount()}
+                        className={`flex-1 border rounded-md px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-1 transition-all bg-white uppercase tracking-wider ${
+                          discountError
+                            ? "border-red-400 focus:border-red-500 focus:ring-red-400"
+                            : discountSuccess
+                            ? "border-green-400 focus:border-green-500 focus:ring-green-400"
+                            : "border-gray-300 focus:border-[#1a1410] focus:ring-[#1a1410]"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyDiscount()}
+                        disabled={isApplying || !discountInput.trim()}
+                        className={`font-bold px-6 py-3 rounded-md text-xs uppercase tracking-widest transition-all ${
+                          !discountInput.trim() || isApplying
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                            : "bg-[#1a1410] text-white hover:bg-[#b8924a] cursor-pointer shadow-sm"
+                        }`}
+                      >
+                        {isApplying ? "Applying..." : "Apply"}
+                      </button>
+                    </div>
+                    {discountError && (
+                      <p className="text-xs text-red-600 font-semibold pl-1">
+                        {discountError}
+                      </p>
+                    )}
+                    {discountSuccess && (
+                      <p className="text-xs text-green-700 font-semibold pl-1">
+                        {discountSuccess}
+                      </p>
+                    )}
+
+                    {/* Available Offers in Checkout */}
+                    {availableCoupons.length > 0 && (
+                      <div className="pt-2 border-t border-dashed border-gray-200 space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Available Offers</p>
+                        {availableCoupons.map((c) => (
+                          <div
+                            key={c.code}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-[#faf8f5] border border-[#ede8e0] hover:border-[#b8924a]/50 transition-all"
+                          >
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-[11px] text-[#1a1410] bg-white px-1.5 py-0.5 rounded border border-[#ede8e0] tracking-wider">
+                                  {c.code}
+                                </span>
+                                {c.first_order_only && (
+                                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#b8924a] bg-[#b8924a]/10 px-1 rounded">
+                                    First Order
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-600 font-medium">{c.description}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyDiscount(c.code)}
+                              className="text-xs font-bold text-[#b8924a] hover:text-[#1a1410] hover:underline uppercase tracking-wider cursor-pointer pl-2 shrink-0"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

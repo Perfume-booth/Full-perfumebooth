@@ -79,7 +79,7 @@ export default async function CollectionTemplate({
   const cmsImages = cmsBanner?.images?.map((img: any) => img.image_url) || [];
 
   return (
-    <main className="pt-13 lg:pt-28">
+    <main className="pt-28 md:pt-40 lg:pt-44">
       <SideFilter
         initialProducts={products}
         initialPageInfo={pageInfo}

@@ -18,16 +18,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # ─────────────────────────────────────────────────────────────────────────────
 IS_TESTING = 'test' in sys.argv
-DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool) if not IS_TESTING else True
 if DEBUG or IS_TESTING:
-    SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-local-development-only')
+    SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-local-dev-secret-key-32bytes-minimum-length-for-hmac')
 else:
     # A production deployment must never start with a known signing key.
     SECRET_KEY = config('DJANGO_SECRET_KEY')
 ALLOWED_HOSTS = ['*'] if DEBUG else config('ALLOWED_HOSTS', default=config('DJANGO_ALLOWED_HOSTS', default='localhost,django,127.0.0.1'), cast=Csv())
 
 # CORS settings for storefront and admin portal communication
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=DEBUG, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF Trusted Origins for local network and dev servers
@@ -36,16 +36,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
-    'http://192.168.31.168:3000',
-    'http://192.168.31.168:3001',
 ]
 
-if DEBUG:
-    for i in range(1, 255):
-        CSRF_TRUSTED_ORIGINS.extend([
-            f'http://192.168.31.{i}:3000',
-            f'http://192.168.31.{i}:3001',
-        ])
+extra_csrf = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+if extra_csrf:
+    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in extra_csrf if origin.strip()])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -419,6 +414,7 @@ EMAIL_TIMEOUT = 15
 CUSTOMER_NOTIFICATIONS_ENABLED = config('CUSTOMER_NOTIFICATIONS_ENABLED', default=False, cast=bool)
 NOTIFICATION_SITE_URL = config('NOTIFICATION_SITE_URL', default='http://localhost:3001')
 NOTIFICATION_FROM_EMAIL = config('NOTIFICATION_FROM_EMAIL', default='PerfumeBooth <admin@perfumebooth.com>')
+STAFF_SECURITY_EMAIL = config('STAFF_SECURITY_EMAIL', default='admin@perfumebooth.com')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.resend.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)

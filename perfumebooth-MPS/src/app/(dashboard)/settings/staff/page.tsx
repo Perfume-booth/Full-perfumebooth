@@ -52,10 +52,18 @@ export default function StaffSettingsPage() {
   const [role, setRole] = useState('Admin');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState('');
+  const [editEmailOtp, setEditEmailOtp] = useState('');
+  const [editEmailOtpSending, setEditEmailOtpSending] = useState(false);
+  const [editEmailOtpSent, setEditEmailOtpSent] = useState(false);
+  const [devOtpEditEmail, setDevOtpEditEmail] = useState('');
 
   // Self Password Change State
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [selfOtp, setSelfOtp] = useState('');
+  const [selfOtpSending, setSelfOtpSending] = useState(false);
+  const [selfOtpSent, setSelfOtpSent] = useState(false);
+  const [devOtpSelf, setDevOtpSelf] = useState('');
   const [changeSelfLoading, setChangeSelfLoading] = useState(false);
   const [changeSelfSuccess, setChangeSelfSuccess] = useState('');
   const [changeSelfError, setChangeSelfError] = useState('');
@@ -64,6 +72,10 @@ export default function StaffSettingsPage() {
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
   const [resetPassword, setResetPassword] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetOtpSending, setResetOtpSending] = useState(false);
+  const [resetOtpSent, setResetOtpSent] = useState(false);
+  const [devOtpReset, setDevOtpReset] = useState('');
   const [resetStaffLoading, setResetStaffLoading] = useState(false);
   const [resetStaffError, setResetStaffError] = useState('');
 
@@ -71,7 +83,10 @@ export default function StaffSettingsPage() {
     try {
       setLoading(true);
       const data = await apiFetch('/auth/staff/');
-      setStaff(data);
+      const staffMembers = Array.isArray(data)
+        ? data.filter((u: StaffUser) => Array.isArray(u.roles) && u.roles.length > 0)
+        : [];
+      setStaff(staffMembers);
     } catch (err) {
       console.error(err);
     } finally {
@@ -99,6 +114,48 @@ export default function StaffSettingsPage() {
     }
   }, [activeTab]);
 
+  const handleSendSelfOtp = async () => {
+    try {
+      setSelfOtpSending(true);
+      setChangeSelfError('');
+      const data = await apiFetch('/auth/staff/send-password-otp/', { method: 'POST' });
+      setSelfOtpSent(true);
+      if (data?.dev_otp) setDevOtpSelf(data.dev_otp);
+    } catch (err: any) {
+      setChangeSelfError(err.message || 'Failed to send verification code.');
+    } finally {
+      setSelfOtpSending(false);
+    }
+  };
+
+  const handleSendResetOtp = async () => {
+    try {
+      setResetOtpSending(true);
+      setResetStaffError('');
+      const data = await apiFetch('/auth/staff/send-password-otp/', { method: 'POST' });
+      setResetOtpSent(true);
+      if (data?.dev_otp) setDevOtpReset(data.dev_otp);
+    } catch (err: any) {
+      setResetStaffError(err.message || 'Failed to send verification code.');
+    } finally {
+      setResetOtpSending(false);
+    }
+  };
+
+  const handleSendEditEmailOtp = async () => {
+    try {
+      setEditEmailOtpSending(true);
+      setError('');
+      const data = await apiFetch('/auth/staff/send-password-otp/', { method: 'POST' });
+      setEditEmailOtpSent(true);
+      if (data?.dev_otp) setDevOtpEditEmail(data.dev_otp);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send verification code.');
+    } finally {
+      setEditEmailOtpSending(false);
+    }
+  };
+
   const handleChangeSelfPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setChangeSelfLoading(true);
@@ -111,11 +168,15 @@ export default function StaffSettingsPage() {
         body: JSON.stringify({
           old_password: oldPassword,
           new_password: newPassword,
+          otp: selfOtp,
         })
       });
       setChangeSelfSuccess('Your password has been changed successfully.');
       setOldPassword('');
       setNewPassword('');
+      setSelfOtp('');
+      setSelfOtpSent(false);
+      setDevOtpSelf('');
     } catch (err: any) {
       setChangeSelfError(err.message || 'Failed to change password.');
     } finally {
@@ -126,6 +187,9 @@ export default function StaffSettingsPage() {
   const handleOpenResetPassword = (user: StaffUser) => {
     setSelectedStaff(user);
     setResetPassword('');
+    setResetOtp('');
+    setResetOtpSent(false);
+    setDevOtpReset('');
     setResetStaffError('');
     setResetModalOpen(true);
   };
@@ -142,6 +206,7 @@ export default function StaffSettingsPage() {
         body: JSON.stringify({
           user_id: selectedStaff.id,
           new_password: resetPassword,
+          otp: resetOtp,
         })
       });
       setResetModalOpen(false);
@@ -160,6 +225,9 @@ export default function StaffSettingsPage() {
     setEmail('');
     setPassword('');
     setRole('Admin');
+    setEditEmailOtp('');
+    setEditEmailOtpSent(false);
+    setDevOtpEditEmail('');
     setError('');
     setModalOpen(true);
   };
@@ -171,6 +239,9 @@ export default function StaffSettingsPage() {
     setEmail(user.email);
     setPassword('');
     setRole(user.roles?.[0] || 'Admin');
+    setEditEmailOtp('');
+    setEditEmailOtpSent(false);
+    setDevOtpEditEmail('');
     setError('');
     setModalOpen(true);
   };
@@ -182,13 +253,24 @@ export default function StaffSettingsPage() {
 
     try {
       if (editingStaff) {
+        const payload: Record<string, any> = {
+          first_name: firstName,
+          last_name: lastName,
+          role
+        };
+        const emailChanged = email.trim().toLowerCase() !== editingStaff.email.toLowerCase();
+        if (emailChanged) {
+          if (!editEmailOtp) {
+            setError('Please enter the 6-digit authorization code (OTP) sent to admin@perfumebooth.com to update the staff email.');
+            setSubmitLoading(false);
+            return;
+          }
+          payload.email = email.trim();
+          payload.otp = editEmailOtp.trim();
+        }
         await apiFetch(`/auth/staff/${editingStaff.id}/`, {
           method: 'PUT',
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            role
-          })
+          body: JSON.stringify(payload)
         });
       } else {
         await apiFetch('/auth/staff/', {
@@ -456,6 +538,50 @@ export default function StaffSettingsPage() {
               </div>
             </div>
 
+            {/* 2FA OTP Authorization Input */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Security Authorization Code (OTP)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSendSelfOtp}
+                  disabled={selfOtpSending}
+                  className="text-[11px] font-bold text-primary hover:underline cursor-pointer disabled:opacity-50"
+                >
+                  {selfOtpSending ? "Sending code..." : selfOtpSent ? "Resend Code" : "Send OTP to admin@perfumebooth.com"}
+                </button>
+              </div>
+              <div className="relative">
+                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={selfOtp}
+                  onChange={(e) => setSelfOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="Enter 6-digit OTP"
+                  className="w-full pl-11 pr-4 py-3 neu-input rounded-2xl text-xs font-medium tracking-widest"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                For security, a 6-digit authorization code is sent to <strong className="text-foreground">admin@perfumebooth.com</strong>.
+              </p>
+              {devOtpSelf && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300">
+                  <span>Dev Mode (Local SMTP): Code is <strong>{devOtpSelf}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => setSelfOtp(devOtpSelf)}
+                    className="ml-auto underline font-bold cursor-pointer"
+                  >
+                    Auto-fill
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={changeSelfLoading}
@@ -528,20 +654,72 @@ export default function StaffSettingsPage() {
 
               {/* Email */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase">Email Address</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Email Address</label>
+                  {editingStaff && (
+                    <span className="text-[10px] text-muted-foreground font-semibold">
+                      (2FA OTP verified via admin@perfumebooth.com)
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
                     type="email"
                     required
-                    disabled={!!editingStaff}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@perfumebooth.com"
-                    className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium disabled:opacity-50"
+                    placeholder="name@example.com"
+                    className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium"
                   />
                 </div>
               </div>
+
+              {/* Email change 2FA OTP prompt if email was modified */}
+              {editingStaff && email.trim().toLowerCase() !== editingStaff.email.toLowerCase() && (
+                <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                      Security Authorization Code (OTP)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSendEditEmailOtp}
+                      disabled={editEmailOtpSending}
+                      className="text-[11px] font-bold text-primary hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      {editEmailOtpSending ? "Sending code..." : editEmailOtpSent ? "Resend Code" : "Send OTP to admin@perfumebooth.com"}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      value={editEmailOtp}
+                      onChange={(e) => setEditEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter 6-digit OTP"
+                      className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium tracking-widest"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Changing staff email requires security authorization. A 6-digit OTP is sent to <strong className="text-foreground">admin@perfumebooth.com</strong>.
+                  </p>
+                  {devOtpEditEmail && (
+                    <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300">
+                      <span>Dev Mode: Code is <strong>{devOtpEditEmail}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setEditEmailOtp(devOtpEditEmail)}
+                        className="ml-auto underline font-bold cursor-pointer"
+                      >
+                        Auto-fill
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Password */}
               {!editingStaff && (
@@ -647,6 +825,48 @@ export default function StaffSettingsPage() {
                     className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium"
                   />
                 </div>
+              </div>
+
+              {/* 2FA OTP Input */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Authorization Code (OTP)</label>
+                  <button
+                    type="button"
+                    onClick={handleSendResetOtp}
+                    disabled={resetOtpSending}
+                    className="text-[11px] font-bold text-primary hover:underline cursor-pointer disabled:opacity-50"
+                  >
+                    {resetOtpSending ? "Sending code..." : resetOtpSent ? "Resend Code" : "Send OTP to admin@perfumebooth.com"}
+                  </button>
+                </div>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={resetOtp}
+                    onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit OTP"
+                    className="w-full pl-9 pr-4 py-2.5 neu-input rounded-2xl text-xs font-medium tracking-widest"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Security authorization code is sent to <strong className="text-foreground">admin@perfumebooth.com</strong>.
+                </p>
+                {devOtpReset && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300">
+                    <span>Dev Mode: Code is <strong>{devOtpReset}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => setResetOtp(devOtpReset)}
+                      className="ml-auto underline font-bold cursor-pointer"
+                    >
+                      Auto-fill
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 mt-3">

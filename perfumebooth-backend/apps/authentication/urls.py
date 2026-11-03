@@ -8,6 +8,7 @@ from .views import (
     StaffAuditLogView, 
     ChangePasswordSelfView, 
     ResetStaffPasswordView,
+    SendStaffPasswordOTPView,
     LoginView,
     LogoutView,
     GetCSRFTokenView
@@ -41,6 +42,7 @@ urlpatterns = [
     path('me/', MeView.as_view(), name='auth-me'),
     path('staff/', StaffManagementView.as_view(), name='staff-management'),
     path('staff/logs/', StaffAuditLogView.as_view(), name='staff-logs'),
+    path('staff/send-password-otp/', SendStaffPasswordOTPView.as_view(), name='staff-send-password-otp'),
     path('staff/<uuid:pk>/', StaffDetailView.as_view(), name='staff-detail'),
     path('change-password-self/', ChangePasswordSelfView.as_view(), name='change-password-self'),
     path('reset-staff-password/', ResetStaffPasswordView.as_view(), name='reset-staff-password'),
@@ -64,5 +66,3 @@ urlpatterns = [
     path('merchant/customers/<uuid:pk>/', MerchantCustomerDetailView.as_view(), name='merchant-customer-detail'),
     path('merchant/customers/<uuid:pk>/toggle-status/', MerchantCustomerToggleStatusView.as_view(), name='merchant-customer-toggle-status'),
 ]
-
-

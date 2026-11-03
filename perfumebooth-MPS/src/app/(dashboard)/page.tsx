@@ -5,10 +5,9 @@ import { apiFetch } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { 
   TrendingUp, 
-  DollarSign, 
+  IndianRupee, 
   ShoppingBag, 
   Users, 
-  Percent, 
   ArrowUpRight, 
   ArrowDownRight,
   Loader2,
@@ -16,7 +15,8 @@ import {
   Plus,
   FolderPlus,
   Crown,
-  Calendar
+  Calendar,
+  RefreshCw,
 } from 'lucide-react';
 import { 
   XAxis, 
@@ -35,11 +35,28 @@ interface KPI {
   value: string;
   change: string;
   isPositive: boolean;
+  subtitle?: string;
+}
+
+interface TodaysMetrics {
+  todaySales: string;
+  todaySalesRaw: number;
+  todaySalesChange: string;
+  salesIsPositive: boolean;
+  todayOrders: number;
+  todayOrdersFormatted: string;
+  todayOrdersChange: string;
+  ordersIsPositive: boolean;
+  todayAov: string;
+  yesterdaySales: string;
+  yesterdayOrders: number;
+  currentDateIST: string;
 }
 
 interface SalesTrend {
   name: string;
   sales: number;
+  date?: string;
 }
 
 interface CategoryData {
@@ -73,16 +90,20 @@ interface TopProduct {
 
 // Initial Clean Zero-State Arrays (No Mock / Dummy Data)
 const initialKPIs: KPI[] = [
-  { title: 'Total Revenue', value: '₹0.00', change: '0%', isPositive: true },
-  { title: 'Total Orders', value: '0', change: '0%', isPositive: true },
-  { title: 'Active Customers', value: '0', change: '0%', isPositive: true },
-  { title: 'Average Order Value', value: '₹0.00', change: '0%', isPositive: true },
+  { title: "Today's Orders", value: '0', change: '0.0%', isPositive: true, subtitle: 'vs yesterday' },
+  { title: "Today's Sales", value: '₹0.00', change: '0.0%', isPositive: true, subtitle: 'vs yesterday' },
+  { title: 'Total Revenue', value: '₹0.00', change: 'Confirmed', isPositive: true, subtitle: 'Lifetime store revenue' },
+  { title: 'Total Orders', value: '0', change: 'Processed', isPositive: true, subtitle: 'All completed orders' },
+  { title: 'Average Order Value', value: '₹0.00', change: 'Average', isPositive: true, subtitle: 'Storewide AOV' },
+  { title: 'Active Customers', value: '0', change: 'Accounts', isPositive: true, subtitle: 'Unique purchasers' },
 ];
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [todaysMetrics, setTodaysMetrics] = useState<TodaysMetrics | null>(null);
   const [kpis, setKpis] = useState<KPI[]>(initialKPIs);
   const [salesTrend, setSalesTrend] = useState<SalesTrend[]>([]);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
@@ -92,12 +113,15 @@ export default function DashboardPage() {
   const [liveVisitors, setLiveVisitors] = useState(0);
   const [timeRange, setTimeRange] = useState('7d');
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (range: string = timeRange) => {
     try {
-      setLoading(true);
-      const data = await apiFetch('/shop/dashboard/');
+      setRefreshing(true);
+      const data = await apiFetch<any>(`/shop/dashboard/?range=${range}`);
       if (!data) return;
 
+      if (data.todaysMetrics) {
+        setTodaysMetrics(data.todaysMetrics);
+      }
       if (data.kpis && data.kpis.length > 0) {
         setKpis(data.kpis);
       }
@@ -116,15 +140,16 @@ export default function DashboardPage() {
       console.warn('Dashboard API error:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     setMounted(true);
     if (user) {
-      fetchDashboardData();
+      fetchDashboardData(timeRange);
     }
-  }, [user]);
+  }, [user, timeRange]);
 
   if (!mounted) {
     return <div className="h-screen w-full bg-background animate-pulse"></div>;
@@ -142,10 +167,13 @@ export default function DashboardPage() {
   // Icons matching logic
   const getIcon = (title: string) => {
     switch (title) {
-      case 'Total Revenue': return DollarSign;
+      case "Today's Orders": return ShoppingBag;
+      case "Today's Sales": return IndianRupee;
+      case 'Total Revenue': return IndianRupee;
       case 'Total Orders': return ShoppingBag;
       case 'Active Customers': return Users;
-      default: return Percent;
+      case 'Average Order Value': return IndianRupee;
+      default: return IndianRupee;
     }
   };
 
@@ -159,33 +187,40 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Refresh Action */}
+          <button
+            type="button"
+            onClick={() => fetchDashboardData(timeRange)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3.5 py-2 neu-btn rounded-2xl text-xs font-bold text-foreground hover:text-primary transition-all cursor-pointer disabled:opacity-50"
+            title="Refresh dashboard metrics"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-primary' : ''}`} />
+            <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+          </button>
+
           {/* Date-Range Selector */}
           <div className="flex items-center gap-2 px-3.5 py-2 neu-inset-sm border border-border/20 rounded-2xl">
             <Calendar className="w-4 h-4 text-primary" />
             <select
               value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
+              onChange={(e) => {
+                const newRange = e.target.value;
+                setTimeRange(newRange);
+                fetchDashboardData(newRange);
+              }}
               className="bg-transparent text-xs font-bold text-foreground focus:outline-none cursor-pointer"
             >
-              <option value="today" className="bg-card text-foreground">Today</option>
+              <option value="today" className="bg-card text-foreground">Today (IST)</option>
               <option value="7d" className="bg-card text-foreground">Last 7 Days</option>
               <option value="30d" className="bg-card text-foreground">Last 30 Days</option>
+              <option value="all" className="bg-card text-foreground">All Time</option>
             </select>
-          </div>
-
-          {/* Live Visitors Counter */}
-          <div className="flex items-center gap-2.5 px-4 py-2 neu-inset-sm border border-emerald-500/30 rounded-2xl">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300">
-              {liveVisitors} Live Shoppers
-            </span>
           </div>
         </div>
       </div>
 
+      
       {/* Quick-Action Shortcuts Card */}
       <div className="bg-card neu-extruded p-6 rounded-3xl border border-border/10 flex flex-col gap-4">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Quick Actions</h3>
@@ -230,7 +265,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {kpis.map((kpi) => {
           const Icon = getIcon(kpi.title);
           return (
@@ -252,7 +287,9 @@ export default function DashboardPage() {
                   <span className={`text-xs font-bold ${kpi.isPositive ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-500'}`}>
                     {kpi.change}
                   </span>
-                  <span className="text-xs text-muted-foreground">vs last month</span>
+                  <span className="text-xs text-muted-foreground">
+                    {kpi.subtitle || 'vs previous period'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -267,12 +304,19 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center">
             <h3 className="font-extrabold text-foreground tracking-tight">Sales Performance</h3>
             <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="w-4 h-4 text-primary" /> Daily revenue trend (Last 7 Days)
+              <TrendingUp className="w-4 h-4 text-primary" />
+              {timeRange === 'today'
+                ? "Today's hourly revenue trend (IST)"
+                : timeRange === '30d'
+                ? "Daily revenue trend (Last 30 Days)"
+                : timeRange === 'all'
+                ? "Monthly revenue trend (All Time)"
+                : "Daily revenue trend (Last 7 Days)"}
             </span>
           </div>
           <div className="h-80 w-full neu-inset p-4 rounded-2xl border border-border/20">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={salesTrend} margin={{ top: 12, right: 15, left: 15, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3}/>
@@ -280,12 +324,35 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={10} 
+                  fontWeight={700}
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickMargin={8}
+                  width={50}
+                  tickFormatter={(val: number) => {
+                    if (val >= 10000000) return `${(val / 10000000).toFixed(1)}Cr`;
+                    if (val >= 100000) return `${(val / 100000).toFixed(1)}L`;
+                    if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
+                    return String(val);
+                  }}
+                />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'rgba(163, 177, 198, 0.4)', borderRadius: '16px', boxShadow: 'var(--neu-shadow-extruded-sm)' }}
                   labelStyle={{ color: 'var(--foreground)', fontWeight: 'bold' }}
                 />
-                <Area type="monotone" dataKey="sales" stroke="#7c3aed" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                <Area 
+                  type="monotone" 
+                  dataKey="sales" 
+                  stroke="#7c3aed" 
+                  strokeWidth={2.5} 
+                  fillOpacity={1} 
+                  fill="url(#colorSales)" 
+                  dot={{ r: 3.5, fill: '#7c3aed', strokeWidth: 1.5, stroke: '#ffffff' }}
+                  activeDot={{ r: 5.5, fill: '#7c3aed', strokeWidth: 2, stroke: '#ffffff' }}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>

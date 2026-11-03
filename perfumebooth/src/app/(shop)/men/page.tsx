@@ -31,7 +31,7 @@ export default async function MenFragrancePage() {
   const { title, products, totalCount, pageInfo, filters } = collection;
 
   return (
-    <main className="pt-20 lg:pt-28">
+    <main className="pt-24 md:pt-36 lg:pt-40">
       <SideFilter
         initialProducts={products}
         initialPageInfo={pageInfo}

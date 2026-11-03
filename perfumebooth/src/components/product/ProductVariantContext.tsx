@@ -105,9 +105,6 @@ export function ProductVariantSelector({ product }: { product: Product }) {
 
   return (
     <div id="product-variants" className="w-full pt-2 pb-1 border-t border-[var(--color-border)]/50 mt-1.5" data-testid="product-variants">
-      <button type="button" onClick={() => setSelectedVariant(null)} aria-pressed={!selectedVariant} className="text-[11px] underline mb-1.5 text-[var(--color-text-muted)] hover:text-black block">
-        View main product
-      </button>
       {/* Header with Touch Sense Hint */}
       <div className="flex items-center justify-between mb-1.5 select-none">
         <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--color-gold)] flex items-center gap-1.5">
