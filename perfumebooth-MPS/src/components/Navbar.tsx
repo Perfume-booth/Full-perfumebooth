@@ -32,13 +32,7 @@ export default function Navbar() {
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        <button 
-          className="w-10 h-10 rounded-full neu-btn flex items-center justify-center text-muted-foreground hover:text-foreground relative cursor-pointer transition-all duration-200"
-          title="Notifications"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full shadow-[0_0_6px_rgba(124,58,237,0.9)]"></span>
-        </button>
+        
 
         <div className="flex items-center gap-3 pl-4 border-l border-border/40">
           <div className="flex flex-col items-end">

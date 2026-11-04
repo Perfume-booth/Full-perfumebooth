@@ -145,7 +145,6 @@ export default function ProductsPage() {
   const [filterStatus, setFilterStatus] = useState(''); // 'online', 'offline', or ''
   const [filterStock, setFilterStock] = useState(''); // 'instock', 'outofstock', or ''
   const [filterForm, setFilterForm] = useState(''); // Product form filter
-  const [filterCollection, setFilterCollection] = useState(''); // Collection filter
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -926,12 +925,7 @@ export default function ProductsPage() {
       (filterStock === 'outofstock' && p.stock === 0);
     const matchesForm = !filterForm ||
       (p.attributes?.product_form || (p as any).product_form || '').toLowerCase() === filterForm.toLowerCase();
-    const matchesCollection = !filterCollection || (
-      Array.isArray(p.attributes?.collections) && p.attributes.collections.some((c: string) => c.toLowerCase() === filterCollection.toLowerCase())
-    ) || (
-      Array.isArray((p as any).collections) && (p as any).collections.some((c: string) => c.toLowerCase() === filterCollection.toLowerCase())
-    );
-    return matchesSearch && matchesBrand && matchesStatus && matchesStock && matchesForm && matchesCollection;
+    return matchesSearch && matchesBrand && matchesStatus && matchesStock && matchesForm;
   });
 
   const [productPage, setProductPage] = useState(1);
@@ -939,7 +933,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setProductPage(1);
-  }, [search, filterBrand, filterStatus, filterStock, filterForm, filterCollection]);
+  }, [search, filterBrand, filterStatus, filterStock, filterForm]);
 
   const totalProductPages = Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE) || 1;
   const paginatedProducts = filteredProducts.slice(
@@ -1970,32 +1964,14 @@ export default function ProductsPage() {
             </select>
           </div>
 
-          {/* Collection Filter */}
-          <div className="flex items-center gap-2 neu-inset-sm px-3.5 py-2 rounded-2xl border border-border/20">
-            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">Collection</span>
-            <select
-              value={filterCollection}
-              onChange={(e) => setFilterCollection(e.target.value)}
-              className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer font-medium pr-1"
-            >
-              <option value="" className="bg-card text-foreground">All Collections</option>
-              {availableCollections.map((col) => (
-                <option key={col.id || col.slug} value={col.title} className="bg-card text-foreground">
-                  {col.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Clear Filters Button */}
-          {(filterBrand || filterStatus || filterStock || filterForm || filterCollection) && (
+          {(filterBrand || filterStatus || filterStock || filterForm) && (
             <button
               onClick={() => {
                 setFilterBrand('');
                 setFilterStatus('');
                 setFilterStock('');
                 setFilterForm('');
-                setFilterCollection('');
               }}
               className="text-xs font-bold text-red-400 hover:text-red-300 transition duration-150 cursor-pointer ml-1"
             >

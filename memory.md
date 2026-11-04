@@ -5,6 +5,17 @@ This file keeps track of completed features, active architecture, test verificat
 ---
 
 ## 🎯 Current Context & Focus
+*   **2026-11-04 — Removed Collection Search/Filter Option from Product Listing Page**:
+    1. **Overview & Problem Solved**:
+       - On the MPS Product Listing Page ([`perfumebooth-MPS/src/app/(dashboard)/products/page.tsx`](file:///d:/Full-Perfumebooth/perfumebooth-MPS/src/app/\(dashboard\)/products/page.tsx)), removed the redundant "Collection" dropdown filter from the catalog toolbar per user request.
+    2. **Changes Applied**:
+       - Removed `filterCollection` state and removed `matchesCollection` predicate from `filteredProducts`.
+       - Removed `filterCollection` from the page-reset `useEffect` dependencies.
+       - Removed `{/* Collection Filter */}` select dropdown element from the catalog filter bar.
+       - Updated the "Clear All" filters button condition and reset handler to only clear active filters (`Brand`, `Status`, `Stock`, `Form`).
+    3. **Verification**:
+       - Next.js Turbopack production build verified cleanly: 28/28 routes compiled with 0 TypeScript/build errors.
+       - Verified live in browser using Chrome DevTools MCP at `http://localhost:3002/products`: verified toolbar spans (`BRAND`, `STATUS`, `STOCK`, `FORM`), `COLLECTION` is completely gone, and 0 console errors.
 *   **2026-11-03 — Unified Pagination Across Products, Orders, Collections & Inventory Portals**:
     1. **Overview & Problem Solved**:
        - Previously, `/collections` rendered all 625 collections into the DOM simultaneously without pagination, and `/products` rendered all 479 items at once with 493 initial images, causing browser thread lag and high memory consumption.
