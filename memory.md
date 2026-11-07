@@ -6,6 +6,16 @@ This file keeps track of completed features, active architecture, test verificat
 
 ## 🎯 Current Context & Focus
 ## 🎯 Current Context & Focus
+*   **2026-11-07 — Restarted Servers & Generated New Live Cloudflare Tunnel Links**:
+    1. **Overview**:
+       - Overnight server restart cleared previous background tunnels.
+       - Re-launched dev servers: Storefront (port 3000) and Merchant Console MPS (port 3002).
+       - Created and verified new live Cloudflare Tunnels (both \HTTP 200 OK\).
+    2. **Active Live Links**:
+       - **Customer Storefront (Port 3000)**: \https://decreased-rebel-menus-pic.trycloudflare.com       - **Merchant Console MPS (Port 3002)**: \https://soon-command-christmas-egg.trycloudflare.com    3. **Android App Package Updated**:
+       - Synced new storefront tunnel URL to Capacitor config.
+       - Re-compiled fresh APK: [\PerfumeBooth-App.apk\](file:///d:/Full-Perfumebooth/PerfumeBooth-App.apk) (Timestamp: 07-11-2026 13:12:04).
+## 🎯 Current Context & Focus
 *   **2026-11-06 — JWT & Session Cookie Security Audit & Strict SameSite Enforcement**:
     1. **Cookie & LocalStorage Security Audit**:
        - Verified customer JWT storage in \perfumebooth\: Tokens (\customerAccessToken\ and \customerRefreshToken\) are stored exclusively in **HTTP-Only Cookies**.
