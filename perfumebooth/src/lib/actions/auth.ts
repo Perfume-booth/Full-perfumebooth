@@ -16,7 +16,7 @@ async function setAuthCookies(accessToken: string, refreshToken: string) {
     cookieStore.set("customerAccessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       expires: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
     });
@@ -25,7 +25,7 @@ async function setAuthCookies(accessToken: string, refreshToken: string) {
     cookieStore.set("customerRefreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     });
@@ -33,7 +33,7 @@ async function setAuthCookies(accessToken: string, refreshToken: string) {
     cookieStore.set("isLoggedIn", "true", {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });

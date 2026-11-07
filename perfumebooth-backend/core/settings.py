@@ -284,8 +284,8 @@ if not DEBUG:
     # ── Production Security Settings ─────────────────────────────────────────
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax')
-    CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Lax')
+    SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Strict')
+    CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Strict')
 
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -312,8 +312,8 @@ else:
     # ── Local Development Security Settings ──────────────────────────────────
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    CSRF_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SAMESITE = 'Strict'
+    CSRF_COOKIE_SAMESITE = 'Strict'
 
     CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
     CORS_ALLOWED_ORIGINS = config(
@@ -323,7 +323,7 @@ else:
     )
     CSRF_TRUSTED_ORIGINS = config(
         'CSRF_TRUSTED_ORIGINS',
-        default='http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,http://192.168.31.168:3000,http://192.168.31.168:3001',
+        default='http://localhost:3000,http://localhost:3001,http://localhost:3002,http://10.0.2.2:3000,http://nextjs:3000,http://nextjs:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://192.168.31.168:3000,http://192.168.31.168:3001,https://*.trycloudflare.com,https://*.loca.lt,https://*.ngrok-free.app',
         cast=Csv(),
     )
 

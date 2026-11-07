@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Perfume Booth</string>
+    <string name="title_activity_main">Perfume Booth</string>
+    <string name="package_name">com.perfumebooth.store</string>
+    <string name="custom_url_scheme">com.perfumebooth.store</string>
+</resources>

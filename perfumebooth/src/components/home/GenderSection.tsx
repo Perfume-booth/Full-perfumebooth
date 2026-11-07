@@ -8,26 +8,22 @@ const GENDER_CARDS = [
   { id: "unisex", label: "Unisex", tagline: "Boundless. Free. Singular.", desktopImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/FOR-UNISEX-1.webp?v=1784546288", mobileImage: "https://cdn.shopify.com/s/files/1/0718/5786/4996/files/FOR-UNISEX-mobile.jpg_1.jpg?v=1782809006", href: "/unisex", accent: "#8bbfd8", glow: "rgba(139,191,216,0.3)" },
 ] as const;
 
-function GenderCard({ card }: { card: (typeof GENDER_CARDS)[number] }) {
+function GenderCard({ card }: { card: any }) {
   return (
     <div className="group relative">
       <Link href={card.href} className="block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-gold)]" aria-label={`Shop ${card.label} fragrances`}>
         <span className="pointer-events-none absolute -inset-2 -z-10 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" style={{ background: card.glow }} />
         <div className="relative overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.15)] transition-shadow duration-300 group-hover:shadow-xl">
           <div className="relative aspect-[3/5] overflow-hidden md:aspect-square">
-            <picture className="relative block h-full w-full">
-              <source media="(max-width: 767px)" srcSet={card.mobileImage} />
-              <source media="(min-width: 768px)" srcSet={card.desktopImage} />
-              <Image
-                src={card.desktopImage}
-                alt={`${card.label} fragrance collection`}
-                fill
-                sizes="(max-width: 640px) 32vw, (max-width: 1024px) 30vw, 480px"
-                quality={75}
-                loading="lazy"
-                className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-              />
-            </picture>
+            <Image
+              src={card.mobileImage || card.desktopImage}
+              alt={`${card.label} fragrance collection`}
+              fill
+              sizes="(max-width: 640px) 32vw, (max-width: 1024px) 30vw, 480px"
+              quality={75}
+              loading="lazy"
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            />
             <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 md:p-7">
               <p className="mb-2 hidden text-[9px] font-bold uppercase tracking-[0.3em] text-white/90 sm:block">{card.tagline}</p>
               <div className="flex items-center gap-2 text-white">

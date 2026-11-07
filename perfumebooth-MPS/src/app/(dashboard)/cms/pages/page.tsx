@@ -1,9 +1,8 @@
 'use client';
 
-import React from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Sparkles, 
+  
   FileText, 
   Folder, 
   ExternalLink 
@@ -24,7 +23,6 @@ export default function CMSPagesPage() {
             onClick={() => router.push('/cms')}
             className="px-5 py-2.5 font-bold text-xs rounded-2xl flex items-center gap-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-amber-500" />
             <span>Home</span>
           </button>
 

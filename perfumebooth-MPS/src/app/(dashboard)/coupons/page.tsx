@@ -540,7 +540,6 @@ export default function CouponsAndPromotionsPage() {
               : 'neu-btn text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-amber-500" />
           <span>Automated Promotions & Flash Sales</span>
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 ml-1">
             {promoMetrics.total_promotions}
@@ -815,9 +814,6 @@ export default function CouponsAndPromotionsPage() {
           {/* Promotion KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-card neu-extruded border border-border/10 p-6 rounded-3xl flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl neu-inset-sm flex items-center justify-center text-primary">
-                <Sparkles className="w-6 h-6" />
-              </div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Campaigns</p>
                 <h3 className="text-2xl font-extrabold text-foreground mt-0.5">{promoMetrics.total_promotions}</h3>
@@ -897,7 +893,6 @@ export default function CouponsAndPromotionsPage() {
               </div>
             ) : promotions.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground space-y-3">
-                <Sparkles className="w-12 h-12 mx-auto stroke-[1.2] opacity-40 text-amber-500" />
                 <p className="font-bold text-base text-foreground">No promotions found</p>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto font-medium">
                   Launch automated storewide sales, brand deals, or flash sale campaigns.
@@ -1512,9 +1507,6 @@ export default function CouponsAndPromotionsPage() {
           <div className="bg-card neu-extruded border border-border/10 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4.5 border-b border-border/30 flex items-center justify-between bg-muted/20">
               <h2 className="text-lg font-extrabold text-foreground flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl neu-inset-sm flex items-center justify-center text-amber-500">
-                  <Sparkles className="w-4 h-4" />
-                </div>
                 {editingPromo ? 'Edit Promotion' : 'Create Automated Promotion'}
               </h2>
               <button

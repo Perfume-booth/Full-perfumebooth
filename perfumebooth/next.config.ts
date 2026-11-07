@@ -10,6 +10,11 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   output: 'standalone',
   allowedDevOrigins: [
+    '*.trycloudflare.com',
+    '*.loca.lt',
+    '*.ngrok-free.app',
+    '10.0.2.2',
+    '10.0.2.2:3000',
     '192.168.31.168',
     '192.168.31.168:3000',
     'localhost',
@@ -91,7 +96,7 @@ const nextConfig: NextConfig = {
       },
     ],
     qualities: [75, 85],
-    unoptimized: process.env.NODE_ENV === 'development',
+    unoptimized: false,
   },
   async rewrites() {
     const isDocker = process.env.WATCHPACK_POLLING === "true";

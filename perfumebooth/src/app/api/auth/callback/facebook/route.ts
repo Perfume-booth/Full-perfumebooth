@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     cookieStore.set("customerAccessToken", authData.access, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       expires: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
     });
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     cookieStore.set("customerRefreshToken", authData.refresh, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     });

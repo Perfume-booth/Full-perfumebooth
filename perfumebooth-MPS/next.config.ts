@@ -4,10 +4,14 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   skipTrailingSlashRedirect: true,
   allowedDevOrigins: [
+    '*.trycloudflare.com',
+    '*.loca.lt',
+    '*.ngrok-free.app',
     '192.168.31.168',
     '192.168.31.168:3001',
     'localhost',
-    'localhost:3001'
+    'localhost:3001',
+    'localhost:3002'
   ],
   images: {
     remotePatterns: [

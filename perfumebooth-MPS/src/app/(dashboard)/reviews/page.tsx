@@ -9,12 +9,6 @@ import {
   Loader2, 
   CheckCircle, 
   EyeOff, 
-  Eye, 
-  MessageSquare, 
-  ShieldCheck, 
-  Filter,
-  ExternalLink,
-  Sparkles
 } from 'lucide-react';
 import { apiFetch, apiDownload } from '@/lib/api';
 
@@ -157,7 +151,6 @@ export default function ReviewsManagementPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card neu-extruded p-6 rounded-3xl border border-border/10">
         <div>
           <div className="flex items-center gap-2 text-primary font-extrabold text-xs uppercase tracking-wider mb-1">
-            <Sparkles className="w-4 h-4 text-amber-500" />
             <span>Product Ratings & Feedback Studio</span>
           </div>
           <h1 className="text-2xl font-black text-foreground tracking-tight">Customer Reviews Management</h1>

@@ -5,6 +5,90 @@ This file keeps track of completed features, active architecture, test verificat
 ---
 
 ## 🎯 Current Context & Focus
+## 🎯 Current Context & Focus
+*   **2026-11-06 — JWT & Session Cookie Security Audit & Strict SameSite Enforcement**:
+    1. **Cookie & LocalStorage Security Audit**:
+       - Verified customer JWT storage in \perfumebooth\: Tokens (\customerAccessToken\ and \customerRefreshToken\) are stored exclusively in **HTTP-Only Cookies**.
+       - Confirmed that **NO JWT or session tokens are stored in \localStorage\** across either storefront or MPS, protecting the application from client-side XSS token theft.
+    2. **SameSite=Strict Enforcement**:
+       - In \perfumebooth/src/lib/actions/auth.ts\: Upgraded \customerAccessToken\, \customerRefreshToken\, and \isLoggedIn\ cookies from \sameSite: 'lax'\ to \sameSite: 'strict'\.
+       - In \perfumebooth/src/app/api/auth/callback/facebook/route.ts\: Upgraded OAuth callback tokens to \sameSite: 'strict'\.
+       - In \perfumebooth-backend/core/settings.py\: Upgraded \SESSION_COOKIE_SAMESITE\ and \CSRF_COOKIE_SAMESITE\ to 'Strict'\ for both production and development environments.
+       - Verified Django settings via \django.setup()\: Confirmed \SESSION_COOKIE_HTTPONLY = True\ and \SESSION_COOKIE_SAMESITE = Strict\.
+       - Full TypeScript verification compiled with 0 errors across both \perfumebooth\ and \perfumebooth-MPS\.
+## 🎯 Current Context & Focus
+*   **2026-11-06 — Fresh Physical Phone APK Built with Active Live Tunnel**:
+    1. **Overview & Root Cause**:
+       - User encountered 'Webpage not available' on their physical phone after installing the previous APK because the old quick tunnel from yesterday had expired overnight.
+       - Re-synced and generated a brand-new build of [\PerfumeBooth-App.apk\](file:///d:/Full-Perfumebooth/PerfumeBooth-App.apk) pointing to the active tunnel: \https://exhibitions-sensitivity-drainage-fell.trycloudflare.com\.
+       - Verified host port 3000 also accepts connections over local Wi-Fi (\http://192.168.31.168:3000\).
+    2. **Verification**:
+       - \gradlew assembleDebug\ completed in 12s.
+       - Fresh APK created at \D:\Full-Perfumebooth\PerfumeBooth-App.apk\ (Timestamp: 06-11-2026 11:24:40).
+## 🎯 Current Context & Focus
+*   **2026-11-06 — Resolved Net Name Not Resolved & Restored Flawless Android Studio Rendering**:
+    1. **Issue Identified from User Screenshot**:
+       - The emulator displayed et::ERR_NAME_NOT_RESOLVED\ for yesterday's temporary quick tunnel URL (\https://mid-powered-weighted-incentives.trycloudflare.com\) after the overnight PC reboot.
+       - Terminal error in Android Studio showed \[error] android platform has not been added yet\ because command was run from \perfumebooth/android\ instead of \perfumebooth\.
+    2. **Root Cause Fixes**:
+       - Re-pointed \capacitor.config.ts\ default URL back to \http://10.0.2.2:3000\ so the Android Studio emulator connects directly via loopback without requiring internet tunnels or expiring links.
+       - Started Next.js dev server on port 3000 (verified ready in 5.6s).
+       - Fixed GenderSection \<picture><source>\ tags that bypassed Next.js image proxy on mobile screens; converted to native \<Image>\ components so all \FOR MEN\, \FOR WOMEN\, and \FOR EVERYONE\ images route through \/_next/image\.
+       - Re-compiled and installed debug build onto active emulator: \BUILD SUCCESSFUL in 23s\.
+    3. **Visual Verification**:
+       - Verified live on Android Studio emulator screen: Header, categories, Gender cards (Men, Women, Unisex), and floating widgets load and render with 100% fidelity.
+## 🎯 Current Context & Focus
+*   **2026-11-05 — Android APK Generation & Physical Phone Installation Ready**:
+    1. **Overview**:
+       - Built production-ready debug APK for physical Android phone testing.
+       - Configured Capacitor to connect to the live tunnel (working across both Wi-Fi and mobile 4G/5G).
+    2. **Build Results**:
+       - Gradle compilation gradlew assembleDebug succeeded in 1m 30s (183 actionable tasks).
+       - Standalone installable APK created: [PerfumeBooth-App.apk](file:///d:/Full-Perfumebooth/PerfumeBooth-App.apk) (18.2 MB).
+    3. **Installation Methods Supported**:
+       - Direct APK install (via WhatsApp Web, Google Drive, or USB file transfer).
+       - USB Debugging 1-click Run in Android Studio.
+       - Terminal install via \db install PerfumeBooth-App.apk\.
+*   **2026-11-05 — Root Cause Resolution for Mobile Image Loading in Android Studio / Capacitor**:
+    1. **Overview & Root Cause Diagnosis**:
+       - User reported that product images were not displaying when running the Capacitor storefront in the Android Studio emulator (`Medium Phone API 37.0`).
+       - Diagnosed via ADB logcat and Chrome execution:
+         * **Root Cause 1 (`unoptimized: true`)**: In `perfumebooth/next.config.ts`, `unoptimized` was set to `process.env.NODE_ENV === 'development'`. This bypassed Next.js's local `/_next/image` proxy, emitting direct `<img src="https://pub-*.r2.dev/products/..." />` URLs.
+         * **Root Cause 2 (Android Studio IPv6 Routing Drop)**: Cloudflare R2 (`*.r2.dev`) advertises both IPv6 (AAAA) and IPv4 (A) records. The Android Studio QEMU virtual router (`10.0.2.2`) has a non-functional IPv6 gateway (100% packet loss). Chromium dual-stack socket attempts failed with `ERR_SSL_PROTOCOL_ERROR (net_error -107)`, `ERR_SSL_VERSION_OR_CIPHER_MISMATCH (net_error -113)`, and `ERR_CONNECTION_RESET (net_error -101)`.
+         * **Root Cause 3 (Android WebView Mixed Content)**: Cleartext HTTP (`http://10.0.2.2:3000`) loading external HTTPS subresources triggered WebView mixed-content restrictions without explicit allowances.
+    2. **Architectural Fixes Applied**:
+       - In [`perfumebooth/next.config.ts`](file:///d:/Full-Perfumebooth/perfumebooth/next.config.ts): Changed `unoptimized` to `false`. Next.js on the host machine downloads external R2 images via working host IPv4, processes them with `sharp`, and serves them locally via `/_next/image?...` from the same origin (`http://10.0.2.2:3000`), completely bypassing emulator IPv6 failure.
+       - In [`perfumebooth/android/app/src/main/java/com/perfumebooth/store/MainActivity.java`](file:///d:/Full-Perfumebooth/perfumebooth/android/app/src/main/java/com/perfumebooth/store/MainActivity.java): Configured `WebSettings.MIXED_CONTENT_ALWAYS_ALLOW`, `domStorageEnabled(true)`, and `databaseEnabled(true)` in `onStart()`.
+       - Created [`perfumebooth/android/app/src/main/res/xml/network_security_config.xml`](file:///d:/Full-Perfumebooth/perfumebooth/android/app/src/main/res/xml/network_security_config.xml): Defined cleartext permissions and system/user trust anchors for `10.0.2.2`, `localhost`, `127.0.0.1`, and local dev IPs.
+       - In [`perfumebooth/android/app/src/main/AndroidManifest.xml`](file:///d:/Full-Perfumebooth/perfumebooth/android/app/src/main/AndroidManifest.xml): Linked `android:networkSecurityConfig="@xml/network_security_config"`.
+    3. **Verification**:
+       - Executed `npm --prefix perfumebooth run cap:sync` with 0 errors.
+       - Executed Gradle compilation `gradlew compileDebugJavaWithJavac` with Android Studio JDK: `BUILD SUCCESSFUL in 24s` (81 actionable tasks).
+*   **2026-11-04 — Native Mobile App Configuration with Capacitor for Storefront (`perfumebooth`)**:
+    1. **Overview**:
+       - Initialized and configured **Capacitor** native runtime in `perfumebooth` to package the customer storefront into a high-performance native Android (and iOS) mobile app.
+    2. **Architectural Implementation**:
+       - Installed `@capacitor/core`, `@capacitor/cli`, `@capacitor/android`, `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/status-bar`.
+       - Created [`capacitor.config.ts`](file:///d:/Full-Perfumebooth/perfumebooth/capacitor.config.ts) configured for remote e-commerce server mode (`appId: com.perfumebooth.store`, dark luxury splash screen, and status bar color `#0a0a0a`).
+       - Generated complete native Android project in [`perfumebooth/android`](file:///d:/Full-Perfumebooth/perfumebooth/android) with Gradle wrappers, `AndroidManifest.xml` internet permissions, and assets.
+       - Built [`CapacitorBridge.tsx`](file:///d:/Full-Perfumebooth/perfumebooth/src/components/layout/CapacitorBridge.tsx) loaded via `ClientSideHydrators` with zero SSR overhead. Automatically handles native status bar themes and hardware Android back button navigation.
+       - Added handy npm scripts: `npm run cap:sync` and `npm run cap:open:android`.
+    3. **Verification**:
+       - `npx cap sync` executed successfully (0.133s).
+       - Full TypeScript type-checking (`npx tsc --noEmit`) compiled with 0 errors.
+       - Configured active testing URL to `http://10.0.2.2:3000` (Android emulator loopback bridge) and `android:usesCleartextTraffic="true"` in AndroidManifest.xml. Synced to Android assets for direct local testing.
+*   **2026-11-04 — Tunnel Readiness Configuration for Free Team Testing**:
+    1. **Overview**:
+       - Configured project to support instant, zero-cost team testing via secure tunnels (Cloudflare Tunnel, localtunnel, ngrok) without requiring a remote VPS.
+    2. **Network & Security Enhancements**:
+       - In [`perfumebooth-MPS/next.config.ts`](file:///d:/Full-Perfumebooth/perfumebooth-MPS/next.config.ts) and [`perfumebooth/next.config.ts`](file:///d:/Full-Perfumebooth/perfumebooth/next.config.ts), added tunnel wildcards (`*.trycloudflare.com`, `*.loca.lt`, `*.ngrok-free.app`) to `allowedDevOrigins` to prevent origin blocking during remote testing.
+       - In [`perfumebooth-backend/core/settings.py`](file:///d:/Full-Perfumebooth/perfumebooth-backend/core/settings.py), added tunnel domains to `CSRF_TRUSTED_ORIGINS` to allow seamless logins, session cookies, and POST mutations from remote tester browsers.
+       - Verified that Next.js built-in API proxy rewrites (`/api/*` and `/media/*` $\to$ `http://127.0.0.1:8000`) keep all remote client traffic on the same origin, eliminating Mixed Content and CORS failures.
+    3. **Verification & Active Live Tunnels**:
+       - Restarted `perfumebooth_django` Docker container; verified clean 200/401 API responses on port 8000.
+       - Launched stable Cloudflare Tunnels via `cloudflared`:
+         * **Customer Storefront (Port 3000)**: `https://mid-powered-weighted-incentives.trycloudflare.com` (Verified `HTTP 200 OK`).
+         * **Merchant Console MPS (Port 3002)**: `https://scanner-flat-mall-shine.trycloudflare.com` (Verified `HTTP 200 OK`).
 *   **2026-11-04 — Removed Collection Search/Filter Option from Product Listing Page**:
     1. **Overview & Problem Solved**:
        - On the MPS Product Listing Page ([`perfumebooth-MPS/src/app/(dashboard)/products/page.tsx`](file:///d:/Full-Perfumebooth/perfumebooth-MPS/src/app/\(dashboard\)/products/page.tsx)), removed the redundant "Collection" dropdown filter from the catalog toolbar per user request.

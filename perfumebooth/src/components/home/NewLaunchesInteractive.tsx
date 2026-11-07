@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight,} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Product } from "@/lib/backend/types";
 

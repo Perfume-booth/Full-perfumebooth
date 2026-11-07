@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Upload, X, Star, Image as ImageIcon, Sparkles, Check } from 'lucide-react';
+import { Upload, X, Star, Image as ImageIcon,} from 'lucide-react';
 
 interface BatchImageDropzoneProps {
   onFeaturedFileChange: (file: File | null) => void;

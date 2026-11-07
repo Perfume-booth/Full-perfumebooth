@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import CSVEditorNav from '@/components/csv/CSVEditorNav';
 import { useCSVEditorStore } from '@/lib/csv/changeSetStore';
 import { parseCatalogCsv } from '@/lib/csv/csvParser';
-import { FileUp, FileSpreadsheet, Sparkles, CheckCircle2, ArrowRight, ShieldAlert } from 'lucide-react';
+import { FileUp, FileSpreadsheet, CheckCircle2, ArrowRight, ShieldAlert } from 'lucide-react';
 
 const SAMPLE_CATALOG_CSV = `Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Variant SKU,Variant Price,Variant Compare At Price,Variant Inventory Qty,Image Src,Status
 noir-oud-100ml,Noir Oud Eau de Parfum,"Luxurious Oud fragrance with notes of saffron and amber.",PerfumeBooth,Eau de Parfum,"Attar, Oud, Luxury, Men",true,Size,100ml,NOIR-OUD-100,2499.00,2999.00,45,https://images.unsplash.com/photo-1541643600914-78b084683601,active
@@ -89,7 +89,6 @@ export default function CSVImportPage() {
               onClick={handleLoadSample}
               className="px-4 py-2.5 neu-btn text-foreground text-xs font-bold rounded-2xl hover:text-primary flex items-center gap-2 cursor-pointer transition-all"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               Load Sample Perfume Catalog
             </button>
           </div>
